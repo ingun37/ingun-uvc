@@ -22,7 +22,10 @@ and avoid nullable stored properties where practical.
   capture output changes and start/stop use CaptureResource's serial queue.
   Done waits for finalization, then offers NSSavePanel with Movies and a timestamp
   filename. Cancel/save failure retains the movie for retry; success returns to preview.
-  Recording is video-only. Live recording/save still needs hardware validation.
+  Recording includes the selected audio input. Preview offers an audio-source picker,
+  preferring combined/linked capture-device audio; recording requests microphone
+  permission and rejects missing audio connections. Live recording/save still needs
+  hardware validation.
 - Idle system and display sleep prevention during preview. This does not
   override explicit Sleep commands or laptop lid closure.
 - IOKit USB vendor/product/location and interface class/subclass lookup when
@@ -52,7 +55,7 @@ and avoid nullable stored properties where practical.
 - `streamer/Untitled Project.xcodeproj/project.pbxproj`: synchronized source
   folder, MyApp scheme, macOS 27 target, main-actor default isolation. Camera
   sandbox access and camera usage description exist. User-selected file access
-  is read-write for saving recordings. No microphone permission/capability is configured.
+  is read-write for saving recordings. Microphone usage description and audio-input sandbox capability are configured.
 
 ## Validation and known limits
 

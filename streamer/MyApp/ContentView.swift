@@ -21,11 +21,39 @@ struct ContentView: View {
                     }
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
-                    Button("Record", systemImage: "record.circle") { model.record(device, resource: resource) }
+                    Button("Record", systemImage: "record.circle") {
+                        Task { await model.record(device, resource: resource) }
+                    }
+                    .disabled(model.preparingRecording || model.audioDevices.isEmpty)
                 }
-                DeviceDetail(device: device, resource: resource)
+            case .record:
+                Text("Record").font(.title2.bold())
+            }
+            // Keep the same preview layer connected while changing capture steps.
+            // Detaching/recreating it during movie startup changes session connections.
+            if let (_, resource) = model.screen.capture {
+                CapturePreview(session: resource.session)
+                    .frame(width: 400, height: 225)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Live video preview")
+            }
+            switch model.screen {
+            case let .detail(device, _):
+                if model.audioDevices.isEmpty {
+                    Text("No audio sources found. Connect an audio device and reopen this video source.").foregroundStyle(.orange)
+                } else {
+                    Picker("Audio source", selection: $model.selectedAudioID) {
+                        ForEach(model.audioDevices, id: \.uniqueID) { audio in
+                            Text(audio.localizedName).tag(audio.uniqueID)
+                        }
+                    }
+                    .disabled(model.preparingRecording || device.hasMediaType(.audio))
+                }
+                DeviceDetail(device: device)
             case let .record(device, recording):
                 RecordView(recording: recording) { model.screen = .detail(device, recording.resource) }
+            default:
+                EmptyView()
             }
             if !model.streamMessage.isEmpty {
                 Label(model.streamMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
@@ -110,7 +138,6 @@ private struct RecordView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text("Record").font(.title2.bold())
                 Spacer()
                 if recording.phase == .failed {
                     Button("Back to preview", action: returnToPreview)
@@ -122,11 +149,8 @@ private struct RecordView: View {
                     .disabled(recording.phase == .starting || recording.phase == .finishing)
                 }
             }
-            CapturePreview(session: recording.resource.session)
-                .frame(width: 400, height: 225)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .accessibilityLabel("Live recording preview")
             Text(recording.phase.label).font(.headline)
+            Text("Audio: \(recording.audioDevice.localizedName)").foregroundStyle(.secondary)
             Text("Temporary file").foregroundStyle(.secondary)
             Text(recording.url.path).textSelection(.enabled)
             if !recording.message.isEmpty {
@@ -174,7 +198,6 @@ private struct RecordView: View {
 
 private struct DeviceDetail: View {
     let device: AVCaptureDevice
-    let resource: CaptureResource
     private var rows: [DetailRow] {
         let format = device.activeFormat
         let description = format.formatDescription
@@ -197,10 +220,6 @@ private struct DeviceDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                CapturePreview(session: resource.session)
-                    .frame(width: 400, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Live video preview")
                 GroupBox("Video source") { details(rows) }
                 GroupBox("USB descriptors") {
                     let usb = USBDetails.rows(for: device)
@@ -243,7 +262,9 @@ private struct CapturePreview: NSViewRepresentable {
     }
 
     func updateNSView(_ view: PreviewView, context: Context) {
-        view.previewLayer.session = session
+        if view.previewLayer.session !== session {
+            view.previewLayer.session = session
+        }
     }
 
     static func dismantleNSView(_ view: PreviewView, coordinator: ()) {
