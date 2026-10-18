@@ -2,9 +2,26 @@ import AVFoundation
 import AppKit
 import Observation
 
+/// Balances the activity token automatically when the preview owner is released.
+private final class PreviewActivity {
+    private let token: NSObjectProtocol
+
+    init() {
+        token = ProcessInfo.processInfo.beginActivity(
+            options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled],
+            reason: "Displaying a live video capture preview"
+        )
+    }
+
+    deinit {
+        ProcessInfo.processInfo.endActivity(token)
+    }
+}
+
 /// Owns the session for exactly as long as the detail scene needs it.
 final class CaptureResource: @unchecked Sendable {
     let session: AVCaptureSession
+    private let previewActivity: PreviewActivity
     private let queue = DispatchQueue(label: "dev.streamer.capture")
 
     init(device: AVCaptureDevice) throws {
@@ -18,6 +35,7 @@ final class CaptureResource: @unchecked Sendable {
         session.addInput(input)
         session.commitConfiguration()
         self.session = session
+        previewActivity = PreviewActivity()
     }
 
     func start() {
