@@ -17,6 +17,12 @@ and avoid nullable stored properties where practical.
 - Camera permission instructions, capture errors/interruption messages, and
   selected-device disconnection handling.
 - Back returns to discovery and releases capture resources.
+- Record opens a separate view with live preview and a temporary .mov path.
+  MovieRecording owns the temporary directory and AVCaptureMovieFileOutput delegate;
+  capture output changes and start/stop use CaptureResource's serial queue.
+  Done waits for finalization, then offers NSSavePanel with Movies and a timestamp
+  filename. Cancel/save failure retains the movie for retry; success returns to preview.
+  Recording is video-only. Live recording/save still needs hardware validation.
 - Idle system and display sleep prevention during preview. This does not
   override explicit Sleep commands or laptop lid closure.
 - IOKit USB vendor/product/location and interface class/subclass lookup when
@@ -46,7 +52,7 @@ and avoid nullable stored properties where practical.
 - `streamer/Untitled Project.xcodeproj/project.pbxproj`: synchronized source
   folder, MyApp scheme, macOS 27 target, main-actor default isolation. Camera
   sandbox access and camera usage description exist. User-selected file access
-  is currently read-only. No microphone permission/capability is configured.
+  is read-write for saving recordings. No microphone permission/capability is configured.
 
 ## Validation and known limits
 

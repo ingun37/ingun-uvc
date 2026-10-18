@@ -38,6 +38,34 @@ final class CaptureResource: @unchecked Sendable {
         previewActivity = PreviewActivity()
     }
 
+    func record(to url: URL, output: AVCaptureMovieFileOutput, delegate: MovieRecording) {
+        let session = session
+        queue.async {
+            session.beginConfiguration()
+            let supported = session.canAddOutput(output)
+            if supported { session.addOutput(output) }
+            session.commitConfiguration()
+            guard supported, output.connection(with: .video) != nil else {
+                Task { @MainActor in delegate.failed("This source does not support movie recording.") }
+                return
+            }
+            output.startRecording(to: url, recordingDelegate: delegate)
+        }
+    }
+
+    func stopRecording(_ output: AVCaptureMovieFileOutput) {
+        queue.async { output.stopRecording() }
+    }
+
+    func removeRecordingOutput(_ output: AVCaptureMovieFileOutput) {
+        let session = session
+        queue.async {
+            session.beginConfiguration()
+            if session.outputs.contains(where: { $0 === output }) { session.removeOutput(output) }
+            session.commitConfiguration()
+        }
+    }
+
     func start() {
         let session = session
         queue.async { session.startRunning() }
@@ -65,6 +93,15 @@ final class CaptureModel {
         case devices
         case opening(String)
         case detail(AVCaptureDevice, CaptureResource)
+        case record(AVCaptureDevice, MovieRecording)
+
+        var capture: (AVCaptureDevice, CaptureResource)? {
+            switch self {
+            case let .detail(device, resource): (device, resource)
+            case let .record(device, recording): (device, recording.resource)
+            default: nil
+            }
+        }
     }
 
     var devices: [AVCaptureDevice] = []
@@ -107,22 +144,37 @@ final class CaptureModel {
         }
     }
 
+    func record(_ device: AVCaptureDevice, resource: CaptureResource) {
+        do {
+            let recording = try MovieRecording(resource: resource)
+            screen = .record(device, recording)
+            recording.start()
+        } catch {
+            streamMessage = error.localizedDescription
+        }
+    }
+
     func back() {
         screen = .devices
         streamMessage = ""
     }
 
     func disconnected(_ notification: Notification) {
-        guard case let .detail(device, _) = screen,
+        guard let (device, _) = screen.capture,
               let disconnected = notification.object as? AVCaptureDevice,
               disconnected.uniqueID == device.uniqueID else { return }
-        back()
+        if case let .record(_, recording) = screen {
+            recording.finish()
+            streamMessage = "\(device.localizedName) was disconnected. Save the recording before returning to preview."
+        } else {
+            back()
+        }
         devices.removeAll { $0.uniqueID == device.uniqueID }
         message = "\(device.localizedName) was disconnected. Reconnect it and refresh the list."
     }
 
     func sessionFailed(_ notification: Notification) {
-        guard case let .detail(_, resource) = screen,
+        guard let (_, resource) = screen.capture,
               let session = notification.object as? AVCaptureSession,
               session === resource.session else { return }
         streamMessage = (notification.userInfo?[AVCaptureSessionErrorKey] as? Error)?.localizedDescription

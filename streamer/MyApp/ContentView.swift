@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import AppKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var model = CaptureModel()
@@ -20,11 +21,14 @@ struct ContentView: View {
                     }
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
+                    Button("Record", systemImage: "record.circle") { model.record(device, resource: resource) }
                 }
                 DeviceDetail(device: device, resource: resource)
-                if !model.streamMessage.isEmpty {
-                    Label(model.streamMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-                }
+            case let .record(device, recording):
+                RecordView(recording: recording) { model.screen = .detail(device, recording.resource) }
+            }
+            if !model.streamMessage.isEmpty {
+                Label(model.streamMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
         }
         .padding(24)
@@ -33,13 +37,13 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { model.disconnected($0) }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.runtimeErrorNotification)) { model.sessionFailed($0) }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.wasInterruptedNotification)) { notification in
-            if case let .detail(_, resource) = model.screen,
+            if let (_, resource) = model.screen.capture,
                let session = notification.object as? AVCaptureSession, session === resource.session {
                 model.streamMessage = "Capture was interrupted. The preview will resume when the device becomes available."
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.interruptionEndedNotification)) { notification in
-            if case let .detail(_, resource) = model.screen,
+            if let (_, resource) = model.screen.capture,
                let session = notification.object as? AVCaptureSession, session === resource.session {
                 model.streamMessage = ""
             }
@@ -93,6 +97,77 @@ struct ContentView: View {
             if !model.message.isEmpty {
                 Label(model.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
+        }
+    }
+}
+
+
+private struct RecordView: View {
+    let recording: MovieRecording
+    let returnToPreview: () -> Void
+    @State private var saveMessage = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Record").font(.title2.bold())
+                Spacer()
+                if recording.phase == .failed {
+                    Button("Back to preview", action: returnToPreview)
+                } else {
+                    Button("Done") {
+                        if recording.phase == .ready { save() }
+                        else { recording.finish() }
+                    }
+                    .disabled(recording.phase == .starting || recording.phase == .finishing)
+                }
+            }
+            CapturePreview(session: recording.resource.session)
+                .frame(width: 400, height: 225)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("Live recording preview")
+            Text(recording.phase.label).font(.headline)
+            Text("Temporary file").foregroundStyle(.secondary)
+            Text(recording.url.path).textSelection(.enabled)
+            if !recording.message.isEmpty {
+                Label(recording.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            if !saveMessage.isEmpty {
+                Label(saveMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+            Spacer()
+        }
+        .onDisappear { recording.finish() }
+        .onChange(of: recording.phase) { _, phase in
+            if phase == .ready && recording.saveRequested { save() }
+        }
+    }
+
+    private func save() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.quickTimeMovie]
+        panel.directoryURL = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        panel.nameFieldStringValue = formatter.string(from: Date()) + ".mov"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let access = destination.startAccessingSecurityScopedResource()
+        defer { if access { destination.stopAccessingSecurityScopedResource() } }
+        do {
+            // Copy first so a failed save leaves the temporary recording available for retry.
+            if FileManager.default.fileExists(atPath: destination.path) {
+                let staging = recording.url.deletingLastPathComponent().appendingPathComponent("Save.mov")
+                defer { try? FileManager.default.removeItem(at: staging) }
+                try FileManager.default.copyItem(at: recording.url, to: staging)
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: staging)
+            } else {
+                try FileManager.default.copyItem(at: recording.url, to: destination)
+            }
+            returnToPreview()
+        } catch {
+            saveMessage = "Could not save the recording: \(error.localizedDescription). The temporary file is available above; click Done to retry."
         }
     }
 }
