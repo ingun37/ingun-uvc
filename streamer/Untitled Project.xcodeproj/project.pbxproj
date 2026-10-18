@@ -253,6 +253,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Inspect capture cards and display their live video.";
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -290,6 +292,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_RESOURCE_ACCESS_CAMERA = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Inspect capture cards and display their live video.";
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
