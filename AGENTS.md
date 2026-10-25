@@ -4,9 +4,7 @@ This repository contains multiple projects:
 
 - `streamer/`: native macOS SwiftUI capture-card inspector. Before working on this
   project, read and follow [streamer/AGENTS.md](streamer/AGENTS.md).
-- `time_mapper/`: a separate project. Keep its guidance and changes scoped to that
-  directory.
+- `time_mapper/`: native macOS SwiftUI App. Before working on this
+  project, read and follow [time_mapper/AGENTS.md](time_mapper/AGENTS.md).
 
 Project-specific instructions apply only to their respective project directories.
-Paths in `streamer/AGENTS.md` are relative to the repository root unless stated
-otherwise.
