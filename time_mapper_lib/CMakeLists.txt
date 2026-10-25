@@ -11,5 +11,9 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 
 find_package(OpenCV REQUIRED)
 
+find_package(OpenMP REQUIRED)
+
+find_package(ncnn REQUIRED)
+
 target_link_libraries(time_mapper_lib PUBLIC PkgConfig::FFMPEG ${OpenCV_LIBS})
 target_include_directories(time_mapper_lib PUBLIC ${OpenCV_INCLUDE_DIRS})
