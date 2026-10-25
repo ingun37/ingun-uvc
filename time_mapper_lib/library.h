@@ -1,0 +1,6 @@
+#ifndef TIME_MAPPER_LIB_LIBRARY_H
+#define TIME_MAPPER_LIB_LIBRARY_H
+
+void hello();
+
+#endif // TIME_MAPPER_LIB_LIBRARY_H
