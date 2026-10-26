@@ -1,10 +1,13 @@
 #include "library.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -21,8 +24,10 @@ void near(double actual, double expected) {
 
 void exercise_video(const char* filename, double duration) {
     const auto path = std::filesystem::path(TEST_DATA_DIR) / filename;
+    const auto output_path = std::filesystem::path(TEST_OUTPUT_DIR) /
+                             (std::string(filename) + ".mapping.json");
     int calls = 0;
-    auto result = map_gametime_to_videotime(path, {75, 8, 100, 58},
+    auto result = map_gametime_to_videotime(path, {75, 8, 100, 58}, output_path,
         [&](const std::vector<std::uint8_t>& rgb, int width, int height)
             -> std::optional<int> {
             if (width != 100 || height != 58 || rgb.size() != 17400)
@@ -39,15 +44,31 @@ void exercise_video(const char* filename, double duration) {
     const int expected_samples = static_cast<int>(std::ceil(duration / 0.5));
     if (calls != expected_samples)
         throw std::runtime_error("Video was not sampled every 0.5 seconds");
-    const auto& forty_two = result.at(42);
-    if (forty_two.size() != 2) throw std::runtime_error("Gap was incorrectly merged");
-    near(forty_two[0].start_seconds, 0.0);
-    near(forty_two[0].end_seconds, 1.5);
-    near(forty_two[1].start_seconds, 3.0);
-    near(forty_two[1].end_seconds, 3.5);
-    const auto& forty_one = result.at(41);
-    near(forty_one[0].start_seconds, 2.0);
-    near(forty_one.back().end_seconds, duration);
+    if (result.size() != 4 || result[0].game_second != 42 ||
+        result[1].game_second != 41 || result[2].game_second != 42 ||
+        result[3].game_second != 41)
+        throw std::runtime_error("Clock ranges lost video order or a gap");
+    near(result[0].start_seconds, 0.0);
+    near(result[0].end_seconds, 1.5);
+    near(result[1].start_seconds, 2.0);
+    near(result[1].end_seconds, 3.0);
+    near(result[2].start_seconds, 3.0);
+    near(result[2].end_seconds, 3.5);
+    near(result[3].start_seconds, 3.5);
+    near(result[3].end_seconds, duration);
+
+    std::ifstream input(output_path);
+    if (!input) throw std::runtime_error("Mapping JSON was not created");
+    const auto json = nlohmann::json::parse(input);
+    if (!json.is_array() || json.size() != result.size())
+        throw std::runtime_error("Mapping JSON is not a chronological list");
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        const auto& entry = json.at(index);
+        if (entry.at("game_second").get<int>() != result[index].game_second)
+            throw std::runtime_error("Mapping JSON lost a repeated game second");
+        near(entry.at("start_seconds").get<double>(), result[index].start_seconds);
+        near(entry.at("end_seconds").get<double>(), result[index].end_seconds);
+    }
 }
 
 } // namespace
@@ -59,6 +80,7 @@ int main() {
         map_gametime_to_videotime(
             std::filesystem::path(TEST_DATA_DIR) / "minutes-seconds.mp4",
             {240, 0, 10, 10},
+            std::filesystem::path(TEST_OUTPUT_DIR) / "invalid-region.json",
             [](const auto&, int, int) -> std::optional<int> { return 0; });
         throw std::runtime_error("Out of bounds region was accepted");
     } catch (const std::invalid_argument&) {
@@ -66,20 +88,20 @@ int main() {
     if (std::getenv("TIME_MAPPER_LIVE_OCR")) {
         for (const char* filename : {"minutes-seconds.mp4", "seconds-fractional.mp4"}) {
             const auto mapping = map_gametime_to_videotime(
-                std::filesystem::path(TEST_DATA_DIR) / filename, {0, 0, 242, 80});
+                std::filesystem::path(TEST_DATA_DIR) / filename, {0, 0, 242, 80},
+                std::filesystem::path(TEST_OUTPUT_DIR) /
+                    (std::string(filename) + ".live.mapping.json"));
             if (mapping.empty()) throw std::runtime_error("Live OCR found no game clocks");
-            if (std::string(filename) == "minutes-seconds.mp4") {
-                near(mapping.at(440).at(0).start_seconds, 2.0); // 7:20
-                near(mapping.at(440).at(0).end_seconds, 3.0);
-            } else {
-                near(mapping.at(22).at(0).start_seconds, 1.5); // :22.x
-                near(mapping.at(22).at(0).end_seconds, 2.5);
-            }
+            const int expected_second = std::string(filename) == "minutes-seconds.mp4" ? 440 : 22;
+            const auto found = std::find_if(mapping.begin(), mapping.end(),
+                [&](const GameTimeEntry& entry) { return entry.game_second == expected_second; });
+            if (found == mapping.end()) throw std::runtime_error("Expected clock was not recognized");
+            near(found->start_seconds, expected_second == 440 ? 2.0 : 1.5);
+            near(found->end_seconds, expected_second == 440 ? 3.0 : 2.5);
             std::cout << filename << ": " << mapping.size() << " clock seconds\n";
-            for (const auto& [second, ranges] : mapping)
-                for (const auto& range : ranges)
-                    std::cout << "  " << second << " -> [" << range.start_seconds
-                              << ", " << range.end_seconds << ")\n";
+            for (const auto& entry : mapping)
+                std::cout << "  " << entry.game_second << " -> ["
+                          << entry.start_seconds << ", " << entry.end_seconds << ")\n";
         }
     }
     std::cout << "Video sampling and mapping tests passed\n";

@@ -10,7 +10,9 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
         libavcodec libavformat libavutil libswscale)
 
-target_link_libraries(time_mapper_lib PRIVATE PkgConfig::FFMPEG)
+find_package(nlohmann_json 3.12.0 REQUIRED)
+
+target_link_libraries(time_mapper_lib PRIVATE PkgConfig::FFMPEG nlohmann_json::nlohmann_json)
 target_compile_definitions(time_mapper_lib PRIVATE
         TIME_MAPPER_OCR_SCRIPT="${CMAKE_CURRENT_LIST_DIR}/../ocr/main.py"
         TIME_MAPPER_PYTHON="${CMAKE_CURRENT_LIST_DIR}/../ocr/.venv/bin/python")
@@ -18,8 +20,9 @@ target_compile_definitions(time_mapper_lib PRIVATE
 include(CTest)
 if(BUILD_TESTING)
     add_executable(time_mapper_lib_tests tests.cpp)
-    target_link_libraries(time_mapper_lib_tests PRIVATE time_mapper_lib)
+    target_link_libraries(time_mapper_lib_tests PRIVATE time_mapper_lib nlohmann_json::nlohmann_json)
     target_compile_definitions(time_mapper_lib_tests PRIVATE
-            TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/test-data")
+            TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/test-data"
+            TEST_OUTPUT_DIR="${CMAKE_CURRENT_BINARY_DIR}")
     add_test(NAME time_mapper_lib_tests COMMAND time_mapper_lib_tests)
 endif()

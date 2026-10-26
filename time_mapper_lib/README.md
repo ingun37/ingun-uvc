@@ -7,15 +7,19 @@ Set `TIME_MAPPER_PYTHON` to another interpreter path if needed. The engine's
 Python distribution is named `paddlepaddle` (distinct from `paddle`). The
 PP-OCRv6 model files are downloaded on first use unless already cached.
 
-`map_gametime_to_videotime(video_path, region)` accepts a pixel rectangle
-`{x, y, width, height}`. It samples the video clock every 0.5 seconds and
-returns an in-memory map keyed by whole game seconds remaining. Each value is
-a vector of video ranges with an exclusive end. Contiguous observations of
-the same second merge; missing clocks leave gaps, and repeated clocks can
-produce separate ranges. Fractional clock values such as `:06.1` map to
-second `6`.
+`map_gametime_to_videotime(video_path, region, output_json_path)` accepts a
+pixel rectangle `{x, y, width, height}`. It samples the video clock every 0.5
+seconds, writes JSON to the supplied path, and returns the same chronological
+list in memory. Each JSON item is
+`{"game_second": 440, "start_seconds": 2.0, "end_seconds": 3.0}`; the video
+range has an exclusive end. Contiguous observations of the same second merge.
+Missing clocks leave gaps, and a game second may occur in multiple list items,
+including across quarters. Fractional clock values such as `:06.1` map to
+second `6`. List order follows video time, but a replay or missing clock can
+also repeat a second within one quarter, so list position does not prove the
+quarter by itself.
 
-For callers that provide their own OCR, the three-argument overload accepts
+For callers that provide their own OCR, the four-argument overload accepts
 a callback receiving cropped RGB24 pixels. It also makes video sampling and
 range aggregation testable without loading OCR models.
 

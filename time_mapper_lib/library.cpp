@@ -6,7 +6,9 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
@@ -154,20 +156,37 @@ private:
     pid_t pid_ = -1;
 };
 
-void add_sample(GameTimeMap& result, int game_second,
+void add_sample(GameTimeMapping& result, int game_second,
                 double start, double end) {
-    auto& ranges = result[game_second];
-    if (!ranges.empty() && start <= ranges.back().end_seconds + 0.000001) {
-        ranges.back().end_seconds = std::max(ranges.back().end_seconds, end);
+    if (!result.empty() && result.back().game_second == game_second &&
+        start <= result.back().end_seconds + 0.000001) {
+        result.back().end_seconds = std::max(result.back().end_seconds, end);
     } else {
-        ranges.push_back({start, end});
+        result.push_back({game_second, start, end});
     }
+}
+
+void write_mapping_json(const GameTimeMapping& mapping,
+                        const std::filesystem::path& output_path) {
+    nlohmann::json document = nlohmann::json::array();
+    for (const auto& entry : mapping) {
+        document.push_back({
+            {"game_second", entry.game_second},
+            {"start_seconds", entry.start_seconds},
+            {"end_seconds", entry.end_seconds},
+        });
+    }
+    std::ofstream output(output_path);
+    if (!output) throw std::runtime_error("Could not open mapping JSON: " + output_path.string());
+    output << document.dump(2) << '\n';
+    if (!output) throw std::runtime_error("Could not write mapping JSON: " + output_path.string());
 }
 
 } // namespace
 
-GameTimeMap map_gametime_to_videotime(
+GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
+    const std::filesystem::path& output_json_path,
     const OcrCallback& recognize) {
     if (region.x < 0 || region.y < 0 || region.width <= 0 || region.height <= 0)
         throw std::invalid_argument("Region must have nonnegative origin and positive size");
@@ -201,7 +220,7 @@ GameTimeMap map_gametime_to_videotime(
         : (stream->duration != AV_NOPTS_VALUE
             ? stream->duration * av_q2d(stream->time_base) : INFINITY);
     double next_sample = 0.0;
-    GameTimeMap result;
+    GameTimeMapping result;
     std::unique_ptr<SwsContext, ScaleDeleter> scaler;
 
     auto consume = [&] {
@@ -258,13 +277,15 @@ GameTimeMap map_gametime_to_videotime(
     }
     check_ffmpeg(avcodec_send_packet(codec.get(), nullptr), "Flushing video decoder");
     consume();
+    write_mapping_json(result, output_json_path);
     return result;
 }
 
-GameTimeMap map_gametime_to_videotime(
-    const std::filesystem::path& video_path, Region region) {
+GameTimeMapping map_gametime_to_videotime(
+    const std::filesystem::path& video_path, Region region,
+    const std::filesystem::path& output_json_path) {
     PythonOcr worker(region);
-    return map_gametime_to_videotime(video_path, region,
+    return map_gametime_to_videotime(video_path, region, output_json_path,
         [&worker](const std::vector<std::uint8_t>& rgb, int, int) {
             return worker.recognize(rgb);
         });
