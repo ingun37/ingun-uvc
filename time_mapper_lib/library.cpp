@@ -2,6 +2,6 @@
 
 #include <iostream>
 
-void hello() {
+void map_gametime_to_videotime() {
     std::cout << "Hello, World!" << std::endl;
 }

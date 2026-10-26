@@ -1,6 +1,6 @@
 #ifndef TIME_MAPPER_LIB_LIBRARY_H
 #define TIME_MAPPER_LIB_LIBRARY_H
 
-void hello();
+void map_gametime_to_videotime();
 
 #endif // TIME_MAPPER_LIB_LIBRARY_H
