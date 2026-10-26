@@ -12,6 +12,9 @@ struct ContentView: View {
     @State private var isPicking = false
     @State private var isScrubbing = false
     @State private var resumeAfterScrubbing = false
+    @State private var isProcessing = false
+    @State private var outputURL: URL?
+    @State private var processingError: String?
     private let clock = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -70,6 +73,7 @@ struct ContentView: View {
                 Button("Done") {
                     session.pause()
                     stage = .process
+                    startProcessing()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(session.region?.isValid != true)
@@ -110,17 +114,69 @@ struct ContentView: View {
             Text("Process").font(.largeTitle)
             Text(session.url?.lastPathComponent ?? "").foregroundStyle(.secondary)
             if let region = session.region { RegionInformation(region: region) }
+            if isProcessing {
+                ProgressView("Reading game clocks…")
+            } else if let outputURL {
+                Label("Mapping saved", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text(outputURL.path).textSelection(.enabled)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                }
+            } else if let processingError {
+                Label("Processing failed", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                Text(processingError).textSelection(.enabled)
+                Button("Try Again", action: startProcessing)
+            }
             HStack {
                 Button("Back to Video") { stage = .videoPlay }
+                    .disabled(isProcessing)
                 Button("Choose Another Video…") {
                     session.close()
                     stage = .fileSelect
                     chooseVideo()
                 }
+                .disabled(isProcessing)
             }
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func startProcessing() {
+        guard !isProcessing, let videoURL = session.url,
+              let region = session.decoderRegion() else {
+            processingError = "Select a valid video region before processing."
+            return
+        }
+        let base = videoURL.deletingPathExtension().lastPathComponent
+        let folder = videoURL.deletingLastPathComponent()
+        var candidate = folder.appendingPathComponent("\(base).gametime.json")
+        var suffix = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = folder.appendingPathComponent("\(base).gametime-\(suffix).json")
+            suffix += 1
+        }
+        let destination = candidate
+        let videoPath = videoURL.path
+        let outputPath = destination.path
+        isProcessing = true
+        processingError = nil
+        outputURL = nil
+        Task {
+            let failure = await Task.detached(priority: .userInitiated) {
+                TimeMapperBridge.mapVideo(atPath: videoPath, outputJSONPath: outputPath,
+                                          x: region.x, y: region.y,
+                                          width: region.width, height: region.height)
+            }.value
+            isProcessing = false
+            if let failure {
+                processingError = failure as String
+            } else {
+                outputURL = destination
+            }
+        }
     }
 
     private func chooseVideo() {

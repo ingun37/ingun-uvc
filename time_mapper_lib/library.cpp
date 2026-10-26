@@ -9,11 +9,14 @@
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <spawn.h>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+extern char** environ;
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -96,24 +99,41 @@ public:
         int enabled = 1;
         setsockopt(sockets[0], SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
 #endif
-        pid_ = fork();
-        if (pid_ < 0) {
+        posix_spawn_file_actions_t actions;
+        int spawn_status = posix_spawn_file_actions_init(&actions);
+        if (spawn_status != 0) {
             close(sockets[0]);
             close(sockets[1]);
-            throw std::runtime_error("Could not start OCR worker");
+            throw std::runtime_error("Could not prepare OCR worker: " +
+                                     std::string(std::strerror(spawn_status)));
         }
-        if (pid_ == 0) {
+        const auto destroy_actions = [&] { posix_spawn_file_actions_destroy(&actions); };
+        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_adddup2(
+            &actions, sockets[1], STDIN_FILENO);
+        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_adddup2(
+            &actions, sockets[1], STDOUT_FILENO);
+        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_addclose(
+            &actions, sockets[0]);
+        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_addclose(
+            &actions, sockets[1]);
+        const char* python = std::getenv("TIME_MAPPER_PYTHON");
+        if (!python || !*python) python = TIME_MAPPER_PYTHON;
+        const std::string width = std::to_string(region.width);
+        const std::string height = std::to_string(region.height);
+        const std::array<char*, 6> arguments{
+            const_cast<char*>(python), const_cast<char*>("-u"),
+            const_cast<char*>(TIME_MAPPER_OCR_SCRIPT),
+            const_cast<char*>(width.c_str()), const_cast<char*>(height.c_str()), nullptr
+        };
+        if (spawn_status == 0)
+            spawn_status = posix_spawn(&pid_, python, &actions, nullptr,
+                                       arguments.data(), environ);
+        destroy_actions();
+        if (spawn_status != 0) {
             close(sockets[0]);
-            if (dup2(sockets[1], STDIN_FILENO) < 0 ||
-                dup2(sockets[1], STDOUT_FILENO) < 0) _exit(127);
             close(sockets[1]);
-            const char* python = std::getenv("TIME_MAPPER_PYTHON");
-            if (!python || !*python) python = TIME_MAPPER_PYTHON;
-            const std::string width = std::to_string(region.width);
-            const std::string height = std::to_string(region.height);
-            execl(python, python, "-u", TIME_MAPPER_OCR_SCRIPT,
-                  width.c_str(), height.c_str(), static_cast<char*>(nullptr));
-            _exit(127);
+            throw std::runtime_error("Could not start OCR worker: " +
+                                     std::string(std::strerror(spawn_status)));
         }
         close(sockets[1]);
         fd_ = sockets[0];

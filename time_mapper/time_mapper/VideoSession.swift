@@ -22,6 +22,9 @@ final class VideoSession {
     var isLoading = false
     var errorMessage: String?
     var region: VideoRegion?
+    private var sourceSize = CGSize.zero
+    private var displayBounds = CGRect.zero
+    private var videoTransform = CGAffineTransform.identity
     private var scopedURL: URL?
 
     func open(_ url: URL) async -> Bool {
@@ -41,6 +44,9 @@ final class VideoSession {
             guard bounds.width != 0, bounds.height != 0, seconds.isFinite, seconds > 0,
                   try await asset.load(.isPlayable) else { throw VideoError.unplayable }
             videoSize = CGSize(width: abs(bounds.width), height: abs(bounds.height))
+            sourceSize = size
+            displayBounds = bounds
+            videoTransform = transform
             duration = seconds
             self.url = url
             player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
@@ -80,6 +86,20 @@ final class VideoSession {
                     toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
+    func decoderRegion() -> (x: Int, y: Int, width: Int, height: Int)? {
+        guard let region, region.isValid else { return nil }
+        let displayRect = region.rect.offsetBy(dx: displayBounds.minX, dy: displayBounds.minY)
+        let sourceRect = displayRect.applying(videoTransform.inverted()).standardized
+            .intersection(CGRect(origin: .zero, size: sourceSize))
+        guard !sourceRect.isNull else { return nil }
+        let x = max(0, Int(floor(sourceRect.minX)))
+        let y = max(0, Int(floor(sourceRect.minY)))
+        let right = min(Int(sourceSize.width), Int(ceil(sourceRect.maxX)))
+        let bottom = min(Int(sourceSize.height), Int(ceil(sourceRect.maxY)))
+        guard right > x, bottom > y else { return nil }
+        return (x, y, right - x, bottom - y)
+    }
+
     func close() {
         pause()
         player.replaceCurrentItem(with: nil)
@@ -90,6 +110,9 @@ final class VideoSession {
         duration = 0
         currentTime = 0
         videoSize = .zero
+        sourceSize = .zero
+        displayBounds = .zero
+        videoTransform = .identity
     }
 
     private enum VideoError: LocalizedError {
