@@ -88,7 +88,7 @@ int main() {
     if (std::getenv("TIME_MAPPER_LIVE_OCR")) {
         for (const char* filename : {"minutes-seconds.mp4", "seconds-fractional.mp4"}) {
             const auto mapping = map_gametime_to_videotime(
-                std::filesystem::path(TEST_DATA_DIR) / filename, {55, 8, 120, 58},
+                std::filesystem::path(TEST_DATA_DIR) / filename, {0, 0, 242, 80},
                 std::filesystem::path(TEST_OUTPUT_DIR) /
                     (std::string(filename) + ".live.mapping.json"));
             if (mapping.empty()) throw std::runtime_error("Live OCR found no game clocks");

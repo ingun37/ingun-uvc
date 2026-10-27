@@ -1,9 +1,11 @@
 # Time mapper library
 
 Requires FFmpeg development libraries (`libavcodec`, `libavformat`,
-`libavutil`, and `libswscale`), Tesseract with English trained data, and
-nlohmann_json. OCR runs in the C++ process through Tesseract's API; one engine
-is initialized per mapping and reused for every sampled crop.
+`libavutil`, and `libswscale`) and a Python environment with PaddleOCR,
+PaddlePaddle, and NumPy. The default interpreter is `../ocr/.venv/bin/python`.
+Set `TIME_MAPPER_PYTHON` to another interpreter path if needed. The engine's
+Python distribution is named `paddlepaddle` (distinct from `paddle`). The
+PP-OCRv6 model files are downloaded on first use unless already cached.
 
 `map_gametime_to_videotime(video_path, region, output_json_path)` accepts a
 pixel rectangle `{x, y, width, height}`. It samples the video clock every 0.5
@@ -12,7 +14,7 @@ list in memory. Each JSON item is
 `{"game_second": 440, "start_seconds": 2.0, "end_seconds": 3.0}`; the video
 range has an exclusive end. Contiguous observations of the same second merge.
 Missing clocks leave gaps, and a game second may occur in multiple list items,
-including across quarters. Fractional clock values such as `:06.1` or `06.1` map to
+including across quarters. Fractional clock values such as `:06.1` map to
 second `6`. List order follows video time, but a replay or missing clock can
 also repeat a second within one quarter, so list position does not prove the
 quarter by itself.
@@ -27,7 +29,8 @@ Build and test on macOS:
 cmake -S time_mapper_lib -B build/time_mapper_lib
 cmake --build build/time_mapper_lib
 ctest --test-dir build/time_mapper_lib --output-on-failure
+ocr/.venv/bin/python -m unittest discover -s ocr -p 'test_*.py'
 ```
 
 To exercise live OCR on both bundled videos, run the test executable with
-`TIME_MAPPER_LIVE_OCR=1` with Tesseract and English trained data installed.
+`TIME_MAPPER_LIVE_OCR=1` after the models are available.
