@@ -10,12 +10,11 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
         libavcodec libavformat libavutil libswscale)
 
+pkg_check_modules(TESSERACT REQUIRED IMPORTED_TARGET tesseract)
+
 find_package(nlohmann_json 3.12.0 REQUIRED)
 
-target_link_libraries(time_mapper_lib PRIVATE PkgConfig::FFMPEG nlohmann_json::nlohmann_json)
-target_compile_definitions(time_mapper_lib PRIVATE
-        TIME_MAPPER_OCR_SCRIPT="${CMAKE_CURRENT_LIST_DIR}/../ocr/main.py"
-        TIME_MAPPER_PYTHON="${CMAKE_CURRENT_LIST_DIR}/../ocr/.venv/bin/python")
+target_link_libraries(time_mapper_lib PRIVATE PkgConfig::FFMPEG PkgConfig::TESSERACT nlohmann_json::nlohmann_json)
 
 include(CTest)
 if(BUILD_TESTING)

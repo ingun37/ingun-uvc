@@ -23,10 +23,10 @@ immutability over mutability.
 ## Build and local dependencies
 
 The Xcode project compiles the C++ library source and links Homebrew FFmpeg.
-Its OCR script and Python interpreter paths point into this repository's
-`ocr/` directory. The app sandbox is disabled so this local development build
-can launch Python and create a JSON sibling of the selected video. Packaging a
-standalone app requires bundling these dependencies and revisiting file access.
+It links Homebrew Tesseract and uses its English trained data in process.
+The app sandbox is disabled so this local development build can create a JSON
+sibling of the selected video. Packaging a standalone app requires bundling
+these dependencies and revisiting file access.
 
 Build from the repository root:
 

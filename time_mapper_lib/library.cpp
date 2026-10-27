@@ -2,21 +2,15 @@
 
 #include <algorithm>
 #include <array>
-#include <cerrno>
 #include <cmath>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <spawn.h>
+#include <regex>
 #include <stdexcept>
 #include <string>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-extern char** environ;
+#include <tesseract/baseapi.h>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -24,13 +18,6 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 }
-
-#ifndef TIME_MAPPER_OCR_SCRIPT
-#error TIME_MAPPER_OCR_SCRIPT must be defined by the build
-#endif
-#ifndef TIME_MAPPER_PYTHON
-#error TIME_MAPPER_PYTHON must be defined by the build
-#endif
 
 namespace time_mapper {
 namespace {
@@ -61,119 +48,38 @@ struct ScaleDeleter {
     void operator()(SwsContext* context) const { sws_freeContext(context); }
 };
 
-void write_all(int fd, const void* data, std::size_t size) {
-    const auto* bytes = static_cast<const std::uint8_t*>(data);
-    while (size) {
-#ifdef MSG_NOSIGNAL
-        const auto written = send(fd, bytes, size, MSG_NOSIGNAL);
-#else
-        const auto written = send(fd, bytes, size, 0);
-#endif
-        if (written < 0 && errno == EINTR) continue;
-        if (written <= 0) throw std::runtime_error("OCR worker disconnected while sending a frame");
-        bytes += written;
-        size -= static_cast<std::size_t>(written);
-    }
+std::optional<int> parse_game_time(std::string text) {
+    text = std::regex_replace(text, std::regex(R"(\s*([:.])\s*)"), "$1");
+    static const std::regex clock(R"((^|[^0-9])(?:(\d{1,2}):(\d{2})|:?(\d{2})\.(\d))(?=$|[^0-9]))");
+    std::smatch match;
+    if (!std::regex_search(text, match, clock)) return std::nullopt;
+    const int minutes = match[2].matched ? std::stoi(match[2].str()) : 0;
+    const int seconds = std::stoi(match[2].matched ? match[3].str() : match[4].str());
+    if (seconds >= 60) return std::nullopt;
+    return minutes * 60 + seconds;
 }
 
-std::string read_line(int fd) {
-    std::string line;
-    char character;
-    while (line.size() < 128) {
-        const auto count = recv(fd, &character, 1, 0);
-        if (count < 0 && errno == EINTR) continue;
-        if (count <= 0) throw std::runtime_error("OCR worker disconnected while reading a result");
-        if (character == '\n') return line;
-        line += character;
-    }
-    throw std::runtime_error("OCR worker returned an oversized result");
-}
-
-class PythonOcr {
+class TesseractOcr {
 public:
-    explicit PythonOcr(Region region) {
-        int sockets[2];
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
-            throw std::runtime_error("Could not create OCR worker channel");
-#ifdef SO_NOSIGPIPE
-        int enabled = 1;
-        setsockopt(sockets[0], SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
-#endif
-        posix_spawn_file_actions_t actions;
-        int spawn_status = posix_spawn_file_actions_init(&actions);
-        if (spawn_status != 0) {
-            close(sockets[0]);
-            close(sockets[1]);
-            throw std::runtime_error("Could not prepare OCR worker: " +
-                                     std::string(std::strerror(spawn_status)));
-        }
-        const auto destroy_actions = [&] { posix_spawn_file_actions_destroy(&actions); };
-        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_adddup2(
-            &actions, sockets[1], STDIN_FILENO);
-        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_adddup2(
-            &actions, sockets[1], STDOUT_FILENO);
-        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_addclose(
-            &actions, sockets[0]);
-        if (spawn_status == 0) spawn_status = posix_spawn_file_actions_addclose(
-            &actions, sockets[1]);
-        const char* python = std::getenv("TIME_MAPPER_PYTHON");
-        if (!python || !*python) python = TIME_MAPPER_PYTHON;
-        const std::string width = std::to_string(region.width);
-        const std::string height = std::to_string(region.height);
-        const std::array<char*, 6> arguments{
-            const_cast<char*>(python), const_cast<char*>("-u"),
-            const_cast<char*>(TIME_MAPPER_OCR_SCRIPT),
-            const_cast<char*>(width.c_str()), const_cast<char*>(height.c_str()), nullptr
-        };
-        if (spawn_status == 0)
-            spawn_status = posix_spawn(&pid_, python, &actions, nullptr,
-                                       arguments.data(), environ);
-        destroy_actions();
-        if (spawn_status != 0) {
-            close(sockets[0]);
-            close(sockets[1]);
-            throw std::runtime_error("Could not start OCR worker: " +
-                                     std::string(std::strerror(spawn_status)));
-        }
-        close(sockets[1]);
-        fd_ = sockets[0];
-        try {
-            if (read_line(fd_) != "READY")
-                throw std::runtime_error("OCR worker failed to initialize");
-        } catch (...) {
-            close(fd_);
-            waitpid(pid_, nullptr, 0);
-            fd_ = -1;
-            pid_ = -1;
-            throw;
-        }
+    TesseractOcr() {
+        if (engine_.Init(nullptr, "eng", tesseract::OEM_LSTM_ONLY) != 0)
+            throw std::runtime_error("Could not initialize Tesseract OCR (eng trained data required)");
+        engine_.SetPageSegMode(tesseract::PSM_SINGLE_LINE);
+        engine_.SetVariable("tessedit_char_whitelist", "0123456789:.");
     }
 
-    PythonOcr(const PythonOcr&) = delete;
-    PythonOcr& operator=(const PythonOcr&) = delete;
-
-    ~PythonOcr() {
-        if (fd_ >= 0) close(fd_);
-        if (pid_ > 0) {
-            int status;
-            while (waitpid(pid_, &status, 0) < 0 && errno == EINTR) {}
-        }
-    }
-
-    std::optional<int> recognize(const std::vector<std::uint8_t>& rgb) const {
-        write_all(fd_, rgb.data(), rgb.size());
-        const auto result = read_line(fd_);
-        if (result == "-") return std::nullopt;
-        std::size_t parsed = 0;
-        const int seconds = std::stoi(result, &parsed);
-        if (parsed != result.size() || seconds < 0)
-            throw std::runtime_error("Invalid OCR worker result: " + result);
-        return seconds;
+    std::optional<int> recognize(const std::vector<std::uint8_t>& rgb,
+                                 int width, int height) {
+        engine_.SetImage(rgb.data(), width, height, 3, width * 3);
+        std::unique_ptr<char[]> text(engine_.GetUTF8Text());
+        if (!text) throw std::runtime_error("Tesseract OCR failed to read a frame");
+        const auto result = parse_game_time(text.get());
+        engine_.Clear();
+        return result;
     }
 
 private:
-    int fd_ = -1;
-    pid_t pid_ = -1;
+    tesseract::TessBaseAPI engine_;
 };
 
 void add_sample(GameTimeMapping& result, int game_second,
@@ -304,10 +210,10 @@ GameTimeMapping map_gametime_to_videotime(
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
     const std::filesystem::path& output_json_path) {
-    PythonOcr worker(region);
+    TesseractOcr worker;
     return map_gametime_to_videotime(video_path, region, output_json_path,
-        [&worker](const std::vector<std::uint8_t>& rgb, int, int) {
-            return worker.recognize(rgb);
+        [&worker](const std::vector<std::uint8_t>& rgb, int width, int height) {
+            return worker.recognize(rgb, width, height);
         });
 }
 

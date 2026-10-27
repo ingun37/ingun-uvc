@@ -391,15 +391,14 @@
 				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(inherited)",
-					"-DTIME_MAPPER_OCR_SCRIPT=\\\"$(PROJECT_DIR)/../ocr/main.py\\\"",
-					"-DTIME_MAPPER_PYTHON=\\\"$(PROJECT_DIR)/../ocr/.venv/bin/python\\\"",
-				);
+						);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					-lavformat,
 					-lavcodec,
 					-lswscale,
 					-lavutil,
+					-ltesseract,
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -444,15 +443,14 @@
 				);
 				OTHER_CPLUSPLUSFLAGS = (
 					"$(inherited)",
-					"-DTIME_MAPPER_OCR_SCRIPT=\\\"$(PROJECT_DIR)/../ocr/main.py\\\"",
-					"-DTIME_MAPPER_PYTHON=\\\"$(PROJECT_DIR)/../ocr/.venv/bin/python\\\"",
-				);
+						);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					-lavformat,
 					-lavcodec,
 					-lswscale,
 					-lavutil,
+					-ltesseract,
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
