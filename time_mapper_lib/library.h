@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace time_mapper {
@@ -27,16 +28,18 @@ using GameTimeMapping = std::vector<GameTimeEntry>;
 
 using OcrCallback = std::function<std::optional<int>(
     const std::vector<std::uint8_t>& rgb, int width, int height)>;
+using LogCallback = std::function<void(const std::string&)>;
 
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
-    const std::filesystem::path& output_json_path);
+    const std::filesystem::path& output_json_path,
+    const LogCallback& log = {});
 
 // Allows a caller to provide an OCR implementation, including for tests.
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
     const std::filesystem::path& output_json_path,
-    const OcrCallback& recognize);
+    const OcrCallback& recognize, const LogCallback& log = {});
 
 } // namespace time_mapper
 

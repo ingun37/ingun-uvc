@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var isProcessing = false
     @State private var outputURL: URL?
     @State private var processingError: String?
+    @State private var processLog: [String] = []
     private let clock = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -129,6 +130,26 @@ struct ContentView: View {
                 Text(processingError).textSelection(.enabled)
                 Button("Try Again", action: startProcessing)
             }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(processLog.indices, id: \.self) { index in
+                            Text(processLog[index])
+                                .font(.system(.caption, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .id(index)
+                        }
+                    }
+                    .padding(12)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.quaternary.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .onChange(of: processLog.count) { _, count in
+                    if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                }
+            }
             HStack {
                 Button("Back to Video") { stage = .videoPlay }
                     .disabled(isProcessing)
@@ -164,15 +185,19 @@ struct ContentView: View {
         isProcessing = true
         processingError = nil
         outputURL = nil
+        processLog = []
         Task {
             let failure = await Task.detached(priority: .userInitiated) {
                 TimeMapperBridge.mapVideo(atPath: videoPath, outputJSONPath: outputPath,
                                           x: region.x, y: region.y,
-                                          width: region.width, height: region.height)
+                                          width: region.width, height: region.height) { message in
+                    Task { @MainActor in processLog.append(message) }
+                }
             }.value
             isProcessing = false
             if let failure {
                 processingError = failure as String
+                processLog.append("Error: \(failure)")
             } else {
                 outputURL = destination
             }

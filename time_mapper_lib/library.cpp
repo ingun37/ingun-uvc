@@ -3,15 +3,18 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <iomanip>
 #include <nlohmann/json.hpp>
 #include <spawn.h>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -36,6 +39,11 @@ namespace time_mapper {
 namespace {
 
 constexpr double sample_interval = 0.5;
+using Clock = std::chrono::steady_clock;
+
+double milliseconds(Clock::time_point start) {
+    return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+}
 
 void check_ffmpeg(int result, const char* action) {
     if (result < 0) {
@@ -207,10 +215,12 @@ void write_mapping_json(const GameTimeMapping& mapping,
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
     const std::filesystem::path& output_json_path,
-    const OcrCallback& recognize) {
+    const OcrCallback& recognize, const LogCallback& log) {
+    const auto report = [&](const std::string& message) { if (log) log(message); };
     if (region.x < 0 || region.y < 0 || region.width <= 0 || region.height <= 0)
         throw std::invalid_argument("Region must have nonnegative origin and positive size");
     if (!recognize) throw std::invalid_argument("OCR callback is empty");
+    report("Opening video: " + video_path.filename().string());
 
     AVFormatContext* input = nullptr;
     check_ffmpeg(avformat_open_input(&input, video_path.string().c_str(), nullptr, nullptr),
@@ -231,6 +241,8 @@ GameTimeMapping map_gametime_to_videotime(
     if (region.x > codec->width || region.width > codec->width - region.x ||
         region.y > codec->height || region.height > codec->height - region.y)
         throw std::invalid_argument("Region lies outside the video frame");
+    report("Video ready: " + std::to_string(codec->width) + " × " +
+           std::to_string(codec->height) + "; sampling every 0.5 seconds");
 
     std::unique_ptr<AVFrame, FrameDeleter> frame(av_frame_alloc());
     std::unique_ptr<AVPacket, PacketDeleter> packet(av_packet_alloc());
@@ -242,10 +254,18 @@ GameTimeMapping map_gametime_to_videotime(
     double next_sample = 0.0;
     GameTimeMapping result;
     std::unique_ptr<SwsContext, ScaleDeleter> scaler;
+    double decode_ms = 0.0;
+    double total_decode_ms = 0.0;
+    double total_convert_ms = 0.0;
+    double total_crop_ms = 0.0;
+    double total_ocr_ms = 0.0;
+    std::size_t sample_count = 0;
 
     auto consume = [&] {
         while (true) {
+            const auto decode_start = Clock::now();
             const int status = avcodec_receive_frame(codec.get(), frame.get());
+            decode_ms += milliseconds(decode_start);
             if (status == AVERROR(EAGAIN) || status == AVERROR_EOF) break;
             check_ffmpeg(status, "Decoding frame");
             const auto timestamp = frame->best_effort_timestamp;
@@ -259,6 +279,7 @@ GameTimeMapping map_gametime_to_videotime(
             if (video_seconds >= next_sample + sample_interval)
                 next_sample = std::floor(video_seconds / sample_interval) * sample_interval;
             if (next_sample >= duration) continue;
+            const auto convert_start = Clock::now();
             scaler.reset(sws_getCachedContext(scaler.release(), codec->width,
                 codec->height, codec->pix_fmt, codec->width, codec->height,
                 AV_PIX_FMT_RGB24, SWS_BILINEAR, nullptr, nullptr, nullptr));
@@ -269,6 +290,8 @@ GameTimeMapping map_gametime_to_videotime(
             const int stride[] = {codec->width * 3};
             check_ffmpeg(sws_scale(scaler.get(), frame->data, frame->linesize, 0,
                                    codec->height, destination, stride), "Converting frame");
+            const double convert_ms = milliseconds(convert_start);
+            const auto crop_start = Clock::now();
             std::vector<std::uint8_t> crop(static_cast<std::size_t>(region.width) *
                                             region.height * 3);
             for (int row = 0; row < region.height; ++row) {
@@ -278,7 +301,28 @@ GameTimeMapping map_gametime_to_videotime(
                             region.width * 3, image.data() + offset,
                             static_cast<std::size_t>(region.width) * 3);
             }
-            if (const auto game_second = recognize(crop, region.width, region.height))
+            const double crop_ms = milliseconds(crop_start);
+            const auto ocr_start = Clock::now();
+            const auto game_second = recognize(crop, region.width, region.height);
+            const double ocr_ms = milliseconds(ocr_start);
+            total_decode_ms += decode_ms;
+            total_convert_ms += convert_ms;
+            total_crop_ms += crop_ms;
+            total_ocr_ms += ocr_ms;
+            ++sample_count;
+            if (log) {
+                std::ostringstream line;
+                line << std::fixed << std::setprecision(1) << next_sample
+                     << "s → ";
+                if (game_second) line << "game clock " << *game_second << "s";
+                else line << "no clock detected";
+                line << std::setprecision(2) << " | decode " << decode_ms
+                     << " ms, RGB convert " << convert_ms << " ms, crop "
+                     << crop_ms << " ms, OCR " << ocr_ms << " ms";
+                report(line.str());
+            }
+            decode_ms = 0.0;
+            if (game_second)
                 add_sample(result, *game_second, next_sample,
                            std::min(next_sample + sample_interval, duration));
             next_sample += sample_interval;
@@ -286,29 +330,53 @@ GameTimeMapping map_gametime_to_videotime(
     };
 
     while (true) {
+        const auto read_start = Clock::now();
         const int status = av_read_frame(format.get(), packet.get());
+        decode_ms += milliseconds(read_start);
         if (status == AVERROR_EOF) break;
         check_ffmpeg(status, "Reading video packet");
         if (packet->stream_index == stream_index) {
+            const auto send_start = Clock::now();
             check_ffmpeg(avcodec_send_packet(codec.get(), packet.get()), "Sending video packet");
+            decode_ms += milliseconds(send_start);
             consume();
         }
         av_packet_unref(packet.get());
     }
+    const auto flush_start = Clock::now();
     check_ffmpeg(avcodec_send_packet(codec.get(), nullptr), "Flushing video decoder");
+    decode_ms += milliseconds(flush_start);
     consume();
+    if (log) {
+        std::ostringstream summary;
+        summary << std::fixed << std::setprecision(1) << "Timing for " << sample_count
+                << " samples: decode " << total_decode_ms << " ms, RGB convert "
+                << total_convert_ms << " ms, crop " << total_crop_ms
+                << " ms, OCR " << total_ocr_ms << " ms";
+        report(summary.str());
+    }
+    report("Writing " + std::to_string(result.size()) + " mapping ranges");
     write_mapping_json(result, output_json_path);
+    report("Mapping saved: " + output_json_path.filename().string());
     return result;
 }
 
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
-    const std::filesystem::path& output_json_path) {
+    const std::filesystem::path& output_json_path, const LogCallback& log) {
+    if (log) log("Starting OCR worker");
+    const auto worker_start = Clock::now();
     PythonOcr worker(region);
+    if (log) {
+        std::ostringstream line;
+        line << std::fixed << std::setprecision(1)
+             << "OCR worker ready in " << milliseconds(worker_start) << " ms";
+        log(line.str());
+    }
     return map_gametime_to_videotime(video_path, region, output_json_path,
         [&worker](const std::vector<std::uint8_t>& rgb, int, int) {
             return worker.recognize(rgb);
-        });
+        }, log);
 }
 
 } // namespace time_mapper

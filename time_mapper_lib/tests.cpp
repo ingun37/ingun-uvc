@@ -27,6 +27,7 @@ void exercise_video(const char* filename, double duration) {
     const auto output_path = std::filesystem::path(TEST_OUTPUT_DIR) /
                              (std::string(filename) + ".mapping.json");
     int calls = 0;
+    std::vector<std::string> logs;
     auto result = map_gametime_to_videotime(path, {75, 8, 100, 58}, output_path,
         [&](const std::vector<std::uint8_t>& rgb, int width, int height)
             -> std::optional<int> {
@@ -39,11 +40,20 @@ void exercise_video(const char* filename, double duration) {
             if (index == 3) return std::nullopt; // Missing clock: a gap.
             if (index == 6) return 42;            // Same second after gap.
             return index < 4 ? 42 : 41;
-        });
+        }, [&](const std::string& message) { logs.push_back(message); });
 
     const int expected_samples = static_cast<int>(std::ceil(duration / 0.5));
     if (calls != expected_samples)
         throw std::runtime_error("Video was not sampled every 0.5 seconds");
+    if (logs.size() != static_cast<std::size_t>(expected_samples + 5) ||
+        logs[2].find("0.0s → game clock 42s | decode ") != 0 ||
+        logs[2].find(" ms, RGB convert ") == std::string::npos ||
+        logs[2].find(" ms, crop ") == std::string::npos ||
+        logs[2].find(" ms, OCR ") == std::string::npos ||
+        logs[5].find("1.5s → no clock detected | decode ") != 0 ||
+        logs[logs.size() - 3].find("Timing for ") != 0 ||
+        logs.back().find("Mapping saved:") != 0)
+        throw std::runtime_error("Processing logs missed samples or completion");
     if (result.size() != 4 || result[0].game_second != 42 ||
         result[1].game_second != 41 || result[2].game_second != 42 ||
         result[3].game_second != 41)
