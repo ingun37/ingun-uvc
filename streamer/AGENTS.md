@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-18 (Asia/Seoul).
+Updated 2026-10-27 (Asia/Seoul).
 
 ## Scope and current state
 
@@ -34,8 +34,8 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 
 - `MyApp/MyApp.swift`: app entry and WindowGroup.
 - `MyApp/CaptureModel.swift`:
-  - `CaptureModel` is observable state and actions. `Screen` is an enum with
-    devices, opening(name), and detail(device, resource) cases.
+  - `CaptureModel` is observable state and actions. `Screen` covers device
+    discovery, opening, detail, and recording.
   - `CaptureResource` owns AVCaptureSession and device input. Start/stop run on
     a serial dispatch queue; deinit schedules stop and input removal.
   - `PreviewActivity` owns a ProcessInfo activity token with
@@ -47,10 +47,12 @@ and avoid nullable stored properties where practical. Prefer immutability over m
   - `DeviceDetail` builds metadata rows and displays preview and USB details.
   - `CapturePreview` bridges SwiftUI to AppKit using NSViewRepresentable.
   - `PreviewView` hosts AVCaptureVideoPreviewLayer; teardown detaches session.
+- `MyApp/MovieRecording.swift`: owns the temporary movie, recording phases,
+  file-output delegate callbacks, and cleanup. `CaptureResource` retains the
+  capture session while recording finalizes.
 - `MyApp/USBDetails.swift`: DetailRow value type and IOKit lookup.
   Registry handles are released with defer. Identifier parsing is a best-effort
   match, not a universal guarantee for all AVFoundation devices.
-- `README.md`: run instructions and manual hardware checks.
 - `Untitled Project.xcodeproj/project.pbxproj`: synchronized source
   folder, MyApp scheme, macOS 27 target, main-actor default isolation. Camera
   sandbox access and camera usage description exist. User-selected file access
@@ -64,12 +66,12 @@ The preview implementation previously passed a Debug build and
 Build from the repository root:
 
 ```sh
-xcodebuild -project 'Untitled Project.xcodeproj' -scheme MyApp \
+xcodebuild -project 'streamer/Untitled Project.xcodeproj' -scheme MyApp \
   -configuration Debug -derivedDataPath /tmp/ingun-uvc-build \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-Xcode 27.0 was available. In the Codex sandbox, Swift Observation macro plugin
+Xcode 27 was available. In the Codex sandbox, Swift Observation macro plugin
 execution failed with a malformed-response error; the same build succeeded
 with approved execution outside the sandbox. This was an environment issue.
 The App Intents metadata extraction warning (no AppIntents dependency) was
