@@ -1,6 +1,6 @@
 import unittest
 
-from main import parse_game_time
+from main import parse_candidates, parse_game_time
 
 
 class GameTimeParsingTests(unittest.TestCase):
@@ -16,6 +16,11 @@ class GameTimeParsingTests(unittest.TestCase):
         self.assertIsNone(parse_game_time("REPLAY"))
         self.assertIsNone(parse_game_time("2:78"))
         self.assertIsNone(parse_game_time(":61.3"))
+
+    def test_candidates_preserve_raw_text_and_parsed_zero(self):
+        texts = ["1ST", ":00.4", "24"]
+        self.assertEqual(parse_candidates(texts), 0)
+        self.assertIsNone(parse_candidates(["REPLAY", "2:78"]))
 
 
 if __name__ == "__main__":

@@ -19,6 +19,10 @@ second `6`. List order follows video time, but a replay or missing clock can
 also repeat a second within one quarter, so list position does not prove the
 quarter by itself.
 
+The optional log callback reports processing timings and each OCR worker's
+recognized strings alongside the parsed game second. The worker exchanges one
+JSON line per frame with the library, with `texts` and `seconds` fields.
+
 For callers that provide their own OCR, the four-argument overload accepts
 a callback receiving cropped RGB24 pixels. It also makes video sampling and
 range aggregation testable without loading OCR models.

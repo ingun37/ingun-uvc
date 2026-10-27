@@ -21,7 +21,8 @@ See [README.md](README.md) for the public API and output format.
   conversion, and OCR separately before changing performance behavior again.
 - The Python OCR process is launched once per mapping and communicates over a
   local Unix socket. `ocr/main.py` reads fixed-size RGB24 frames and returns
-  one whole-second value or `-` per frame. Keep that protocol synchronized.
+  one JSON line per frame containing recognized `texts` and parsed `seconds`
+  (null when no valid clock was found). Keep that protocol synchronized.
 
 ## Validation
 

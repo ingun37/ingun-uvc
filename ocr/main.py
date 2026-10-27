@@ -1,12 +1,14 @@
 """Persistent PP-OCRv6 worker for the C++ video mapper.
 
 Protocol: width and height are argv values; stdin carries consecutive RGB24
-frames of that size. One line on stdout follows each frame: whole game seconds
-or '-' when no valid clock was recognized. Diagnostics go to stderr.
+frames of that size. One JSON line on stdout follows each frame with the
+recognized text and parsed whole game seconds (null if none). Diagnostics go
+to stderr.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from importlib.util import find_spec
@@ -44,7 +46,14 @@ def read_exactly(stream, size: int) -> bytes:
     return bytes(chunks)
 
 
-def recognize_clock(ocr, rgb: np.ndarray) -> int | None:
+def parse_candidates(candidates: list[str]) -> int | None:
+    for text in candidates:
+        if (seconds := parse_game_time(text)) is not None:
+            return seconds
+    return parse_game_time(" ".join(candidates))
+
+
+def recognize_clock(ocr, rgb: np.ndarray) -> tuple[list[str], int | None]:
     # PaddleOCR expects OpenCV-style BGR input.
     results = ocr.predict(rgb[:, :, ::-1].copy())
     candidates = []
@@ -53,10 +62,7 @@ def recognize_clock(ocr, rgb: np.ndarray) -> int | None:
         for text, score in zip(data.get("rec_texts", []), data.get("rec_scores", [])):
             if float(score) >= 0.5:
                 candidates.append(text)
-    for text in candidates:
-        if (seconds := parse_game_time(text)) is not None:
-            return seconds
-    return parse_game_time(" ".join(candidates))
+    return candidates, parse_candidates(candidates)
 
 
 def main() -> None:
@@ -88,8 +94,8 @@ def main() -> None:
     output.flush()
     while frame := read_exactly(sys.stdin.buffer, width * height * 3):
         rgb = np.frombuffer(frame, dtype=np.uint8).reshape(height, width, 3)
-        seconds = recognize_clock(ocr, rgb)
-        output.write(f"{seconds if seconds is not None else '-'}\n".encode())
+        texts, seconds = recognize_clock(ocr, rgb)
+        output.write((json.dumps({"texts": texts, "seconds": seconds}) + "\n").encode())
         output.flush()
 
 

@@ -87,7 +87,7 @@ void write_all(int fd, const void* data, std::size_t size) {
 std::string read_line(int fd) {
     std::string line;
     char character;
-    while (line.size() < 128) {
+    while (line.size() < 16384) {
         const auto count = recv(fd, &character, 1, 0);
         if (count < 0 && errno == EINTR) continue;
         if (count <= 0) throw std::runtime_error("OCR worker disconnected while reading a result");
@@ -168,15 +168,24 @@ public:
         }
     }
 
-    std::optional<int> recognize(const std::vector<std::uint8_t>& rgb) const {
+    struct Reading {
+        nlohmann::json texts;
+        std::optional<int> seconds;
+    };
+
+    Reading recognize(const std::vector<std::uint8_t>& rgb) const {
         write_all(fd_, rgb.data(), rgb.size());
-        const auto result = read_line(fd_);
-        if (result == "-") return std::nullopt;
-        std::size_t parsed = 0;
-        const int seconds = std::stoi(result, &parsed);
-        if (parsed != result.size() || seconds < 0)
-            throw std::runtime_error("Invalid OCR worker result: " + result);
-        return seconds;
+        const auto response = nlohmann::json::parse(read_line(fd_));
+        const auto texts = response.at("texts");
+        const auto& seconds_value = response.at("seconds");
+        const std::optional<int> seconds = seconds_value.is_null()
+            ? std::nullopt : std::optional<int>{seconds_value.get<int>()};
+        if (!texts.is_array() ||
+            !std::all_of(texts.begin(), texts.end(),
+                         [](const auto& text) { return text.is_string(); }) ||
+            (seconds && *seconds < 0))
+            throw std::runtime_error("Invalid OCR worker result");
+        return {texts, seconds};
     }
 
 private:
@@ -374,8 +383,14 @@ GameTimeMapping map_gametime_to_videotime(
         log(line.str());
     }
     return map_gametime_to_videotime(video_path, region, output_json_path,
-        [&worker](const std::vector<std::uint8_t>& rgb, int, int) {
-            return worker.recognize(rgb);
+        [&worker, &log](const std::vector<std::uint8_t>& rgb, int, int) {
+            const auto reading = worker.recognize(rgb);
+            if (log) {
+                log("OCR text: " + reading.texts.dump() +
+                    " | parsed: " + (reading.seconds
+                        ? std::to_string(*reading.seconds) + "s" : "no valid clock"));
+            }
+            return reading.seconds;
         }, log);
 }
 

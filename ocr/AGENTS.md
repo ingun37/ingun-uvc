@@ -10,8 +10,9 @@ wire protocol or game-time semantics.
   explicitly requires updating them.
 - The process receives width and height as arguments, then consecutive RGB24
   frames of exactly `width * height * 3` bytes on stdin. Send `READY` after
-  model initialization; for each frame, write one line containing a whole game
-  second or `-` when no valid clock is found. Keep diagnostics on stderr.
+  model initialization; for each frame, write one JSON line with `texts` (the
+  recognized strings) and `seconds` (a whole game second or null). Keep
+  diagnostics on stderr.
 - Recognize `mm:ss` and `:ss.s`; fractional readings map to their whole
   second. Preserve the distinction between no recognized clock and a valid
   zero-second clock. Do not silently infer missing readings.

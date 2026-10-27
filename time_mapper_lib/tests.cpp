@@ -97,12 +97,22 @@ int main() {
     }
     if (std::getenv("TIME_MAPPER_LIVE_OCR")) {
         for (const char* filename : {"minutes-seconds.mp4", "seconds-fractional.mp4"}) {
+            std::vector<std::string> live_logs;
             const auto mapping = map_gametime_to_videotime(
                 std::filesystem::path(TEST_DATA_DIR) / filename, {0, 0, 242, 80},
                 std::filesystem::path(TEST_OUTPUT_DIR) /
-                    (std::string(filename) + ".live.mapping.json"));
+                    (std::string(filename) + ".live.mapping.json"),
+                [&](const std::string& message) { live_logs.push_back(message); });
             if (mapping.empty()) throw std::runtime_error("Live OCR found no game clocks");
             const int expected_second = std::string(filename) == "minutes-seconds.mp4" ? 440 : 22;
+            const auto logged = std::find_if(live_logs.begin(), live_logs.end(),
+                [&](const std::string& message) {
+                    return message.find("OCR text: [") == 0 &&
+                           message.find(" | parsed: " +
+                               std::to_string(expected_second) + "s") != std::string::npos;
+                });
+            if (logged == live_logs.end())
+                throw std::runtime_error("Live OCR log missed raw text or parsed time");
             const auto found = std::find_if(mapping.begin(), mapping.end(),
                 [&](const GameTimeEntry& entry) { return entry.game_second == expected_second; });
             if (found == mapping.end()) throw std::runtime_error("Expected clock was not recognized");
