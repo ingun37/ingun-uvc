@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -71,25 +70,16 @@ public:
 
     std::optional<int> recognize(const std::vector<std::uint8_t>& rgb,
                                  int width, int height) {
-        const auto start = std::chrono::steady_clock::now();
         engine_.SetImage(rgb.data(), width, height, 3, width * 3);
         std::unique_ptr<char[]> text(engine_.GetUTF8Text());
         if (!text) throw std::runtime_error("Tesseract OCR failed to read a frame");
-        text_ = text.get();
-        const auto result = parse_game_time(text_);
+        const auto result = parse_game_time(text.get());
         engine_.Clear();
-        duration_seconds_ = std::chrono::duration<double>(
-            std::chrono::steady_clock::now() - start).count();
         return result;
     }
 
-    const std::string& text() const { return text_; }
-    double duration_seconds() const { return duration_seconds_; }
-
 private:
     tesseract::TessBaseAPI engine_;
-    std::string text_;
-    double duration_seconds_ = 0;
 };
 
 void add_sample(GameTimeMapping& result, int game_second,
@@ -120,11 +110,10 @@ void write_mapping_json(const GameTimeMapping& mapping,
 
 } // namespace
 
-static GameTimeMapping map_impl(
+GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
     const std::filesystem::path& output_json_path,
-    const OcrCallback& recognize,
-    const std::function<void(double, std::optional<int>)>& on_sample) {
+    const OcrCallback& recognize) {
     if (region.x < 0 || region.y < 0 || region.width <= 0 || region.height <= 0)
         throw std::invalid_argument("Region must have nonnegative origin and positive size");
     if (!recognize) throw std::invalid_argument("OCR callback is empty");
@@ -195,9 +184,7 @@ static GameTimeMapping map_impl(
                             region.width * 3, image.data() + offset,
                             static_cast<std::size_t>(region.width) * 3);
             }
-            const auto game_second = recognize(crop, region.width, region.height);
-            if (on_sample) on_sample(next_sample, game_second);
-            if (game_second)
+            if (const auto game_second = recognize(crop, region.width, region.height))
                 add_sample(result, *game_second, next_sample,
                            std::min(next_sample + sample_interval, duration));
             next_sample += sample_interval;
@@ -222,32 +209,12 @@ static GameTimeMapping map_impl(
 
 GameTimeMapping map_gametime_to_videotime(
     const std::filesystem::path& video_path, Region region,
-    const std::filesystem::path& output_json_path,
-    const OcrCallback& recognize) {
-    return map_impl(video_path, region, output_json_path, recognize, {});
-}
-
-GameTimeMapping map_gametime_to_videotime(
-    const std::filesystem::path& video_path, Region region,
-    const std::filesystem::path& output_json_path,
-    const ProgressCallback& progress) {
+    const std::filesystem::path& output_json_path) {
     TesseractOcr worker;
-    return map_impl(video_path, region, output_json_path,
+    return map_gametime_to_videotime(video_path, region, output_json_path,
         [&worker](const std::vector<std::uint8_t>& rgb, int width, int height) {
             return worker.recognize(rgb, width, height);
-        },
-        [&](double video_seconds, std::optional<int> game_second) {
-            if (progress)
-                progress(video_seconds, worker.text(), game_second,
-                         worker.duration_seconds());
         });
-}
-
-GameTimeMapping map_gametime_to_videotime(
-    const std::filesystem::path& video_path, Region region,
-    const std::filesystem::path& output_json_path) {
-    return map_gametime_to_videotime(video_path, region, output_json_path,
-                                     ProgressCallback{});
 }
 
 } // namespace time_mapper
