@@ -2,6 +2,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^TimeMapperLogHandler)(double videoSeconds, NSString *recognizedText,
+                                     NSNumber * _Nullable gameSecond, double ocrSeconds);
+
 @interface TimeMapperBridge : NSObject
 
 // Returns nil on success, or a description of the failure.
@@ -10,7 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
                                     x:(NSInteger)x
                                     y:(NSInteger)y
                                 width:(NSInteger)width
-                               height:(NSInteger)height;
+                               height:(NSInteger)height
+                                  log:(TimeMapperLogHandler)log;
 
 @end
 

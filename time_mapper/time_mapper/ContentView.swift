@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var isProcessing = false
     @State private var outputURL: URL?
     @State private var processingError: String?
+    @State private var processingLog: [String] = []
     private let clock = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -129,6 +130,28 @@ struct ContentView: View {
                 Text(processingError).textSelection(.enabled)
                 Button("Try Again", action: startProcessing)
             }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Live OCR log").font(.headline)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 3) {
+                            ForEach(processingLog.indices, id: \.self) { index in
+                                Text(processingLog[index])
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(index)
+                            }
+                        }
+                    }
+                    .onChange(of: processingLog.count) { _, count in
+                        if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                    }
+                }
+                .frame(maxHeight: .infinity)
+                .background(.quaternary.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
             HStack {
                 Button("Back to Video") { stage = .videoPlay }
                     .disabled(isProcessing)
@@ -164,17 +187,29 @@ struct ContentView: View {
         isProcessing = true
         processingError = nil
         outputURL = nil
+        processingLog = ["Starting OCR…"]
         Task {
             let failure = await Task.detached(priority: .userInitiated) {
                 TimeMapperBridge.mapVideo(atPath: videoPath, outputJSONPath: outputPath,
                                           x: region.x, y: region.y,
-                                          width: region.width, height: region.height)
+                                          width: region.width, height: region.height) {
+                    videoSeconds, recognizedText, gameSecond, ocrSeconds in
+                    let raw = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "\n", with: " ⏎ ")
+                    let reading = gameSecond.map { "\($0) s" } ?? "no clock"
+                    let line = String(format: "%7.1f s  OCR %5.0f ms  %@  text: %@",
+                                      videoSeconds, ocrSeconds * 1000, reading,
+                                      raw.isEmpty ? "(empty)" : raw)
+                    Task { @MainActor in processingLog.append(line) }
+                }
             }.value
             isProcessing = false
             if let failure {
                 processingError = failure as String
+                processingLog.append("Failed: \(failure)")
             } else {
                 outputURL = destination
+                processingLog.append("Saved \(destination.lastPathComponent)")
             }
         }
     }

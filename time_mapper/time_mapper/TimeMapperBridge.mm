@@ -11,7 +11,8 @@
                                     x:(NSInteger)x
                                     y:(NSInteger)y
                                 width:(NSInteger)width
-                               height:(NSInteger)height {
+                               height:(NSInteger)height
+                                  log:(TimeMapperLogHandler)log {
     try {
         const time_mapper::Region region{
             static_cast<int>(x), static_cast<int>(y),
@@ -19,7 +20,13 @@
         };
         time_mapper::map_gametime_to_videotime(
             std::filesystem::path(videoPath.fileSystemRepresentation), region,
-            std::filesystem::path(outputPath.fileSystemRepresentation));
+            std::filesystem::path(outputPath.fileSystemRepresentation),
+            [&](double videoSeconds, const std::string& text,
+                std::optional<int> gameSecond, double ocrSeconds) {
+                NSString *recognizedText = [NSString stringWithUTF8String:text.c_str()];
+                log(videoSeconds, recognizedText ?: @"", gameSecond
+                    ? @(static_cast<NSInteger>(*gameSecond)) : nil, ocrSeconds);
+            });
         return nil;
     } catch (const std::exception& error) {
         return [NSString stringWithUTF8String:error.what()];
