@@ -180,18 +180,21 @@ struct ContentView: View {
             suffix += 1
         }
         let destination = candidate
-        let videoPath = videoURL.path
-        let outputPath = destination.path
+        let selectedRegion = GameTimeMapper.Region(x: region.x, y: region.y, width: region.width, height: region.height)
         isProcessing = true
         processingError = nil
         outputURL = nil
         processLog = []
         Task {
             let failure = await Task.detached(priority: .userInitiated) {
-                TimeMapperBridge.mapVideo(atPath: videoPath, outputJSONPath: outputPath,
-                                          x: region.x, y: region.y,
-                                          width: region.width, height: region.height) { message in
-                    Task { @MainActor in processLog.append(message) }
+                do {
+                    try await GameTimeMapper.map(videoURL: videoURL, outputURL: destination,
+                                                 region: selectedRegion) { message in
+                        Task { @MainActor in processLog.append(message) }
+                    }
+                    return nil as String?
+                } catch {
+                    return error.localizedDescription
                 }
             }.value
             isProcessing = false

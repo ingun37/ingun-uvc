@@ -14,19 +14,13 @@ immutability over mutability.
   drawn on the displayed video back into source-video pixel coordinates.
 - `time_mapper/VideoCanvas.swift` draws the selection in top-left video pixel
   coordinates. Preserve that coordinate contract when changing the canvas.
-- `time_mapper/TimeMapperBridge.h/.mm` connects Swift to the C++ function in
-  `../time_mapper_lib/library.cpp`. Read the library and OCR project guides when
-  changing this processing path.
+- `time_mapper/GameTimeMapper.swift` decodes video with AVFoundation and recognizes the selected clock region with Vision. Keep sampling, parsing, and JSON range behavior aligned with the existing mapping format.
 - Processing writes `<video-name>.gametime.json` beside the selected video;
   existing files are preserved by adding a numeric suffix.
 
 ## Build and local dependencies
 
-The Xcode project compiles the C++ library source and links Homebrew FFmpeg.
-Its OCR script and Python interpreter paths point into this repository's
-`ocr/` directory. The app sandbox is disabled so this local development build
-can launch Python and create a JSON sibling of the selected video. Packaging a
-standalone app requires bundling these dependencies and revisiting file access.
+The Xcode app uses system AVFoundation and Vision frameworks. It has no FFmpeg, C++, Python, or PaddleOCR build dependency. The app sandbox remains disabled for writing a JSON sibling of the selected video.
 
 Build from the repository root:
 
@@ -38,4 +32,4 @@ xcodebuild -project time_mapper/time_mapper.xcodeproj -scheme time_mapper \
 
 If Swift macro helpers fail inside the command sandbox, retry the same build
 with approved execution outside it. A successful build checks compilation;
-use the `time_mapper_lib` tests for video mapping behavior.
+run the app tests for clock parsing and range behavior.
