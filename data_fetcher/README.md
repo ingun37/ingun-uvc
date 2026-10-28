@@ -16,7 +16,8 @@ data_fetcher/.venv/bin/python data_fetcher/main.py games --season 2025-26 --seas
 Use a game ID from the list to print its field goal attempts as CSV:
 
 ```sh
-data_fetcher/.venv/bin/python data_fetcher/main.py attempts 0022400061 > attempts.csv
+data_fetcher/.venv/bin/python data_fetcher/main.py attempts 0022400061
+data_fetcher/.venv/bin/python data_fetcher/main.py attempts 0022400061 --output attempts.csv
 ```
 
 The `period` and `clock` columns give the time of each attempt. `clock` is the game clock remaining in that period, in the NBA feed's ISO 8601 duration format (for example, `PT05M32.00S`). `result` is `made` or `missed`. A game that has no play-by-play data yet produces a message instead of attempt rows.

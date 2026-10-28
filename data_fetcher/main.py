@@ -1,6 +1,7 @@
 """List NBA games and print every field goal attempt in a game."""
 
 import argparse
+from contextlib import nullcontext
 import csv
 from datetime import date
 import re
@@ -67,16 +68,18 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     if rows.empty:
         print("No play-by-play data found for this game.")
         return
-    writer = csv.writer(sys.stdout)
-    writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description"))
-    for row in rows.itertuples(index=False):
-        if row.isFieldGoal not in (1, True, "1", "true", "True"):
-            continue
-        result = str(row.shotResult).lower()
-        if result not in ("made", "missed"):
-            result = "made" if str(row.actionType).lower() == "made shot" else "missed"
-        writer.writerow((args.game_id, row.period, row.clock, row.teamTricode,
-                         row.playerName, result, row.description))
+    destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
+    with destination as stream:
+        writer = csv.writer(stream)
+        writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description"))
+        for row in rows.itertuples(index=False):
+            if row.isFieldGoal not in (1, True, "1", "true", "True"):
+                continue
+            result = str(row.shotResult).lower()
+            if result not in ("made", "missed"):
+                result = "made" if str(row.actionType).lower() == "made shot" else "missed"
+            writer.writerow((args.game_id, row.period, row.clock, row.teamTricode,
+                             row.playerName, result, row.description))
 
 
 def main() -> int:
@@ -91,12 +94,13 @@ def main() -> int:
     games.set_defaults(func=list_games)
     shots = commands.add_parser("attempts", help="print field goal attempts as CSV")
     shots.add_argument("game_id", type=game_id_value, help="10-digit ID from the games command")
+    shots.add_argument("--output", "-o", metavar="FILE", help="write CSV to FILE instead of standard output")
     shots.set_defaults(func=field_goal_attempts)
     args = parser.parse_args()
     try:
         args.func(args)
     except Exception as exc:
-        print(f"NBA request failed: {exc}", file=sys.stderr)
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
     return 0
 
