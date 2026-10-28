@@ -11,28 +11,27 @@ nonisolated enum GameTimeMapper {
     }
 
     struct Entry: Codable, Equatable, Sendable {
-        let game_second: Int
+        let game_second: Double
         var start_seconds: Double
         var end_seconds: Double
     }
 
-    static func parseClock(_ texts: [String]) -> Int? {
+    static func parseClock(_ texts: [String]) -> Double? {
         for text in texts + [texts.joined(separator: " ")] {
             let normalized = text.replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
-            let pattern = #"(?<!\d)(?:(\d{1,2}):(\d{2})|:(\d{2})\.(\d))(?!\d)"#
+            let pattern = #"(?<!\d)(\d{0,2}):(\d{2})(?:\.(\d+))?(?![\d.])"#
             guard let match = normalized.range(of: pattern, options: .regularExpression) else { continue }
             let clock = String(normalized[match])
             let parts = clock.split(separator: ":", omittingEmptySubsequences: false)
             guard parts.count == 2 else { continue }
             let minutes = Int(parts[0]) ?? 0
-            let secondsText = parts[1].split(separator: ".")[0]
-            guard let seconds = Int(secondsText), seconds < 60 else { continue }
-            return minutes * 60 + seconds
+            guard let seconds = Double(parts[1]), seconds < 60 else { continue }
+            return Double(minutes * 60) + seconds
         }
         return nil
     }
 
-    static func add(_ second: Int, at start: Double, until end: Double, to entries: inout [Entry]) {
+    static func add(_ second: Double, at start: Double, until end: Double, to entries: inout [Entry]) {
         if let last = entries.indices.last,
            entries[last].game_second == second,
            start <= entries[last].end_seconds + 0.000001 {

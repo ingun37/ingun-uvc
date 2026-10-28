@@ -226,8 +226,10 @@ struct ContentView: View {
     }
 
     private func time(_ seconds: Double) -> String {
-        let total = Int(max(seconds, 0))
-        return String(format: "%02d:%02d:%02d", total / 3600, (total / 60) % 60, total % 60)
+        let centiseconds = Int(max(seconds, 0) * 100)
+        let total = centiseconds / 100
+        return String(format: "%02d:%02d:%02d.%02d", total / 3600,
+                      (total / 60) % 60, total % 60, centiseconds % 100)
     }
 }
 

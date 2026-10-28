@@ -4,7 +4,9 @@ import Testing
 struct TimeMapperTests {
     @Test func parsesClockFormatsAndRejectsInvalidSeconds() {
         #expect(GameTimeMapper.parseClock(["07 : 20"]) == 440)
-        #expect(GameTimeMapper.parseClock([":06.1"]) == 6)
+        #expect(GameTimeMapper.parseClock([":06.1"]) == 6.1)
+        #expect(GameTimeMapper.parseClock(["00:59.9"]) == 59.9)
+        #expect(GameTimeMapper.parseClock(["01:00.4"]) == 60.4)
         #expect(GameTimeMapper.parseClock(["07", ":", "20"]) == 440)
         #expect(GameTimeMapper.parseClock(["00:00"]) == 0)
         #expect(GameTimeMapper.parseClock(["07:60"]) == nil)
