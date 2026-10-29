@@ -1,0 +1,36 @@
+# GametimeMapper CLI
+
+Target the current macOS SDK. Use AVFoundation to decode video and Vision for
+OCR; the project has no UI or selected subregion. Follow RAII, avoid nullable
+stored properties where practical, and prefer immutable values.
+
+## Code and behavior
+
+- `GametimeMapper/Command.swift` accepts exactly two positional arguments:
+  input video path and output JSON path. It prints per-sampled-frame OCR text,
+  recognized game time, and OCR duration in milliseconds.
+- `GametimeMapper/GameTimeMapper.swift` samples the whole frame every 0.5
+  seconds. Parse a clock only when a recognized period (`1ST`, `2ND`, `3RD`,
+  `4TH`, or `OT`) is present. Supported clocks include `mm:ss` and `:ss.s`.
+  Additional overtime labels are not defined yet.
+- Output is a chronological JSON array with `period`, `game_second`,
+  `start_seconds`, and `end_seconds`. Video range ends are exclusive.
+  Adjacent samples with the same period and game time merge. Missing readings
+  leave gaps; do not infer a clock or period from neighboring frames.
+- Keep the `recognize` callback injectable so decoding and range behavior can
+  be tested with deterministic OCR readings.
+
+## Build and test
+
+From the repository root:
+
+```sh
+xcodebuild -project GametimeMapper/GametimeMapper.xcodeproj \
+  -scheme GametimeMapper -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath /tmp/gametime-mapper-xcode CODE_SIGNING_ALLOWED=NO test
+```
+
+`GametimeMapperTests/` covers parsing, deterministic decoding with the small
+MP4 fixtures, and live Vision OCR on the full-frame MOV clips in `test-data/`.
+When changing sampling or parsing, run the full suite. Xcode's macOS test
+runner may need execution outside the command sandbox.
