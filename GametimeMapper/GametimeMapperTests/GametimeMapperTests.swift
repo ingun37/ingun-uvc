@@ -15,8 +15,7 @@ struct GametimeMapperTests {
     @Test(arguments: ["minutes-seconds.mp4", "seconds-fractional.mp4"])
     func mapsBundledVideo(_ name: String) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let video = root.appendingPathComponent("time_mapper_lib/test-data/\(name)")
+        let video = root.appendingPathComponent("test-data/\(name)")
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         defer { try? FileManager.default.removeItem(at: output) }
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output, recognize: { _ in
