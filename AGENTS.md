@@ -9,6 +9,8 @@ This repository contains multiple projects:
   [GametimeMapper/AGENTS.md](GametimeMapper/AGENTS.md).
 - `data_fetcher/`: Python CLI program that fetches field goal attempts of a NBA game.
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
+- `ClipEditor/`: native macOS SwiftUI app for missed-shot video compilations.
+  Before working on this project, read and follow [ClipEditor/AGENTS.md](ClipEditor/AGENTS.md).
 
 Project-specific instructions apply only to their respective project directories.
 For changes that cross project boundaries, follow each affected project's guide.
