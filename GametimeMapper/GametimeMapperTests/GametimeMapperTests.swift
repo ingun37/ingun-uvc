@@ -19,9 +19,9 @@ struct GametimeMapperTests {
         let video = root.appendingPathComponent("time_mapper_lib/test-data/\(name)")
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         defer { try? FileManager.default.removeItem(at: output) }
-        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output) { _ in
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output, recognize: { _ in
             ["1ST", name == "minutes-seconds.mp4" ? "07:20" : ":06.1"]
-        }
+        })
         #expect(!entries.isEmpty)
         #expect(entries.allSatisfy { $0.period == "1ST" && $0.start_seconds < $0.end_seconds })
         #expect(entries.first?.game_second == (name == "minutes-seconds.mp4" ? 440 : 6.1))

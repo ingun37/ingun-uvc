@@ -50,7 +50,8 @@ nonisolated enum GameTimeMapper {
 
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
 
-    static func map(videoURL: URL, outputURL: URL, recognize: Recognizer = visionTexts) async throws -> [Entry] {
+    static func map(videoURL: URL, outputURL: URL, recognize: Recognizer = visionTexts,
+                    log: (String) -> Void = { _ in }) async throws -> [Entry] {
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw MappingError.noVideo }
         let trackStart = try await track.load(.timeRange).start.seconds
@@ -79,7 +80,14 @@ nonisolated enum GameTimeMapper {
             }
             guard nextSample < duration,
                   let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-            if let reading = parse(try recognize(buffer)) {
+            let start = CFAbsoluteTimeGetCurrent()
+            let texts = try recognize(buffer)
+            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
+            let reading = parse(texts)
+            log(String(format: "%.1fs → %@ | OCR %@ | %.1f ms", nextSample,
+                       reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
+                       texts.description, elapsed))
+            if let reading {
                 add(reading, at: nextSample, until: min(nextSample + interval, duration), to: &entries)
             }
             nextSample += interval
