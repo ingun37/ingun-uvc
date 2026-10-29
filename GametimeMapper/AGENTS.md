@@ -6,11 +6,12 @@ stored properties where practical, and prefer immutable values.
 
 ## Code and behavior
 
-- `GametimeMapper/Command.swift` accepts exactly two positional arguments:
-  input video path and output JSON path. It prints per-sampled-frame OCR text,
+- `GametimeMapper/Command.swift` accepts input video path and output JSON path,
+  plus optional `--bottom-divisor N` to OCR the bottom `1/N` of each frame
+  (default `N=1`, the whole frame). It prints per-sampled-frame OCR text,
   recognized game time, and OCR duration in milliseconds.
-- `GametimeMapper/GameTimeMapper.swift` samples the whole frame every 0.5
-  seconds. Parse a clock only when a recognized period (`1ST`, `2ND`, `3RD`,
+- `GametimeMapper/GameTimeMapper.swift` samples every 0.5 seconds. Parse a
+  clock only when a recognized period (`1ST`, `2ND`, `3RD`,
   `4TH`, or `OT`) is present. Supported clocks include `mm:ss` and `:ss.s`.
   Additional overtime labels are not defined yet.
 - Output is a chronological JSON array with `period`, `game_second`,
