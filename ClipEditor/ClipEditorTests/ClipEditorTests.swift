@@ -18,6 +18,13 @@ struct ClipEditorTests {
         #expect(attempts[1].gameSecond == 121.5)
     }
 
+    @Test func readsDataFetcherCRLFFile() throws {
+        let csv = "game_id,period,clock,team,player,result,description\r\n" +
+            "0012600061,1,PT11M33.00S,SAS,Vassell,missed,MISS Vassell 27' 3PT Jump Shot\r\n"
+        let attempts = try ClipPlanner.attempts(from: csv)
+        #expect(!attempts.isEmpty)
+    }
+
     @Test func mapsClampsAndMergesOverlappingMisses() throws {
         let attempts = [
             MissedAttempt(period: "1ST", gameSecond: 693, description: "first"),

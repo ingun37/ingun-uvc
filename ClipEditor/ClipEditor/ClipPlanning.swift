@@ -131,7 +131,7 @@ enum ClipPlanner {
         var row: [String] = []
         var field = ""
         var quoted = false
-        let characters = Array(text)
+        let characters = Array(text.unicodeScalars)
         var index = 0
         while index < characters.count {
             let character = characters[index]
@@ -144,7 +144,7 @@ enum ClipPlanner {
                         quoted = false
                     }
                 } else {
-                    field.append(character)
+                    field.unicodeScalars.append(character)
                 }
             } else {
                 switch character {
@@ -154,8 +154,11 @@ enum ClipPlanner {
                     row.append(field)
                     if row.contains(where: { !$0.isEmpty }) { rows.append(row) }
                     row = []; field = ""
-                case "\r": break
-                default: field.append(character)
+                case "\r":
+                    row.append(field)
+                    if row.contains(where: { !$0.isEmpty }) { rows.append(row) }
+                    row = []; field = ""
+                default: field.unicodeScalars.append(character)
                 }
             }
             index += 1
