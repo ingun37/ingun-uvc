@@ -53,4 +53,18 @@ struct GametimeMapperTests {
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
         #expect(decoded == entries)
     }
+
+    @Test func leavesGapUntilThirdQuarterScoreboardAppears() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/not-continuous.mov")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
+        #expect(entries.first?.start_seconds == 2.5)
+        #expect(entries.map(\.game_second) == [718, 717, 716])
+        #expect(entries.allSatisfy { $0.period == "3RD" })
+        let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
+        #expect(decoded == entries)
+    }
 }
