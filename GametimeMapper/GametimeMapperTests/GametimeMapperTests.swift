@@ -40,4 +40,17 @@ struct GametimeMapperTests {
         #expect(entries.first?.start_seconds == 0)
         #expect(entries.last?.end_seconds == 3)
     }
+
+    @Test func mapsFractionalBroadcastWithVision() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/trimmed-including-fractional.mov")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
+        #expect(entries.map(\.game_second) == [62, 61, 60, 59.9, 59.4, 58.9, 58.4])
+        #expect(entries.allSatisfy { $0.period == "2ND" })
+        let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
+        #expect(decoded == entries)
+    }
 }
