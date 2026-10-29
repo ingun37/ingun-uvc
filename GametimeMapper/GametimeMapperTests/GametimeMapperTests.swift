@@ -27,4 +27,17 @@ struct GametimeMapperTests {
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
         #expect(decoded == entries)
     }
+
+    @Test func mapsUncroppedBroadcastWithVision() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/trimmed-only.mov")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
+        #expect(entries.map(\.game_second) == [442, 441, 440])
+        #expect(entries.allSatisfy { $0.period == "2ND" })
+        #expect(entries.first?.start_seconds == 0)
+        #expect(entries.last?.end_seconds == 3)
+    }
 }
