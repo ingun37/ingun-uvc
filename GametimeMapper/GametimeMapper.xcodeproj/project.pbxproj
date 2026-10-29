@@ -6,6 +6,19 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		AA0000010000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9270EEFE3093216E002C2249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9270EF053093216E002C2249;
+			remoteInfo = GametimeMapper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXBuildFile section */
+		AA000001000000000000000A = {isa = PBXBuildFile; fileRef = AA000001000000000000000B; };
+/* End PBXBuildFile section */
 /* Begin PBXCopyFilesBuildPhase section */
 		9270EF043093216E002C2249 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -19,12 +32,19 @@
 
 /* Begin PBXFileReference section */
 		9270EF063093216E002C2249 /* GametimeMapper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = GametimeMapper; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000010000000000000001 /* GametimeMapperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GametimeMapperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000001000000000000000B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GametimeMapper/GameTimeMapper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9270EF083093216E002C2249 /* GametimeMapper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = GametimeMapper;
+			sourceTree = "<group>";
+		};
+		AA0000010000000000000002 /* GametimeMapperTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GametimeMapperTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -42,6 +62,8 @@
 			isa = PBXGroup;
 			children = (
 				9270EF083093216E002C2249 /* GametimeMapper */,
+				AA0000010000000000000002 /* GametimeMapperTests */,
+				AA000001000000000000000B,
 				9270EF073093216E002C2249 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -50,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				9270EF063093216E002C2249 /* GametimeMapper */,
+				AA0000010000000000000001 /* GametimeMapperTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,6 +97,25 @@
 			productName = GametimeMapper;
 			productReference = 9270EF063093216E002C2249 /* GametimeMapper */;
 			productType = "com.apple.product-type.tool";
+		};
+		AA0000010000000000000003 /* GametimeMapperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000010000000000000005 /* Build configuration list for PBXNativeTarget "GametimeMapperTests" */;
+			buildPhases = (
+				AA0000010000000000000004 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA0000010000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000010000000000000002 /* GametimeMapperTests */,
+			);
+			name = GametimeMapperTests;
+			productName = GametimeMapperTests;
+			productReference = AA0000010000000000000001 /* GametimeMapperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -105,6 +147,7 @@
 			projectRoot = "";
 			targets = (
 				9270EF053093216E002C2249 /* GametimeMapper */,
+				AA0000010000000000000003 /* GametimeMapperTests */,
 			);
 		};
 /* End PBXProject section */
@@ -115,7 +158,21 @@
 			files = (
 			);
 		};
+		AA0000010000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				AA000001000000000000000A,
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA0000010000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9270EF053093216E002C2249 /* GametimeMapper */;
+			targetProxy = AA0000010000000000000009 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9270EF0B3093216E002C2249 /* Debug configuration for PBXProject "GametimeMapper" */ = {
@@ -258,6 +315,24 @@
 			};
 			name = Release;
 		};
+		AA0000010000000000000006 /* Debug configuration for PBXNativeTarget "GametimeMapperTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AA0000010000000000000007 /* Release configuration for PBXNativeTarget "GametimeMapperTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -274,6 +349,14 @@
 			buildConfigurations = (
 				9270EF0E3093216E002C2249 /* Debug configuration for PBXNativeTarget "GametimeMapper" */,
 				9270EF0F3093216E002C2249 /* Release configuration for PBXNativeTarget "GametimeMapper" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		AA0000010000000000000005 /* Build configuration list for PBXNativeTarget "GametimeMapperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000010000000000000006 /* Debug configuration for PBXNativeTarget "GametimeMapperTests" */,
+				AA0000010000000000000007 /* Release configuration for PBXNativeTarget "GametimeMapperTests" */,
 			);
 			defaultConfigurationName = Release;
 		};
