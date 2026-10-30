@@ -17,8 +17,9 @@ stored properties where practical, and prefer immutable values.
 - Output is a chronological JSON array with `period`, `game_second`,
   `start_seconds`, and `end_seconds`. Video range ends are exclusive.
   Samples with the same period merge while the game clock advances continuously
-  at video speed, allowing for OCR clock rounding and up to one second of
-  missing readings when the next clock confirms continuity. The duration of a
+  at video speed, allowing for OCR clock rounding, the transition to tenths
+  below one minute, and up to one second of missing readings when the next
+  clock confirms continuity. The duration of a
   merged entry is `end_seconds - start_seconds`, and `game_second` is its
   starting clock. Longer gaps and clock jumps split entries.
 - Keep the `recognize` callback injectable so decoding and range behavior can

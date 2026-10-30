@@ -44,7 +44,9 @@ nonisolated enum GameTimeMapper {
            start - entries[last].end_seconds <= 1.000001,
            ((abs(start - entries[last].end_seconds) <= 0.000001 &&
              entries[last].game_second == reading.gameSecond) ||
-            abs((entries[last].game_second - (start - entries[last].start_seconds)) - reading.gameSecond) <= 0.51) {
+            abs((entries[last].game_second - (start - entries[last].start_seconds)) - reading.gameSecond) <=
+                (entries[last].game_second >= 60 && reading.gameSecond < 60 &&
+                 reading.gameSecond != reading.gameSecond.rounded() ? 1.0 : 0.51)) {
             entries[last].end_seconds = max(entries[last].end_seconds, end)
         } else {
             entries.append(Entry(period: reading.period, game_second: reading.gameSecond,

@@ -24,6 +24,14 @@ struct GametimeMapperTests {
         GameTimeMapper.add(.init(period: "2ND", gameSecond: 82), at: 128, until: 129, to: &entries)
         #expect(entries.count == 2)
     }
+
+    @Test func mergesWholeSecondToFractionalClockTransition() {
+        var entries: [GameTimeMapper.Entry] = []
+        GameTimeMapper.add(.init(period: "2ND", gameSecond: 116), at: 69, until: 126, to: &entries)
+        GameTimeMapper.add(.init(period: "2ND", gameSecond: 59.8), at: 126, until: 145, to: &entries)
+        #expect(entries == [.init(period: "2ND", game_second: 116,
+                                  start_seconds: 69, end_seconds: 145)])
+    }
     @Test func parsesPeriodAndClock() {
         #expect(GameTimeMapper.parse(["1ST", "07:20"]) == .init(period: "1ST", gameSecond: 440))
         #expect(GameTimeMapper.parse(["2ND 00:59.9"]) == .init(period: "2ND", gameSecond: 59.9))
