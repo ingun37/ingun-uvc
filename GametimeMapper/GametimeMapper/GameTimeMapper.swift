@@ -38,8 +38,9 @@ nonisolated enum GameTimeMapper {
         return nil
     }
 
-    static func add(_ reading: Reading, at start: Double, until end: Double, to entries: inout [Entry]) {
-        if let last = entries.indices.last {
+    static func add(_ reading: Reading, at start: Double, until end: Double,
+                    discontinuous: Bool = false, to entries: inout [Entry]) {
+        if !discontinuous, let last = entries.indices.last {
             let entry = entries[last]
             let frozen = entry.game_start_seconds == entry.game_end_seconds &&
                 entry.game_end_seconds == reading.gameSecond
@@ -88,6 +89,41 @@ nonisolated enum GameTimeMapper {
         var nextSample = 0.0
         var previousReading: Reading?
         var repeatedSince = 0.0
+        var pending: (time: Double, buffer: CVPixelBuffer)?
+        var inDuplicateRun = false
+        var discontinuous = false
+        func process(_ frame: (time: Double, buffer: CVPixelBuffer)) throws {
+            let sampleTime = frame.time
+            let buffer = frame.buffer
+            let start = CFAbsoluteTimeGetCurrent()
+            let texts = try recognizeFrame(buffer)
+            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
+            let reading = parse(texts)
+            log(String(format: "%.1fs → %@ | OCR %@ | %.1f ms", sampleTime,
+                       reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
+                       texts.description, elapsed))
+            if let reading {
+                if reading != previousReading { repeatedSince = sampleTime }
+                if !discontinuous, sampleTime - repeatedSince >= 1.5,
+                   let last = entries.indices.last,
+                   entries[last].game_start_seconds != reading.gameSecond,
+                   entries[last].video_start_seconds < repeatedSince {
+                    entries[last].video_end_seconds = repeatedSince
+                    entries[last].game_end_seconds = reading.gameSecond
+                    entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
+                                         game_end_seconds: reading.gameSecond,
+                                         video_start_seconds: repeatedSince,
+                                         video_end_seconds: min(sampleTime + interval, duration)))
+                } else {
+                    add(reading, at: sampleTime, until: min(sampleTime + interval, duration),
+                        discontinuous: discontinuous, to: &entries)
+                }
+                previousReading = reading
+            } else {
+                previousReading = nil
+            }
+            discontinuous = false
+        }
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sample).seconds - trackStart
@@ -98,39 +134,63 @@ nonisolated enum GameTimeMapper {
             }
             guard nextSample < duration,
                   let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-            let start = CFAbsoluteTimeGetCurrent()
-            let texts = try recognizeFrame(buffer)
-            let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
-            let reading = parse(texts)
-            log(String(format: "%.1fs → %@ | OCR %@ | %.1f ms", nextSample,
-                       reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
-                       texts.description, elapsed))
-            if let reading {
-                if reading != previousReading { repeatedSince = nextSample }
-                if nextSample - repeatedSince >= 1.5,
-                   let last = entries.indices.last,
-                   entries[last].game_start_seconds != reading.gameSecond,
-                   entries[last].video_start_seconds < repeatedSince {
-                    entries[last].video_end_seconds = repeatedSince
-                    entries[last].game_end_seconds = reading.gameSecond
-                    entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
-                                         game_end_seconds: reading.gameSecond,
-                                         video_start_seconds: repeatedSince,
-                                         video_end_seconds: min(nextSample + interval, duration)))
+            let current = (time: nextSample, buffer: buffer)
+            if let previous = pending {
+                if identicalPixels(previous.buffer, current.buffer) {
+                    if !inDuplicateRun, let reading = previousReading,
+                       let last = entries.indices.last,
+                       entries[last].period == reading.period,
+                       entries[last].game_end_seconds == reading.gameSecond {
+                        if entries[last].video_start_seconds >= repeatedSince {
+                            entries.removeLast()
+                        } else if entries[last].video_end_seconds > repeatedSince {
+                            entries[last].video_end_seconds = repeatedSince
+                        }
+                    }
+                    inDuplicateRun = true
+                    discontinuous = true
+                    previousReading = nil
+                } else if inDuplicateRun {
+                    inDuplicateRun = false
+                    previousReading = nil
                 } else {
-                    add(reading, at: nextSample, until: min(nextSample + interval, duration), to: &entries)
+                    try process(previous)
                 }
-                previousReading = reading
-            } else {
-                previousReading = nil
             }
+            pending = current
             nextSample += interval
+        }
+        if let pending, !inDuplicateRun {
+            try process(pending)
         }
         guard reader.status == .completed else { throw reader.error ?? MappingError.readerFailed }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try (encoder.encode(entries) + Data([0x0a])).write(to: outputURL, options: .atomic)
         return entries
+    }
+
+    private static func identicalPixels(_ lhs: CVPixelBuffer, _ rhs: CVPixelBuffer) -> Bool {
+        guard CVPixelBufferGetWidth(lhs) == CVPixelBufferGetWidth(rhs),
+              CVPixelBufferGetHeight(lhs) == CVPixelBufferGetHeight(rhs),
+              CVPixelBufferGetPixelFormatType(lhs) == CVPixelBufferGetPixelFormatType(rhs),
+              CVPixelBufferLockBaseAddress(lhs, .readOnly) == kCVReturnSuccess else { return false }
+        defer { CVPixelBufferUnlockBaseAddress(lhs, .readOnly) }
+        guard CVPixelBufferLockBaseAddress(rhs, .readOnly) == kCVReturnSuccess else { return false }
+        defer { CVPixelBufferUnlockBaseAddress(rhs, .readOnly) }
+        guard let left = CVPixelBufferGetBaseAddress(lhs),
+              let right = CVPixelBufferGetBaseAddress(rhs) else { return false }
+        let width = CVPixelBufferGetWidth(lhs) * 4
+        let height = CVPixelBufferGetHeight(lhs)
+        let leftStride = CVPixelBufferGetBytesPerRow(lhs)
+        let rightStride = CVPixelBufferGetBytesPerRow(rhs)
+        for row in 0..<height {
+            if memcmp(left.advanced(by: row * leftStride),
+                      right.advanced(by: row * rightStride), width) != 0 {
+                return false
+            }
+        }
+        return true
     }
 
     private static func visionTexts(_ buffer: CVPixelBuffer, bottomDivisor: Int) throws -> [String] {

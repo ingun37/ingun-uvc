@@ -2,6 +2,20 @@ import Foundation
 import Testing
 
 struct GametimeMapperTests {
+    @Test func skipsFrozenVideoFramesAndSplitsMapping() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/frozen-2.mov")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
+        #expect(entries.count == 3)
+        #expect(entries[0].video_end_seconds == 7)
+        #expect(entries[1].video_start_seconds >= 31)
+        #expect(entries[0].video_end_seconds < entries[1].video_start_seconds)
+    }
+
     @Test func mergesFrozenClockAcrossMissingReadings() {
         var entries: [GameTimeMapper.Entry] = []
         GameTimeMapper.add(.init(period: "3RD", gameSecond: 252), at: 0, until: 0.5, to: &entries)
