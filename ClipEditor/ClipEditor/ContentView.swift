@@ -243,6 +243,8 @@ private struct ClipRow: View {
                 Text(clip.descriptions.joined(separator: " · "))
                     .font(.headline)
                     .lineLimit(2)
+                Text("Game time: \(clip.gameTimes.joined(separator: " · "))")
+                    .monospacedDigit().foregroundStyle(.secondary)
                 Text("\(ClipPlanner.clockLabel(clip.start)) – \(ClipPlanner.clockLabel(clip.end))")
                     .monospacedDigit().foregroundStyle(.secondary)
                 HStack {

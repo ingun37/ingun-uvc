@@ -2,14 +2,28 @@ import Foundation
 import Testing
 
 struct GametimeMapperTests {
+    @Test func recordsStoppedClockAndExplicitJSONFields() throws {
+        var entries: [GameTimeMapper.Entry] = []
+        GameTimeMapper.add(.init(period: "2ND", gameSecond: 117), at: 13, until: 13.5, to: &entries)
+        GameTimeMapper.add(.init(period: "2ND", gameSecond: 117), at: 13.5, until: 14, to: &entries)
+        #expect(entries[0].game_start_seconds == 117)
+        #expect(entries[0].game_end_seconds == 117)
+        let json = String(decoding: try JSONEncoder().encode(entries), as: UTF8.self)
+        #expect(json.contains("game_start_seconds"))
+        #expect(json.contains("game_end_seconds"))
+        #expect(json.contains("video_start_seconds"))
+        #expect(json.contains("video_end_seconds"))
+        #expect(!json.contains("\"game_second\""))
+    }
+
     @Test func mergesOnlyContinuousClockAndVideoTime() {
         var entries: [GameTimeMapper.Entry] = []
         GameTimeMapper.add(.init(period: "1ST", gameSecond: 100), at: 0, until: 1, to: &entries)
         GameTimeMapper.add(.init(period: "1ST", gameSecond: 99), at: 1, until: 2, to: &entries)
         GameTimeMapper.add(.init(period: "1ST", gameSecond: 98), at: 3, until: 4, to: &entries)
         GameTimeMapper.add(.init(period: "1ST", gameSecond: 96), at: 4, until: 5, to: &entries)
-        #expect(entries.map(\.game_second) == [100, 98, 96])
-        #expect(entries[0].end_seconds == 2)
+        #expect(entries.map(\.game_start_seconds) == [100, 98, 96])
+        #expect(entries[0].video_end_seconds == 2)
     }
 
     @Test func mergesShortGapsWhenClockRemainsContinuous() {
@@ -19,8 +33,8 @@ struct GametimeMapperTests {
             GameTimeMapper.add(.init(period: "2ND", gameSecond: clock),
                                at: start, until: end, to: &entries)
         }
-        #expect(entries == [.init(period: "2ND", game_second: 116,
-                                  start_seconds: 69, end_seconds: 126)])
+        #expect(entries == [.init(period: "2ND", game_start_seconds: 116, game_end_seconds: 84,
+                                  video_start_seconds: 69, video_end_seconds: 126)])
         GameTimeMapper.add(.init(period: "2ND", gameSecond: 82), at: 128, until: 129, to: &entries)
         #expect(entries.count == 2)
     }
@@ -29,8 +43,8 @@ struct GametimeMapperTests {
         var entries: [GameTimeMapper.Entry] = []
         GameTimeMapper.add(.init(period: "2ND", gameSecond: 116), at: 69, until: 126, to: &entries)
         GameTimeMapper.add(.init(period: "2ND", gameSecond: 59.8), at: 126, until: 145, to: &entries)
-        #expect(entries == [.init(period: "2ND", game_second: 116,
-                                  start_seconds: 69, end_seconds: 145)])
+        #expect(entries == [.init(period: "2ND", game_start_seconds: 116, game_end_seconds: 59.8,
+                                  video_start_seconds: 69, video_end_seconds: 145)])
     }
     @Test func parsesPeriodAndClock() {
         #expect(GameTimeMapper.parse(["1ST", "07:20"]) == .init(period: "1ST", gameSecond: 440))
@@ -55,8 +69,8 @@ struct GametimeMapperTests {
             ["1ST", name == "minutes-seconds.mp4" ? "07:20" : ":06.1"]
         })
         #expect(!entries.isEmpty)
-        #expect(entries.allSatisfy { $0.period == "1ST" && $0.start_seconds < $0.end_seconds })
-        #expect(entries.first?.game_second == (name == "minutes-seconds.mp4" ? 440 : 6.1))
+        #expect(entries.allSatisfy { $0.period == "1ST" && $0.video_start_seconds < $0.video_end_seconds })
+        #expect(entries.first?.game_start_seconds == (name == "minutes-seconds.mp4" ? 440 : 6.1))
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
         #expect(decoded == entries)
     }
@@ -68,10 +82,10 @@ struct GametimeMapperTests {
         defer { try? FileManager.default.removeItem(at: output) }
 
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
-        #expect(entries.map(\.game_second) == [442])
+        #expect(entries.map(\.game_start_seconds) == [442])
         #expect(entries.allSatisfy { $0.period == "2ND" })
-        #expect(entries.first?.start_seconds == 0)
-        #expect(entries.last?.end_seconds == 3)
+        #expect(entries.first?.video_start_seconds == 0)
+        #expect(entries.last?.video_end_seconds == 3)
     }
 
     @Test func mapsBottomHalfOfBroadcastWithVision() async throws {
@@ -81,10 +95,10 @@ struct GametimeMapperTests {
         defer { try? FileManager.default.removeItem(at: output) }
 
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output, bottomDivisor: 2)
-        #expect(entries.map(\.game_second) == [442])
+        #expect(entries.map(\.game_start_seconds) == [442])
         #expect(entries.allSatisfy { $0.period == "2ND" })
-        #expect(entries.first?.start_seconds == 0)
-        #expect(entries.last?.end_seconds == 3)
+        #expect(entries.first?.video_start_seconds == 0)
+        #expect(entries.last?.video_end_seconds == 3)
     }
 
     @Test func mapsFractionalBroadcastWithVision() async throws {
@@ -94,7 +108,7 @@ struct GametimeMapperTests {
         defer { try? FileManager.default.removeItem(at: output) }
 
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
-        #expect(entries.map(\.game_second) == [62])
+        #expect(entries.map(\.game_start_seconds) == [62])
         #expect(entries.allSatisfy { $0.period == "2ND" })
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
         #expect(decoded == entries)
@@ -107,8 +121,8 @@ struct GametimeMapperTests {
         defer { try? FileManager.default.removeItem(at: output) }
 
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
-        #expect(entries.first?.start_seconds == 2.5)
-        #expect(entries.map(\.game_second) == [718])
+        #expect(entries.first?.video_start_seconds == 2.5)
+        #expect(entries.map(\.game_start_seconds) == [718])
         #expect(entries.allSatisfy { $0.period == "3RD" })
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
         #expect(decoded == entries)

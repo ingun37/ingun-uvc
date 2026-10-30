@@ -10,9 +10,10 @@ nonisolated enum GameTimeMapper {
 
     struct Entry: Codable, Equatable, Sendable {
         let period: String
-        let game_second: Double
-        var start_seconds: Double
-        var end_seconds: Double
+        let game_start_seconds: Double
+        var game_end_seconds: Double
+        var video_start_seconds: Double
+        var video_end_seconds: Double
     }
 
     static func parse(_ texts: [String]) -> Reading? {
@@ -40,17 +41,19 @@ nonisolated enum GameTimeMapper {
     static func add(_ reading: Reading, at start: Double, until end: Double, to entries: inout [Entry]) {
         if let last = entries.indices.last,
            entries[last].period == reading.period,
-           start >= entries[last].end_seconds - 0.000001,
-           start - entries[last].end_seconds <= 1.000001,
-           ((abs(start - entries[last].end_seconds) <= 0.000001 &&
-             entries[last].game_second == reading.gameSecond) ||
-            abs((entries[last].game_second - (start - entries[last].start_seconds)) - reading.gameSecond) <=
-                (entries[last].game_second >= 60 && reading.gameSecond < 60 &&
+           start >= entries[last].video_end_seconds - 0.000001,
+           start - entries[last].video_end_seconds <= 1.000001,
+           ((abs(start - entries[last].video_end_seconds) <= 0.000001 &&
+             entries[last].game_end_seconds == reading.gameSecond) ||
+            abs((entries[last].game_start_seconds - (start - entries[last].video_start_seconds)) - reading.gameSecond) <=
+                (entries[last].game_start_seconds >= 60 && reading.gameSecond < 60 &&
                  reading.gameSecond != reading.gameSecond.rounded() ? 1.0 : 0.51)) {
-            entries[last].end_seconds = max(entries[last].end_seconds, end)
+            entries[last].video_end_seconds = max(entries[last].video_end_seconds, end)
+            entries[last].game_end_seconds = reading.gameSecond
         } else {
-            entries.append(Entry(period: reading.period, game_second: reading.gameSecond,
-                                 start_seconds: start, end_seconds: end))
+            entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
+                                 game_end_seconds: reading.gameSecond,
+                                 video_start_seconds: start, video_end_seconds: end))
         }
     }
 
@@ -79,6 +82,8 @@ nonisolated enum GameTimeMapper {
         var entries: [Entry] = []
         let interval = 0.5
         var nextSample = 0.0
+        var previousReading: Reading?
+        var repeatedSince = 0.0
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             let timestamp = CMSampleBufferGetPresentationTimeStamp(sample).seconds - trackStart
@@ -97,7 +102,23 @@ nonisolated enum GameTimeMapper {
                        reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
                        texts.description, elapsed))
             if let reading {
-                add(reading, at: nextSample, until: min(nextSample + interval, duration), to: &entries)
+                if reading != previousReading { repeatedSince = nextSample }
+                if nextSample - repeatedSince >= 1.5,
+                   let last = entries.indices.last,
+                   entries[last].game_start_seconds != reading.gameSecond,
+                   entries[last].video_start_seconds < repeatedSince {
+                    entries[last].video_end_seconds = repeatedSince
+                    entries[last].game_end_seconds = reading.gameSecond
+                    entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
+                                         game_end_seconds: reading.gameSecond,
+                                         video_start_seconds: repeatedSince,
+                                         video_end_seconds: min(nextSample + interval, duration)))
+                } else {
+                    add(reading, at: nextSample, until: min(nextSample + interval, duration), to: &entries)
+                }
+                previousReading = reading
+            } else {
+                previousReading = nil
             }
             nextSample += interval
         }

@@ -2,9 +2,10 @@ import Foundation
 
 struct ClockRange: Decodable, Sendable {
     let period: String
-    let game_second: Double
-    let start_seconds: Double
-    let end_seconds: Double
+    let game_start_seconds: Double
+    let game_end_seconds: Double
+    let video_start_seconds: Double
+    let video_end_seconds: Double
 }
 
 struct MissedAttempt: Sendable {
@@ -18,13 +19,15 @@ struct Clip: Identifiable, Sendable {
     var start: Double
     var end: Double
     var descriptions: [String]
+    var gameTimes: [String]
     var included: Bool = true
 
-    init(start: Double, end: Double, descriptions: [String]) {
+    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = []) {
         id = UUID()
         self.start = start
         self.end = end
         self.descriptions = descriptions
+        self.gameTimes = gameTimes
     }
 }
 
@@ -48,6 +51,22 @@ enum ClipPlanningError: LocalizedError {
 }
 
 enum ClipPlanner {
+    private struct MappedRange {
+        let range: ClockRange
+        var clockDuration: Double { range.game_start_seconds - range.game_end_seconds }
+        var videoDuration: Double { range.video_end_seconds - range.video_start_seconds }
+
+        func distance(to second: Double) -> Double {
+            max(range.game_end_seconds - second, second - range.game_start_seconds, 0)
+        }
+
+        func videoTime(for second: Double) -> Double {
+            guard clockDuration > 0 else { return range.video_start_seconds }
+            let fraction = min(max((range.game_start_seconds - second) / clockDuration, 0), 1)
+            return range.video_start_seconds + fraction * videoDuration
+        }
+    }
+
     static func attempts(from text: String) throws -> [MissedAttempt] {
         let rows = try csvRows(text)
         guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
@@ -74,33 +93,35 @@ enum ClipPlanner {
 
     static func plan(attempts: [MissedAttempt], ranges: [ClockRange], videoDuration: Double) throws -> ClipPlan {
         guard videoDuration.isFinite, videoDuration > 0,
-              ranges.allSatisfy({ $0.game_second.isFinite && $0.start_seconds.isFinite && $0.end_seconds.isFinite && $0.start_seconds >= 0 && $0.start_seconds < $0.end_seconds }) else {
+              ranges.allSatisfy({ $0.game_start_seconds.isFinite && $0.game_end_seconds.isFinite &&
+                  $0.game_start_seconds >= $0.game_end_seconds && $0.game_end_seconds >= 0 &&
+                  $0.video_start_seconds.isFinite && $0.video_end_seconds.isFinite &&
+                  $0.video_start_seconds >= 0 && $0.video_start_seconds < $0.video_end_seconds }) else {
             throw ClipPlanningError.invalidMapping
         }
         guard !attempts.isEmpty else { throw ClipPlanningError.noMisses }
+        let mappedRanges = ranges.map { MappedRange(range: $0) }
         var candidates: [Clip] = []
         var unmatched: [String] = []
         for attempt in attempts {
-            // The first game clock anchors a continuous, one-second-per-second range.
-            // Keep the half-second tolerance for individually sampled readings.
-            let matches = ranges.filter {
-                $0.period.uppercased() == attempt.period &&
-                clockDistance(attempt.gameSecond, in: $0) <= 0.51
+            let matches = mappedRanges.filter {
+                $0.range.period.uppercased() == attempt.period &&
+                $0.distance(to: attempt.gameSecond) <= 0.51
             }
             guard let match = matches.min(by: {
-                let left = clockDistance(attempt.gameSecond, in: $0)
-                let right = clockDistance(attempt.gameSecond, in: $1)
-                return left == right ? $0.start_seconds < $1.start_seconds : left < right
+                let left = $0.distance(to: attempt.gameSecond)
+                let right = $1.distance(to: attempt.gameSecond)
+                return left == right ? $0.range.video_start_seconds < $1.range.video_start_seconds : left < right
             }) else {
                 unmatched.append("\(attempt.period) \(clockLabel(attempt.gameSecond)): \(attempt.description)")
                 continue
             }
-            let moment = min(max(match.start_seconds + min(max(match.game_second - attempt.gameSecond, 0),
-                                                          match.end_seconds - match.start_seconds), 0), videoDuration)
+            let moment = min(max(match.videoTime(for: attempt.gameSecond), 0), videoDuration)
             let start = max(0, moment - 5)
             let end = min(videoDuration, moment + 2)
             if end > start {
-                candidates.append(Clip(start: start, end: end, descriptions: [attempt.description]))
+                candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
+                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"]))
             }
         }
         let sorted = candidates.sorted { $0.start < $1.start }
@@ -109,16 +130,12 @@ enum ClipPlanner {
             if let last = merged.indices.last, clip.start <= merged[last].end {
                 merged[last].end = max(merged[last].end, clip.end)
                 merged[last].descriptions += clip.descriptions
+                merged[last].gameTimes += clip.gameTimes
             } else {
                 merged.append(clip)
             }
         }
         return ClipPlan(clips: merged, unmatched: unmatched)
-    }
-
-    private static func clockDistance(_ second: Double, in range: ClockRange) -> Double {
-        let lowest = range.game_second - (range.end_seconds - range.start_seconds)
-        return max(lowest - second, second - range.game_second, 0)
     }
 
     static func clockLabel(_ seconds: Double) -> String {
