@@ -2,6 +2,18 @@ import Foundation
 import Testing
 
 struct GametimeMapperTests {
+    @Test func mergesFrozenClockAcrossMissingReadings() {
+        var entries: [GameTimeMapper.Entry] = []
+        GameTimeMapper.add(.init(period: "3RD", gameSecond: 252), at: 0, until: 0.5, to: &entries)
+        GameTimeMapper.add(.init(period: "3RD", gameSecond: 252), at: 20, until: 20.5, to: &entries)
+        GameTimeMapper.add(.init(period: "3RD", gameSecond: 252), at: 202.5, until: 203, to: &entries)
+        #expect(entries.count == 1)
+        #expect(entries[0].video_start_seconds == 0)
+        #expect(entries[0].video_end_seconds == 203)
+        #expect(entries[0].game_start_seconds == 252)
+        #expect(entries[0].game_end_seconds == 252)
+    }
+
     @Test func recordsStoppedClockAndExplicitJSONFields() throws {
         var entries: [GameTimeMapper.Entry] = []
         GameTimeMapper.add(.init(period: "2ND", gameSecond: 117), at: 13, until: 13.5, to: &entries)

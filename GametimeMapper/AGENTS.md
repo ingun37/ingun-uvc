@@ -20,7 +20,8 @@ stored properties where practical, and prefer immutable values.
   Samples with the same period merge while the game clock advances continuously
   at video speed, allowing for OCR clock rounding, the transition to tenths
   below one minute, and up to one second of missing readings when the next
-  clock confirms continuity. Longer gaps and clock jumps split entries.
+  clock confirms continuity. Identical stopped-clock readings can also merge
+  across longer OCR gaps. Other longer gaps and clock jumps split entries.
 - Keep the `recognize` callback injectable so decoding and range behavior can
   be tested with deterministic OCR readings.
 

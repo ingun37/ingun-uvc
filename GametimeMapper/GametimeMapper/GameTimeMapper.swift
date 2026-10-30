@@ -39,22 +39,26 @@ nonisolated enum GameTimeMapper {
     }
 
     static func add(_ reading: Reading, at start: Double, until end: Double, to entries: inout [Entry]) {
-        if let last = entries.indices.last,
-           entries[last].period == reading.period,
-           start >= entries[last].video_end_seconds - 0.000001,
-           start - entries[last].video_end_seconds <= 1.000001,
-           ((abs(start - entries[last].video_end_seconds) <= 0.000001 &&
-             entries[last].game_end_seconds == reading.gameSecond) ||
-            abs((entries[last].game_start_seconds - (start - entries[last].video_start_seconds)) - reading.gameSecond) <=
-                (entries[last].game_start_seconds >= 60 && reading.gameSecond < 60 &&
-                 reading.gameSecond != reading.gameSecond.rounded() ? 1.0 : 0.51)) {
-            entries[last].video_end_seconds = max(entries[last].video_end_seconds, end)
-            entries[last].game_end_seconds = reading.gameSecond
-        } else {
-            entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
-                                 game_end_seconds: reading.gameSecond,
-                                 video_start_seconds: start, video_end_seconds: end))
+        if let last = entries.indices.last {
+            let entry = entries[last]
+            let frozen = entry.game_start_seconds == entry.game_end_seconds &&
+                entry.game_end_seconds == reading.gameSecond
+            let gap = start - entry.video_end_seconds
+            let expectedClock = frozen ? entry.game_end_seconds :
+                entry.game_start_seconds - (start - entry.video_start_seconds)
+            let tolerance = entry.game_start_seconds >= 60 && reading.gameSecond < 60 &&
+                reading.gameSecond != reading.gameSecond.rounded() ? 1.0 : 0.51
+            if entry.period == reading.period, gap >= -0.000001,
+               (frozen || gap <= 1.000001),
+               abs(expectedClock - reading.gameSecond) <= tolerance {
+                entries[last].video_end_seconds = max(entries[last].video_end_seconds, end)
+                entries[last].game_end_seconds = reading.gameSecond
+                return
+            }
         }
+        entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
+                             game_end_seconds: reading.gameSecond,
+                             video_start_seconds: start, video_end_seconds: end))
     }
 
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
