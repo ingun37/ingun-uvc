@@ -12,7 +12,7 @@ ClipEditor is a sandboxed SwiftUI app that turns missed NBA field goals into a v
 ## Clip behavior
 
 - Use only rows whose result is `missed`. Match the period and nearest clock within a mapping range, with 0.51 seconds of tolerance at its ends. On equal clock distance, choose the earliest mapping entry. Do not interpolate through missing readings; show attempts without a match.
-- Interpolate between each entry's explicit game and video endpoints. Equal game endpoints represent a stopped clock and cannot locate an attempt. Require mapped footage for the full 5 seconds before and 2 seconds after the attempt; omit attempts without it. Merge overlapping initial clips.
+- Interpolate between each entry's explicit game and video endpoints. Equal game endpoints represent a stopped clock. Clamp the moment to its video range. Start each clip 5 seconds before it and end 2 seconds after it, clamped to the video duration. Merge overlapping initial clips.
 - In the edit scene, each clip shows the CSV game time for every included attempt, plus playback, an include toggle, and adjustable start and end. Export only included clips.
 - Concatenate video ranges without a visual transition. Where source audio exists, extend it across each cut and use volume ramps for a short audio transition. Stage export before replacing an existing destination.
 
