@@ -27,8 +27,9 @@ nonisolated enum GameTimeMapper {
             return String(text[range])
         }).first else { return nil }
         for text in candidates {
-            guard let range = text.range(of: #"(?<!\d)(?:\d{1,2})?:\d{2}(?:\.\d+)?(?![\d.])"#, options: .regularExpression) else { continue }
-            let parts = text[range].split(separator: ":", omittingEmptySubsequences: false)
+            guard let clockRange = text.range(of: #"(?<![\d:])(?:\d{1,2}:\d{2}(?:\.\d+)?|:\d{2}\.\d+)(?![\d.])"#,
+                                              options: .regularExpression) else { continue }
+            let parts = text[clockRange].split(separator: ":", omittingEmptySubsequences: false)
             guard parts.count == 2, let seconds = Double(parts[1]), seconds < 60 else { continue }
             let minutes = Int(parts[0]) ?? 0
             return Reading(period: period, gameSecond: Double(minutes * 60) + seconds)
@@ -39,8 +40,11 @@ nonisolated enum GameTimeMapper {
     static func add(_ reading: Reading, at start: Double, until end: Double, to entries: inout [Entry]) {
         if let last = entries.indices.last,
            entries[last].period == reading.period,
-           entries[last].game_second == reading.gameSecond,
-           start <= entries[last].end_seconds + 0.000001 {
+           start >= entries[last].end_seconds - 0.000001,
+           start - entries[last].end_seconds <= 1.000001,
+           ((abs(start - entries[last].end_seconds) <= 0.000001 &&
+             entries[last].game_second == reading.gameSecond) ||
+            abs((entries[last].game_second - (start - entries[last].start_seconds)) - reading.gameSecond) <= 0.51) {
             entries[last].end_seconds = max(entries[last].end_seconds, end)
         } else {
             entries.append(Entry(period: reading.period, game_second: reading.gameSecond,

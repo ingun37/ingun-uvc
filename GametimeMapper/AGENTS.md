@@ -16,8 +16,11 @@ stored properties where practical, and prefer immutable values.
   Additional overtime labels are not defined yet.
 - Output is a chronological JSON array with `period`, `game_second`,
   `start_seconds`, and `end_seconds`. Video range ends are exclusive.
-  Adjacent samples with the same period and game time merge. Missing readings
-  leave gaps; do not infer a clock or period from neighboring frames.
+  Samples with the same period merge while the game clock advances continuously
+  at video speed, allowing for OCR clock rounding and up to one second of
+  missing readings when the next clock confirms continuity. The duration of a
+  merged entry is `end_seconds - start_seconds`, and `game_second` is its
+  starting clock. Longer gaps and clock jumps split entries.
 - Keep the `recognize` callback injectable so decoding and range behavior can
   be tested with deterministic OCR readings.
 

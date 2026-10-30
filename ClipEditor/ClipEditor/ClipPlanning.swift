@@ -81,17 +81,22 @@ enum ClipPlanner {
         var candidates: [Clip] = []
         var unmatched: [String] = []
         for attempt in attempts {
-            // OCR samples every half second. Accept the nearest reading within one sample.
-            let matches = ranges.filter { $0.period.uppercased() == attempt.period && abs($0.game_second - attempt.gameSecond) <= 0.51 }
+            // The first game clock anchors a continuous, one-second-per-second range.
+            // Keep the half-second tolerance for individually sampled readings.
+            let matches = ranges.filter {
+                $0.period.uppercased() == attempt.period &&
+                clockDistance(attempt.gameSecond, in: $0) <= 0.51
+            }
             guard let match = matches.min(by: {
-                let left = abs($0.game_second - attempt.gameSecond)
-                let right = abs($1.game_second - attempt.gameSecond)
+                let left = clockDistance(attempt.gameSecond, in: $0)
+                let right = clockDistance(attempt.gameSecond, in: $1)
                 return left == right ? $0.start_seconds < $1.start_seconds : left < right
             }) else {
                 unmatched.append("\(attempt.period) \(clockLabel(attempt.gameSecond)): \(attempt.description)")
                 continue
             }
-            let moment = min(max(match.start_seconds, 0), videoDuration)
+            let moment = min(max(match.start_seconds + min(max(match.game_second - attempt.gameSecond, 0),
+                                                          match.end_seconds - match.start_seconds), 0), videoDuration)
             let start = max(0, moment - 5)
             let end = min(videoDuration, moment + 2)
             if end > start {
@@ -109,6 +114,11 @@ enum ClipPlanner {
             }
         }
         return ClipPlan(clips: merged, unmatched: unmatched)
+    }
+
+    private static func clockDistance(_ second: Double, in range: ClockRange) -> Double {
+        let lowest = range.game_second - (range.end_seconds - range.start_seconds)
+        return max(lowest - second, second - range.game_second, 0)
     }
 
     static func clockLabel(_ seconds: Double) -> String {

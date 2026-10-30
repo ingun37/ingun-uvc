@@ -4,6 +4,18 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func interpolatesWithinContinuousClockRangeAndLeavesGapsUnmatched() throws {
+        let attempts = [
+            MissedAttempt(period: "1ST", gameSecond: 97, description: "middle"),
+            MissedAttempt(period: "1ST", gameSecond: 90, description: "gap")
+        ]
+        let ranges = [ClockRange(period: "1ST", game_second: 100, start_seconds: 20, end_seconds: 25)]
+        let plan = try ClipPlanner.plan(attempts: attempts, ranges: ranges, videoDuration: 40)
+        #expect(plan.clips.count == 1)
+        #expect(plan.clips[0].start == 18)
+        #expect(plan.clips[0].end == 25)
+        #expect(plan.unmatched.count == 1)
+    }
     @Test func readsMissedAttemptsIncludingQuotedCSV() throws {
         let csv = "game_id,period,clock,team,player,result,description\n" +
             "1,1,PT11M33.00S,A,One,missed,\"Miss, with comma\"\n" +
