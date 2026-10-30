@@ -106,6 +106,7 @@ enum ClipPlanner {
         for attempt in attempts {
             let matches = mappedRanges.filter {
                 $0.range.period.uppercased() == attempt.period &&
+                $0.clockDuration > 0 &&
                 $0.distance(to: attempt.gameSecond) <= 0.51
             }
             guard let match = matches.min(by: {
@@ -113,13 +114,17 @@ enum ClipPlanner {
                 let right = $1.distance(to: attempt.gameSecond)
                 return left == right ? $0.range.video_start_seconds < $1.range.video_start_seconds : left < right
             }) else {
-                unmatched.append("\(attempt.period) \(clockLabel(attempt.gameSecond)): \(attempt.description)")
+                if !mappedRanges.contains(where: { $0.range.period.uppercased() == attempt.period &&
+                    $0.clockDuration == 0 && $0.distance(to: attempt.gameSecond) <= 0.51 }) {
+                    unmatched.append("\(attempt.period) \(clockLabel(attempt.gameSecond)): \(attempt.description)")
+                }
                 continue
             }
             let moment = min(max(match.videoTime(for: attempt.gameSecond), 0), videoDuration)
-            let start = max(0, moment - 5)
-            let end = min(videoDuration, moment + 2)
-            if end > start {
+            let start = moment - 5
+            let end = moment + 2
+            if start >= 0, end <= videoDuration,
+               coversVideo(start: start, end: end, period: attempt.period, ranges: ranges) {
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
                                        gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"]))
             }
@@ -136,6 +141,18 @@ enum ClipPlanner {
             }
         }
         return ClipPlan(clips: merged, unmatched: unmatched)
+    }
+
+    private static func coversVideo(start: Double, end: Double, period: String, ranges: [ClockRange]) -> Bool {
+        var coveredUntil = start
+        for range in ranges.sorted(by: { $0.video_start_seconds < $1.video_start_seconds })
+            where range.period.uppercased() == period {
+            if range.video_end_seconds <= coveredUntil { continue }
+            if range.video_start_seconds > coveredUntil + 0.000001 { return false }
+            coveredUntil = range.video_end_seconds
+            if coveredUntil >= end - 0.000001 { return true }
+        }
+        return false
     }
 
     static func clockLabel(_ seconds: Double) -> String {

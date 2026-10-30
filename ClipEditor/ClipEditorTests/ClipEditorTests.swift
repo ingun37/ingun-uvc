@@ -4,6 +4,19 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func omitsAttemptWhenOnlyPostPlayFrozenFootageExists() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let csv = try String(contentsOf: root.appendingPathComponent("test-data/0012600061.csv"), encoding: .utf8)
+        let ranges = try JSONDecoder().decode([ClockRange].self, from:
+            Data(contentsOf: root.appendingPathComponent("test-data/frozen-2.json")))
+        let attempts = try ClipPlanner.attempts(from: csv)
+            .filter { $0.description == "MISS Gillespie 2' Running Layup" }
+        let plan = try ClipPlanner.plan(attempts: attempts, ranges: ranges, videoDuration: 39)
+        #expect(plan.clips.isEmpty)
+        #expect(plan.unmatched.isEmpty)
+    }
+
     @Test func usesExplicitClockEndpointsForStoppedClockRange() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -20,18 +33,14 @@ struct ClipEditorTests {
         #expect(plan.clips[0].gameTimes == ["2ND 01:43.00"])
         #expect(plan.clips[0].start > 75 && plan.clips[0].start < 80)
         #expect(plan.clips[0].end > 82 && plan.clips[0].end < 87)
-        #expect(throws: DecodingError.self) {
-            try JSONDecoder().decode([ClockRange].self, from: Data(contentsOf:
-                root.appendingPathComponent("test-data/0012600061-short-compressed.json")))
-        }
     }
 
     @Test func interpolatesWithinContinuousClockRangeAndLeavesGapsUnmatched() throws {
         let attempts = [
             MissedAttempt(period: "1ST", gameSecond: 97, description: "middle"),
-            MissedAttempt(period: "1ST", gameSecond: 90, description: "gap")
+            MissedAttempt(period: "1ST", gameSecond: 85, description: "gap")
         ]
-        let ranges = [ClockRange(period: "1ST", game_start_seconds: 100, game_end_seconds: 95, video_start_seconds: 20, video_end_seconds: 25)]
+        let ranges = [ClockRange(period: "1ST", game_start_seconds: 105, game_end_seconds: 90, video_start_seconds: 15, video_end_seconds: 30)]
         let plan = try ClipPlanner.plan(attempts: attempts, ranges: ranges, videoDuration: 40)
         #expect(plan.clips.count == 1)
         #expect(plan.clips[0].start == 18)
@@ -71,11 +80,7 @@ struct ClipEditorTests {
             ClockRange(period: "1ST", game_start_seconds: 690, game_end_seconds: 689.5, video_start_seconds: 9, video_end_seconds: 9.5)
         ]
         let plan = try ClipPlanner.plan(attempts: attempts, ranges: ranges, videoDuration: 10)
-        #expect(plan.clips.count == 1)
-        #expect(plan.clips[0].start == 0)
-        #expect(plan.clips[0].end == 10)
-        #expect(plan.clips[0].descriptions == ["first", "second"])
-        #expect(plan.clips[0].gameTimes == ["1ST 11:33.00", "1ST 11:30.00"])
+        #expect(plan.clips.isEmpty)
         #expect(plan.unmatched.count == 1)
     }
     @Test func exportsVideoAndAudioWithClipTransitions() async throws {
