@@ -1,4 +1,4 @@
-"""List NBA games and print every field goal attempt in a game."""
+"""List NBA games and print field goal attempts with NBA shot-chart locations."""
 
 import argparse
 from contextlib import nullcontext
@@ -6,8 +6,9 @@ import csv
 from datetime import date
 import re
 import sys
+import time
 
-from nba_api.stats.endpoints import LeagueGameFinder, PlayByPlayV3
+from nba_api.stats.endpoints import LeagueGameFinder, PlayByPlayV3, ShotChartDetail
 
 
 def current_season() -> str:
@@ -33,6 +34,37 @@ def positive_int(value: str) -> int:
     if number < 1:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return number
+
+
+def season_for_game(game_id: str) -> str:
+    start = 2000 + int(game_id[3:5])
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
+def clock_seconds(clock: str) -> float:
+    match = re.fullmatch(r"PT(?:(\d+)M)?([\d.]+)S", clock)
+    if not match:
+        raise ValueError(f"Invalid play-by-play clock: {clock}")
+    return 60 * int(match.group(1) or 0) + float(match.group(2))
+
+
+def match_shot(shot_rows, used: set[int], action, result: str) -> int | None:
+    """Match within a second; leave uncertain or unavailable locations blank."""
+    second = clock_seconds(str(action.clock))
+    made = result == "made"
+    candidates = []
+    for index, shot in enumerate(shot_rows):
+        if index in used or int(shot.PERIOD) != int(action.period) or int(shot.PLAYER_ID) != int(action.personId):
+            continue
+        if bool(shot.SHOT_MADE_FLAG) != made:
+            continue
+        distance = abs(second - (60 * int(shot.MINUTES_REMAINING) + int(shot.SECONDS_REMAINING)))
+        if distance <= 1.01:
+            candidates.append((distance, index))
+    candidates.sort()
+    if not candidates or (len(candidates) > 1 and candidates[0][0] == candidates[1][0]):
+        return None
+    return candidates[0][1]
 
 
 def list_games(args: argparse.Namespace) -> None:
@@ -68,18 +100,34 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     if rows.empty:
         print("No play-by-play data found for this game.")
         return
+    season = args.season or season_for_game(args.game_id)
+    season_type = args.season_type or ("Playoffs" if args.game_id.startswith("004") else "Regular Season")
+    time.sleep(1)
+    chart = ShotChartDetail(team_id=0, player_id=0, game_id_nullable=args.game_id,
+                           season_nullable=season, season_type_all_star=season_type,
+                           context_measure_simple="FGA", get_request=False)
+    chart.get_request()
+    shot_rows = list(chart.shot_chart_detail.get_data_frame().itertuples(index=False))
+    used: set[int] = set()
     destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
     with destination as stream:
         writer = csv.writer(stream)
-        writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description"))
+        writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description",
+                         "loc_x", "loc_y", "shot_distance"))
         for row in rows.itertuples(index=False):
             if row.isFieldGoal not in (1, True, "1", "true", "True"):
                 continue
             result = str(row.shotResult).lower()
             if result not in ("made", "missed"):
                 result = "made" if str(row.actionType).lower() == "made shot" else "missed"
+            shot_index = match_shot(shot_rows, used, row, result)
+            shot = shot_rows[shot_index] if shot_index is not None else None
+            if shot_index is not None:
+                used.add(shot_index)
             writer.writerow((args.game_id, row.period, row.clock, row.teamTricode,
-                             row.playerName, result, row.description))
+                             row.playerName, result, row.description,
+                             shot.LOC_X if shot else "", shot.LOC_Y if shot else "",
+                             shot.SHOT_DISTANCE if shot else ""))
 
 
 def main() -> int:
@@ -94,6 +142,9 @@ def main() -> int:
     games.set_defaults(func=list_games)
     shots = commands.add_parser("attempts", help="print field goal attempts as CSV")
     shots.add_argument("game_id", type=game_id_value, help="10-digit ID from the games command")
+    shots.add_argument("--season", type=season_value, help="YYYY-YY (inferred from game ID by default)")
+    shots.add_argument("--season-type", choices=("Regular Season", "Playoffs", "PlayIn", "Pre Season", "All Star"),
+                       help="default: Playoffs for 004 games, otherwise Regular Season")
     shots.add_argument("--output", "-o", metavar="FILE", help="write CSV to FILE instead of standard output")
     shots.set_defaults(func=field_goal_attempts)
     args = parser.parse_args()
