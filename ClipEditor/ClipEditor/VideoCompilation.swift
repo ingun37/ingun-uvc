@@ -88,19 +88,29 @@ struct VideoCompilation {
                 let basketRight = frame.map { BasketSide.isRight($0) } ?? true
                 let point = BasketSide.project(caption.location, right: basketRight)
                 let label = CATextLayer()
-                label.string = caption.text
-                label.fontSize = max(24, size.height * 0.045)
-                label.foregroundColor = NSColor.white.cgColor
-                label.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
+                let font = NSFont.systemFont(ofSize: max(24, size.height * 0.045), weight: .semibold)
+                let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+                label.string = NSAttributedString(string: caption.text, attributes: attributes)
                 label.alignmentMode = .center
                 label.isWrapped = true
-                label.cornerRadius = 8
                 label.contentsScale = 2
-                let width = max(190, size.width * 0.2)
-                let height = max(86, size.height * 0.13)
-                label.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
-                                     y: min(max((1 - point.y) * size.height, 0), size.height - height),
-                                     width: width, height: height)
+                let padding: CGFloat = 16
+                let naturalWidth = caption.text.components(separatedBy: "\n")
+                    .map { ($0 as NSString).size(withAttributes: attributes).width }.max() ?? 0
+                let width = min(ceil(naturalWidth) + padding * 2, size.width - 16)
+                let textBounds = (caption.text as NSString).boundingRect(
+                    with: CGSize(width: width - padding * 2, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes)
+                let height = min(ceil(textBounds.height) + padding * 2, size.height - 16)
+                let box = CALayer()
+                box.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
+                box.cornerRadius = 8
+                box.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
+                                   y: min(max((1 - point.y) * size.height, 0), size.height - height),
+                                   width: width, height: height)
+                label.frame = CGRect(x: padding, y: (height - ceil(textBounds.height)) / 2,
+                                     width: width - padding * 2, height: ceil(textBounds.height))
+                box.addSublayer(label)
                 let start = max(0, time - 0.5), end = min(cursor.seconds, time + 1.5)
                 let visibility = CAKeyframeAnimation(keyPath: "opacity")
                 // A discrete step at each boundary keeps old captions hidden after their shot.
@@ -118,9 +128,9 @@ struct VideoCompilation {
                 visibility.duration = cursor.seconds
                 visibility.isRemovedOnCompletion = false
                 visibility.fillMode = .both
-                label.opacity = 0
-                label.add(visibility, forKey: "visibility")
-                parent.addSublayer(label)
+                box.opacity = 0
+                box.add(visibility, forKey: "visibility")
+                parent.addSublayer(box)
             }
             videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
             session.videoComposition = videoComposition
