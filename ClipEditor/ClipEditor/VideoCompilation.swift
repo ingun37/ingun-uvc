@@ -1,5 +1,7 @@
 import AVFoundation
 import Foundation
+import AppKit
+import QuartzCore
 
 struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL) async throws {
@@ -25,10 +27,13 @@ struct VideoCompilation {
         if audioTrack != nil && outputAudio.count != 2 { throw CompilationError.trackSetup }
         let audioParameters = outputAudio.map { AVMutableAudioMixInputParameters(track: $0) }
         var cursor = CMTime.zero
+        var overlays: [(Double, ShotCaption)] = []
         for (index, clip) in selected.enumerated() {
             let range = CMTimeRange(start: CMTime(seconds: clip.start, preferredTimescale: 600),
                                     end: CMTime(seconds: clip.end, preferredTimescale: 600))
             try outputVideo.insertTimeRange(range, of: videoTrack, at: cursor)
+            overlays += clip.captions.filter { $0.sourceTime >= clip.start && $0.sourceTime < clip.end }
+                .map { (cursor.seconds + $0.sourceTime - clip.start, $0) }
             if let audioTrack {
                 // Audio extends across the video cut. Alternating tracks allow tails and heads to overlap.
                 let head = index == 0 ? 0 : min(0.25, clip.start, selected[index - 1].end - selected[index - 1].start)
@@ -59,6 +64,59 @@ struct VideoCompilation {
         mix.inputParameters = audioParameters
         guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw CompilationError.exportSetup
+        }
+        if !overlays.isEmpty {
+            let transform = try await videoTrack.load(.preferredTransform)
+            let natural = try await videoTrack.load(.naturalSize)
+            let rect = CGRect(origin: .zero, size: natural).applying(transform)
+            let size = CGSize(width: abs(rect.width), height: abs(rect.height))
+            let videoComposition = AVMutableVideoComposition()
+            videoComposition.renderSize = size
+            videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = CMTimeRange(start: .zero, duration: cursor)
+            let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: outputVideo)
+            instruction.layerInstructions = [layerInstruction]
+            videoComposition.instructions = [instruction]
+            let parent = CALayer(); parent.frame = CGRect(origin: .zero, size: size)
+            let videoLayer = CALayer(); videoLayer.frame = parent.frame
+            parent.addSublayer(videoLayer)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            for (time, caption) in overlays {
+                let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime - 0.5, preferredTimescale: 600), actualTime: nil)
+                let basketRight = frame.map { BasketSide.isRight($0) } ?? true
+                let point = BasketSide.project(caption.location, right: basketRight)
+                let label = CATextLayer()
+                label.string = caption.text
+                label.fontSize = max(24, size.height * 0.045)
+                label.foregroundColor = NSColor.white.cgColor
+                label.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
+                label.alignmentMode = .center
+                label.cornerRadius = 8
+                label.contentsScale = 2
+                let width = max(100, size.width * 0.12)
+                let height = max(38, size.height * 0.07)
+                label.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
+                                     y: min(max((1 - point.y) * size.height, 0), size.height - height),
+                                     width: width, height: height)
+                let start = max(0, time - 0.5), end = min(cursor.seconds, time + 1.5)
+                let visibility = CAKeyframeAnimation(keyPath: "opacity")
+                visibility.values = [0, 0, 1, 1, 0]
+                visibility.keyTimes = [0, NSNumber(value: start / cursor.seconds),
+                                       NSNumber(value: start / cursor.seconds), NSNumber(value: end / cursor.seconds),
+                                       NSNumber(value: end / cursor.seconds)]
+                visibility.calculationMode = .discrete
+                visibility.beginTime = AVCoreAnimationBeginTimeAtZero
+                visibility.duration = cursor.seconds
+                visibility.isRemovedOnCompletion = false
+                visibility.fillMode = .forwards
+                label.opacity = 0
+                label.add(visibility, forKey: "visibility")
+                parent.addSublayer(label)
+            }
+            videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
+            session.videoComposition = videoComposition
         }
         if !audioParameters.isEmpty { session.audioMix = mix }
         try await session.export(to: staged, as: .mp4)

@@ -259,6 +259,10 @@ private struct ClipRow: View {
                     .lineLimit(2)
                 Text("Game time: \(clip.gameTimes.joined(separator: " · "))")
                     .monospacedDigit().foregroundStyle(.secondary)
+                if !clip.captions.isEmpty {
+                    Text("FGM/FGA captions: \(clip.captions.map(\.text).joined(separator: " · "))")
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }
                 Text("\(ClipPlanner.clockLabel(clip.start)) – \(ClipPlanner.clockLabel(clip.end))")
                     .monospacedDigit().foregroundStyle(.secondary)
                 HStack {

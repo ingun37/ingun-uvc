@@ -12,6 +12,22 @@ struct MissedAttempt: Sendable {
     let period: String
     let gameSecond: Double
     let description: String
+    let caption: String?
+    let location: CGPoint?
+
+    init(period: String, gameSecond: Double, description: String, caption: String? = nil, location: CGPoint? = nil) {
+        self.period = period
+        self.gameSecond = gameSecond
+        self.description = description
+        self.caption = caption
+        self.location = location
+    }
+}
+
+struct ShotCaption: Sendable {
+    let sourceTime: Double
+    let text: String
+    let location: CGPoint
 }
 
 struct Clip: Identifiable, Sendable {
@@ -20,14 +36,16 @@ struct Clip: Identifiable, Sendable {
     var end: Double
     var descriptions: [String]
     var gameTimes: [String]
+    var captions: [ShotCaption]
     var included: Bool = true
 
-    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = []) {
+    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [], captions: [ShotCaption] = []) {
         id = UUID()
         self.start = start
         self.end = end
         self.descriptions = descriptions
         self.gameTimes = gameTimes
+        self.captions = captions
     }
 }
 
@@ -76,18 +94,40 @@ enum ClipPlanner {
               let descriptionIndex = header.firstIndex(of: "description") else {
             throw ClipPlanningError.missingColumns
         }
+        let playerIndex = header.firstIndex(of: "player")
+        let teamIndex = header.firstIndex(of: "team")
+        let xIndex = header.firstIndex(of: "loc_x")
+        let yIndex = header.firstIndex(of: "loc_y")
+        var totals: [String: (made: Int, attempted: Int)] = [:]
         return try rows.dropFirst().compactMap { row in
             guard row.count > max(periodIndex, clockIndex, resultIndex, descriptionIndex),
-                  row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "missed" else {
+                  ["made", "missed"].contains(row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) else {
                 return nil
             }
+            let result = row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let player = playerIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let team = teamIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let key = "\(team)|\(player)"
+            if !player.isEmpty {
+                var total = totals[key, default: (0, 0)]
+                total.attempted += 1
+                if result == "made" { total.made += 1 }
+                totals[key] = total
+            }
+            guard result == "missed" else { return nil }
             let periodNumber = Int(row[periodIndex].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
             let period = periodNumber == 5 ? "OT" : periodNumber > 5 ? "\(periodNumber - 4)OT" : "\(periodNumber)\(periodNumber == 1 ? "ST" : periodNumber == 2 ? "ND" : periodNumber == 3 ? "RD" : "TH")"
             let clock = row[clockIndex].trimmingCharacters(in: .whitespacesAndNewlines)
             guard periodNumber >= 1, let seconds = gameSeconds(clock) else {
                 throw ClipPlanningError.invalidClock(clock)
             }
-            return MissedAttempt(period: period, gameSecond: seconds, description: row[descriptionIndex])
+            let x = xIndex.flatMap { row.indices.contains($0) ? Double(row[$0]) : nil }
+            let y = yIndex.flatMap { row.indices.contains($0) ? Double(row[$0]) : nil }
+            let location = (x?.isFinite == true && y?.isFinite == true) ? CGPoint(x: x!, y: y!) : nil
+            let total = totals[key]
+            let caption = total.map { "\($0.made)/\($0.attempted)" }
+            return MissedAttempt(period: period, gameSecond: seconds, description: row[descriptionIndex],
+                                 caption: caption, location: location)
         }
     }
 
@@ -120,8 +160,11 @@ enum ClipPlanner {
             let start = max(0, moment - 5)
             let end = min(videoDuration, moment + 2)
             if end > start {
+                let captions: [ShotCaption] = if let text = attempt.caption, let location = attempt.location {
+                    [ShotCaption(sourceTime: moment, text: text, location: location)]
+                } else { [] }
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
-                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"]))
+                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], captions: captions))
             }
         }
         let sorted = candidates.sorted { $0.start < $1.start }
@@ -131,6 +174,7 @@ enum ClipPlanner {
                 merged[last].end = max(merged[last].end, clip.end)
                 merged[last].descriptions += clip.descriptions
                 merged[last].gameTimes += clip.gameTimes
+                merged[last].captions += clip.captions
             } else {
                 merged.append(clip)
             }
