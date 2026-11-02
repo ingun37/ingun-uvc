@@ -93,10 +93,11 @@ struct VideoCompilation {
                 label.foregroundColor = NSColor.white.cgColor
                 label.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
                 label.alignmentMode = .center
+                label.isWrapped = true
                 label.cornerRadius = 8
                 label.contentsScale = 2
-                let width = max(100, size.width * 0.12)
-                let height = max(38, size.height * 0.07)
+                let width = max(190, size.width * 0.2)
+                let height = max(86, size.height * 0.13)
                 label.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
                                      y: min(max((1 - point.y) * size.height, 0), size.height - height),
                                      width: width, height: height)

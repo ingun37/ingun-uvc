@@ -95,6 +95,8 @@ enum ClipPlanner {
             throw ClipPlanningError.missingColumns
         }
         let playerIndex = header.firstIndex(of: "player")
+        let fullNameIndex = header.firstIndex(of: "player_full_name")
+        let jerseyIndex = header.firstIndex(of: "jersey_number")
         let teamIndex = header.firstIndex(of: "team")
         let xIndex = header.firstIndex(of: "loc_x")
         let yIndex = header.firstIndex(of: "loc_y")
@@ -106,6 +108,8 @@ enum ClipPlanner {
             }
             let result = row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let player = playerIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let fullName = fullNameIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let jersey = jerseyIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
             let team = teamIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
             let key = "\(team)|\(player)"
             if !player.isEmpty {
@@ -125,7 +129,9 @@ enum ClipPlanner {
             let y = yIndex.flatMap { row.indices.contains($0) ? Double(row[$0]) : nil }
             let location = (x?.isFinite == true && y?.isFinite == true) ? CGPoint(x: x!, y: y!) : nil
             let total = totals[key]
-            let caption = total.map { "\($0.made)/\($0.attempted)" }
+            let displayName = fullName.isEmpty ? player : fullName
+            let identity = jersey.isEmpty ? displayName : "#\(jersey) \(displayName)"
+            let caption = total.map { identity.isEmpty ? "\($0.made)/\($0.attempted)" : "\(identity)\n\($0.made)/\($0.attempted)" }
             return MissedAttempt(period: period, gameSecond: seconds, description: row[descriptionIndex],
                                  caption: caption, location: location)
         }

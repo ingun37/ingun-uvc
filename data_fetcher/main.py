@@ -8,7 +8,7 @@ import re
 import sys
 import time
 
-from nba_api.stats.endpoints import LeagueGameFinder, PlayByPlayV3, ShotChartDetail
+from nba_api.stats.endpoints import CommonTeamRoster, LeagueGameFinder, PlayByPlayV3, ShotChartDetail
 
 
 def current_season() -> str:
@@ -46,6 +46,14 @@ def clock_seconds(clock: str) -> float:
     if not match:
         raise ValueError(f"Invalid play-by-play clock: {clock}")
     return 60 * int(match.group(1) or 0) + float(match.group(2))
+
+
+def valid_id(value) -> int | None:
+    try:
+        number = int(value)
+        return number if number > 0 else None
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def match_shot(shot_rows, used: set[int], action, result: str) -> int | None:
@@ -109,11 +117,24 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     chart.get_request()
     shot_rows = list(chart.shot_chart_detail.get_data_frame().itertuples(index=False))
     used: set[int] = set()
+    jersey_numbers: dict[int, str] = {}
+    player_names: dict[int, str] = {}
+    team_ids = sorted({team_id for row in rows.itertuples(index=False)
+                       if (team_id := valid_id(row.teamId)) is not None})
+    for team_id in team_ids:
+        time.sleep(1)
+        roster = CommonTeamRoster(team_id=team_id, season=season, get_request=False)
+        roster.get_request()
+        for player in roster.common_team_roster.get_data_frame().itertuples(index=False):
+            number = str(player.NUM).strip()
+            if number and number.lower() != "nan":
+                jersey_numbers[int(player.PLAYER_ID)] = number
+            player_names[int(player.PLAYER_ID)] = str(player.PLAYER)
     destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
     with destination as stream:
         writer = csv.writer(stream)
         writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description",
-                         "loc_x", "loc_y", "shot_distance"))
+                         "loc_x", "loc_y", "shot_distance", "jersey_number", "player_full_name"))
         for row in rows.itertuples(index=False):
             if row.isFieldGoal not in (1, True, "1", "true", "True"):
                 continue
@@ -127,7 +148,8 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
             writer.writerow((args.game_id, row.period, row.clock, row.teamTricode,
                              row.playerName, result, row.description,
                              shot.LOC_X if shot else "", shot.LOC_Y if shot else "",
-                             shot.SHOT_DISTANCE if shot else ""))
+                             shot.SHOT_DISTANCE if shot else "", jersey_numbers.get(valid_id(row.personId), ""),
+                             player_names.get(valid_id(row.personId), "")))
 
 
 def main() -> int:

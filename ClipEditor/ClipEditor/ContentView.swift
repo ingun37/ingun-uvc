@@ -260,7 +260,7 @@ private struct ClipRow: View {
                 Text("Game time: \(clip.gameTimes.joined(separator: " · "))")
                     .monospacedDigit().foregroundStyle(.secondary)
                 if !clip.captions.isEmpty {
-                    Text("FGM/FGA captions: \(clip.captions.map(\.text).joined(separator: " · "))")
+                    Text("FGM/FGA captions: \(clip.captions.map { $0.text.replacingOccurrences(of: "\n", with: " ") }.joined(separator: " · "))")
                         .monospacedDigit().foregroundStyle(.secondary)
                 }
                 Text("\(ClipPlanner.clockLabel(clip.start)) – \(ClipPlanner.clockLabel(clip.end))")
