@@ -52,17 +52,25 @@ private final class EditorModel {
 
     func name(for kind: InputKind) -> String { files[kind]?.url.lastPathComponent ?? "Choose file…" }
 
+    func accept(_ url: URL, for kind: InputKind) -> Bool {
+        guard url.isFileURL,
+              let type = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType,
+              kind.types.contains(where: { type.conforms(to: $0) }) else { return false }
+        files[kind] = FileAccess(url)
+        clips = []
+        unmatched = []
+        exportedURL = nil
+        message = ""
+        return true
+    }
+
     func choose(_ kind: InputKind) {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = kind.types
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url {
-            files[kind] = FileAccess(url)
-            clips = []
-            unmatched = []
-            exportedURL = nil
-            message = ""
+            _ = accept(url, for: kind)
         }
     }
 
@@ -157,6 +165,12 @@ struct ContentView: View {
                         .lineLimit(1).truncationMode(.middle)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Button("Choose…") { model.choose(kind) }
+                }
+                .padding(10)
+                .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .dropDestination(for: URL.self) { urls, _ in
+                    guard urls.count == 1, let url = urls.first else { return false }
+                    return model.accept(url, for: kind)
                 }
             }
             Spacer()
