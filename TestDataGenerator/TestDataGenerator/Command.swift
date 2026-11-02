@@ -19,10 +19,19 @@ struct Attempt {
 struct Metadata: Encodable {
     let identifier: String
     let attempt: [String: String]
+    let loc_x: Double?
+    let loc_y: Double?
+    let shot_distance: Double?
     let shot_time_seconds: Double
     let source_shot_time_seconds: Double
     let source_start_seconds: Double
     let source_end_seconds: Double
+}
+
+func optionalNumber(_ value: String?) -> Double? {
+    guard let value, let number = Double(value.trimmingCharacters(in: .whitespacesAndNewlines)),
+          number.isFinite else { return nil }
+    return number
 }
 
 func rows(_ text: String) throws -> [[String]] {
@@ -181,6 +190,9 @@ func export(videoTrack: AVAssetTrack, audioTrack: AVAssetTrack?, start: Double, 
             defer { try? FileManager.default.removeItem(at: staged) }
             try await export(videoTrack: videoTrack, audioTrack: audioTrack, start: start, end: end, destination: staged)
             let metadata = Metadata(identifier: identifier, attempt: attempt.fields,
+                                    loc_x: optionalNumber(attempt.fields["loc_x"]),
+                                    loc_y: optionalNumber(attempt.fields["loc_y"]),
+                                    shot_distance: optionalNumber(attempt.fields["shot_distance"]),
                                     shot_time_seconds: moment - start, source_shot_time_seconds: moment,
                                     source_start_seconds: start, source_end_seconds: end)
             let encoder = JSONEncoder()

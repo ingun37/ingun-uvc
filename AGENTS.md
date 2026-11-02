@@ -11,6 +11,9 @@ This repository contains multiple projects:
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
 - `ClipEditor/`: native macOS SwiftUI app for missed-shot video compilations.
   Before working on this project, read and follow [ClipEditor/AGENTS.md](ClipEditor/AGENTS.md).
+- `TestDataGenerator/`: native macOS Swift CLI for per-attempt clips and metadata.
+  Before working on this project, read and follow
+  [TestDataGenerator/AGENTS.md](TestDataGenerator/AGENTS.md).
 
 Project-specific instructions apply only to their respective project directories.
 For changes that cross project boundaries, follow each affected project's guide.
