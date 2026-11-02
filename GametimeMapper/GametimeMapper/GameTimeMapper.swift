@@ -65,10 +65,13 @@ nonisolated enum GameTimeMapper {
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
 
     static func map(videoURL: URL, outputURL: URL, bottomDivisor: Int = 1,
+                    rightDivisor: Int = 1,
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in }) async throws -> [Entry] {
         guard bottomDivisor > 0 else { throw MappingError.invalidBottomDivisor }
-        let recognizeFrame = recognize ?? { try visionTexts($0, bottomDivisor: bottomDivisor) }
+        guard rightDivisor > 0 else { throw MappingError.invalidRightDivisor }
+        let recognizeFrame = recognize ?? { try visionTexts($0, bottomDivisor: bottomDivisor,
+                                                            rightDivisor: rightDivisor) }
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw MappingError.noVideo }
         let trackStart = try await track.load(.timeRange).start.seconds
@@ -193,23 +196,31 @@ nonisolated enum GameTimeMapper {
         return true
     }
 
-    private static func visionTexts(_ buffer: CVPixelBuffer, bottomDivisor: Int) throws -> [String] {
+    static func regionOfInterest(bottomDivisor: Int, rightDivisor: Int) -> CGRect {
+        let width = 1 / CGFloat(rightDivisor)
+        return CGRect(x: 1 - width, y: 0, width: width, height: 1 / CGFloat(bottomDivisor))
+    }
+
+    private static func visionTexts(_ buffer: CVPixelBuffer, bottomDivisor: Int,
+                                    rightDivisor: Int) throws -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
-        request.regionOfInterest = CGRect(x: 0, y: 0, width: 1, height: 1 / CGFloat(bottomDivisor))
+        request.regionOfInterest = regionOfInterest(bottomDivisor: bottomDivisor,
+                                                    rightDivisor: rightDivisor)
         try VNImageRequestHandler(cvPixelBuffer: buffer).perform([request])
         return (request.results ?? []).compactMap { $0.topCandidates(1).first }
             .filter { $0.confidence >= 0.5 }.map(\.string)
     }
 
     private enum MappingError: LocalizedError {
-        case noVideo, invalidDuration, invalidBottomDivisor, readerSetup, readerFailed
+        case noVideo, invalidDuration, invalidBottomDivisor, invalidRightDivisor, readerSetup, readerFailed
         var errorDescription: String? {
             switch self {
             case .noVideo: "The file does not contain a video track."
             case .invalidDuration: "The video duration is invalid."
             case .invalidBottomDivisor: "The bottom divisor must be a positive integer."
+            case .invalidRightDivisor: "The right divisor must be a positive integer."
             case .readerSetup: "Could not set up video decoding."
             case .readerFailed: "Video decoding failed."
             }

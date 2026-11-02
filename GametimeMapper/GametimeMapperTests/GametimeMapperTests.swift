@@ -1,19 +1,13 @@
+import AVFoundation
 import Foundation
 import Testing
 
 struct GametimeMapperTests {
-    @Test func skipsFrozenVideoFramesAndSplitsMapping() async throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let video = root.appendingPathComponent("test-data/frozen-2.mov")
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
-        defer { try? FileManager.default.removeItem(at: output) }
-
-        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
-        #expect(entries.count == 3)
-        #expect(entries[0].video_end_seconds == 7)
-        #expect(entries[1].video_start_seconds >= 31)
-        #expect(entries[0].video_end_seconds < entries[1].video_start_seconds)
+    @Test func cropsFromRightAndBottomTogether() {
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 1, rightDivisor: 2) ==
+                CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 2, rightDivisor: 4) ==
+                CGRect(x: 0.75, y: 0, width: 0.25, height: 0.5))
     }
 
     @Test func mergesFrozenClockAcrossMissingReadings() {
@@ -125,6 +119,37 @@ struct GametimeMapperTests {
         #expect(entries.allSatisfy { $0.period == "2ND" })
         #expect(entries.first?.video_start_seconds == 0)
         #expect(entries.last?.video_end_seconds == 3)
+    }
+
+    @Test func mapsBottomThirdOfVerticalStackWithVision() async throws {
+        try await expectFrozenScoreboard(in: "divisor-vstack.mp4", bottomDivisor: 3, rightDivisor: 1)
+    }
+
+    @Test func mapsRightThirdOfHorizontalStackWithVision() async throws {
+        try await expectFrozenScoreboard(in: "divisor-hstack.mp4", bottomDivisor: 1, rightDivisor: 3)
+    }
+
+    @Test func mapsBottomRightTileOfSquareStackWithVision() async throws {
+        try await expectFrozenScoreboard(in: "divisor-square.mp4", bottomDivisor: 3, rightDivisor: 3)
+    }
+
+    private func expectFrozenScoreboard(in name: String, bottomDivisor: Int,
+                                        rightDivisor: Int) async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/\(name)")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output,
+                                                   bottomDivisor: bottomDivisor,
+                                                   rightDivisor: rightDivisor)
+        #expect(entries.count == 1)
+        #expect(entries.first?.game_start_seconds == 357)
+        #expect(entries.first?.game_end_seconds == 357)
+        #expect(entries.first?.video_start_seconds == 0)
+        let duration = try await AVURLAsset(url: video).load(.duration).seconds
+        #expect(duration > 2.9 && duration <= 3)
+        #expect(entries.first?.video_end_seconds == duration)
     }
 
     @Test func mapsFractionalBroadcastWithVision() async throws {
