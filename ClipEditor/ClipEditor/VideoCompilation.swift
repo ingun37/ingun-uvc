@@ -102,15 +102,21 @@ struct VideoCompilation {
                                      width: width, height: height)
                 let start = max(0, time - 0.5), end = min(cursor.seconds, time + 1.5)
                 let visibility = CAKeyframeAnimation(keyPath: "opacity")
-                visibility.values = [0, 0, 1, 1, 0]
-                visibility.keyTimes = [0, NSNumber(value: start / cursor.seconds),
-                                       NSNumber(value: start / cursor.seconds), NSNumber(value: end / cursor.seconds),
-                                       NSNumber(value: end / cursor.seconds)]
+                // A discrete step at each boundary keeps old captions hidden after their shot.
+                let first = start / cursor.seconds
+                let last = end / cursor.seconds
+                if start == 0 {
+                    visibility.values = [1, 0, 0]
+                    visibility.keyTimes = [0, NSNumber(value: last), 1]
+                } else {
+                    visibility.values = [0, 1, 0, 0]
+                    visibility.keyTimes = [0, NSNumber(value: first), NSNumber(value: last), 1]
+                }
                 visibility.calculationMode = .discrete
                 visibility.beginTime = AVCoreAnimationBeginTimeAtZero
                 visibility.duration = cursor.seconds
                 visibility.isRemovedOnCompletion = false
-                visibility.fillMode = .forwards
+                visibility.fillMode = .both
                 label.opacity = 0
                 label.add(visibility, forKey: "visibility")
                 parent.addSublayer(label)
