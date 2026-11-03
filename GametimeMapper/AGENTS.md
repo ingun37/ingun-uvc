@@ -14,7 +14,7 @@ stored properties where practical, and prefer immutable values.
   recognized game time, and OCR duration in milliseconds.
 - `GametimeMapper/GameTimeMapper.swift` samples every 0.5 seconds. Parse a
   clock only when a recognized period (`1ST`, `2ND`, `3RD`,
-  `4TH`, or `OT`) is present. Supported clocks include `mm:ss` and `:ss.s`.
+  `4TH`, or `OT`) is present. Supported clocks include `mm:ss`, `:ss.s`, and `ss.s`.
   Additional overtime labels are not defined yet.
 - Output is a chronological JSON array with `period`, `game_start_seconds`,
   `game_end_seconds`, `video_start_seconds`, and `video_end_seconds`. Video

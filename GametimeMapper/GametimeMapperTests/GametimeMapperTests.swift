@@ -147,6 +147,9 @@ struct GametimeMapperTests {
         #expect(GameTimeMapper.parse(["1ST", "07:20"]) == .init(period: "1ST", gameSecond: 440))
         #expect(GameTimeMapper.parse(["2ND 00:59.9"]) == .init(period: "2ND", gameSecond: 59.9))
         #expect(GameTimeMapper.parse(["3RD", ":06.1"]) == .init(period: "3RD", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["3RD", "06.1"]) == .init(period: "3RD", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["3RD", "6.1"]) == .init(period: "3RD", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["4TH 59.9"]) == .init(period: "4TH", gameSecond: 59.9))
         #expect(GameTimeMapper.parse(["4TH", "07", ":", "20"]) == .init(period: "4TH", gameSecond: 440))
         #expect(GameTimeMapper.parse(["OT", "00:00"]) == .init(period: "OT", gameSecond: 0))
         #expect(GameTimeMapper.parse(["nGS", "SAC : 34 2ND 1:57 24 67 SAS", "SAC", "34", "67", "SAS"]) == .init(period: "2ND", gameSecond: 117))
@@ -154,6 +157,7 @@ struct GametimeMapperTests {
         #expect(GameTimeMapper.parse(["SAC : 34 2ND 24"]) == nil)
         #expect(GameTimeMapper.parse(["5TH", "07:20"]) == nil)
         #expect(GameTimeMapper.parse(["OT", "07:60"]) == nil)
+        #expect(GameTimeMapper.parse(["OT", "60.0"]) == nil)
     }
 
     @Test(arguments: ["minutes-seconds.mp4", "seconds-fractional.mp4"])

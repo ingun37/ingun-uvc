@@ -28,11 +28,12 @@ nonisolated enum GameTimeMapper {
             return String(text[range])
         }).first else { return nil }
         for text in candidates {
-            guard let clockRange = text.range(of: #"(?<![\d:])(?:\d{1,2}:\d{2}(?:\.\d+)?|:\d{2}\.\d+)(?![\d.])"#,
+            guard let clockRange = text.range(of: #"(?<![\d:])(?:\d{1,2}:\d{2}(?:\.\d+)?|:?\d{1,2}\.\d+)(?![\d.])"#,
                                               options: .regularExpression) else { continue }
             let parts = text[clockRange].split(separator: ":", omittingEmptySubsequences: false)
-            guard parts.count == 2, let seconds = Double(parts[1]), seconds < 60 else { continue }
-            let minutes = Int(parts[0]) ?? 0
+            let secondsText = parts.count == 2 ? parts[1] : parts[0]
+            guard let seconds = Double(secondsText), seconds < 60 else { continue }
+            let minutes = parts.count == 2 ? (Int(parts[0]) ?? 0) : 0
             return Reading(period: period, gameSecond: Double(minutes * 60) + seconds)
         }
         return nil
