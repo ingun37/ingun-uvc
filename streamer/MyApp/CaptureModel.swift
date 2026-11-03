@@ -38,7 +38,8 @@ final class CaptureResource: @unchecked Sendable {
         previewActivity = PreviewActivity()
     }
 
-    func record(to url: URL, audioDevice: AVCaptureDevice, output: AVCaptureMovieFileOutput, delegate: MovieRecording) {
+    func record(to url: URL, audioDevice: AVCaptureDevice, output: AVCaptureMovieFileOutput,
+                monitor: VideoFreezeMonitor, delegate: MovieRecording) {
         let session = session
         queue.async {
             session.beginConfiguration()
@@ -61,12 +62,17 @@ final class CaptureResource: @unchecked Sendable {
             }
             let supported = session.canAddOutput(output)
             if supported { session.addOutput(output) }
+            let canMonitor = session.canAddOutput(monitor.output)
+            if canMonitor { session.addOutput(monitor.output) }
             session.commitConfiguration()
-            guard supported, output.connection(with: .video) != nil else {
+            guard supported, canMonitor, output.connection(with: .video) != nil,
+                  monitor.output.connection(with: .video) != nil else {
+                self.removeRecordingOutput(output, monitor: monitor)
                 Task { @MainActor in delegate.failed("This source does not support movie recording.") }
                 return
             }
             guard output.connection(with: .audio) != nil else {
+                self.removeRecordingOutput(output, monitor: monitor)
                 Task { @MainActor in delegate.failed("No audio connection is available. Choose another audio source and try again.") }
                 return
             }
@@ -78,11 +84,12 @@ final class CaptureResource: @unchecked Sendable {
         queue.async { output.stopRecording() }
     }
 
-    func removeRecordingOutput(_ output: AVCaptureMovieFileOutput) {
+    func removeRecordingOutput(_ output: AVCaptureMovieFileOutput, monitor: VideoFreezeMonitor) {
         let session = session
         queue.async {
             session.beginConfiguration()
             if session.outputs.contains(where: { $0 === output }) { session.removeOutput(output) }
+            if session.outputs.contains(where: { $0 === monitor.output }) { session.removeOutput(monitor.output) }
             for input in session.inputs where input.ports.contains(where: { $0.mediaType == .audio })
                 && !input.ports.contains(where: { $0.mediaType == .video }) {
                 session.removeInput(input)

@@ -1,7 +1,6 @@
 import SwiftUI
 import AVFoundation
 import AppKit
-import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var model = CaptureModel()
@@ -157,7 +156,6 @@ struct ContentView: View {
 private struct RecordView: View {
     let recording: MovieRecording
     let returnToPreview: () -> Void
-    @State private var saveMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -167,56 +165,25 @@ private struct RecordView: View {
                     Button("Back to preview", action: returnToPreview)
                 } else {
                     Button("Done") {
-                        if recording.phase == .ready { save() }
-                        else { recording.finish() }
+                        switch recording.phase {
+                        case .ready: recording.save()
+                        case .saved: returnToPreview()
+                        default: recording.finish()
+                        }
                     }
                     .disabled(recording.phase == .starting || recording.phase == .finishing)
                 }
             }
             Text(recording.phase.label).font(.headline)
             Text("Audio: \(recording.audioDevice.localizedName)").foregroundStyle(.secondary)
-            Text("Temporary file").foregroundStyle(.secondary)
-            Text(recording.url.path).textSelection(.enabled)
+            Text(recording.savedURL == nil ? "Temporary file" : "Saved file").foregroundStyle(.secondary)
+            Text((recording.savedURL ?? recording.url).path).textSelection(.enabled)
             if !recording.message.isEmpty {
                 Label(recording.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
-            }
-            if !saveMessage.isEmpty {
-                Label(saveMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
             Spacer()
         }
         .onDisappear { recording.finish() }
-        .onChange(of: recording.phase) { _, phase in
-            if phase == .ready && recording.saveRequested { save() }
-        }
-    }
-
-    private func save() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.quickTimeMovie]
-        panel.directoryURL = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        panel.nameFieldStringValue = formatter.string(from: Date()) + ".mov"
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-        let access = destination.startAccessingSecurityScopedResource()
-        defer { if access { destination.stopAccessingSecurityScopedResource() } }
-        do {
-            // Copy first so a failed save leaves the temporary recording available for retry.
-            if FileManager.default.fileExists(atPath: destination.path) {
-                let staging = recording.url.deletingLastPathComponent().appendingPathComponent("Save.mov")
-                defer { try? FileManager.default.removeItem(at: staging) }
-                try FileManager.default.copyItem(at: recording.url, to: staging)
-                _ = try FileManager.default.replaceItemAt(destination, withItemAt: staging)
-            } else {
-                try FileManager.default.copyItem(at: recording.url, to: destination)
-            }
-            returnToPreview()
-        } catch {
-            saveMessage = "Could not save the recording: \(error.localizedDescription). The temporary file is available above; click Done to retry."
-        }
     }
 }
 

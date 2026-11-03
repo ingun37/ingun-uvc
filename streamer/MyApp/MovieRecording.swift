@@ -5,14 +5,15 @@ import Observation
 @Observable
 final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     enum Phase {
-        case starting, recording, finishing, ready, failed
+        case starting, recording, finishing, ready, saved, failed
 
         var label: String {
             switch self {
             case .starting: "Starting recording…"
             case .recording: "Recording"
             case .finishing: "Finishing recording…"
-            case .ready: "Recording complete — click Done to save"
+            case .ready: "Recording complete — saving failed"
+            case .saved: "Recording saved"
             case .failed: "Recording failed"
             }
         }
@@ -23,9 +24,10 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     let url: URL
     private let directory: URL
     private let output = AVCaptureMovieFileOutput()
+    @ObservationIgnored private let monitor = VideoFreezeMonitor()
     var phase: Phase = .starting
     var message = ""
-    var saveRequested = false
+    var savedURL: URL?
 
     init(resource: CaptureResource, audioDevice: AVCaptureDevice) throws {
         self.resource = resource
@@ -34,34 +36,44 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         url = directory.appendingPathComponent("Recording.mov")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         super.init()
+        monitor.setOnFreeze { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.finish(reason: "The video stream was frozen for more than 10 seconds.")
+            }
+        }
     }
 
     func start() {
-        resource.record(to: url, audioDevice: audioDevice, output: output, delegate: self)
+        resource.record(to: url, audioDevice: audioDevice, output: output, monitor: monitor, delegate: self)
     }
 
-    func finish() {
+    func finish(reason: String = "") {
+        if !reason.isEmpty { message = reason }
         if phase == .starting {
             phase = .finishing
             return
         }
         guard phase == .recording else { return }
-        saveRequested = true
         phase = .finishing
+        monitor.stop()
         resource.stopRecording(output)
     }
 
     func failed(_ message: String) {
         self.message = message
         phase = .failed
-        resource.removeRecordingOutput(output)
+        monitor.stop()
+        resource.removeRecordingOutput(output, monitor: monitor)
     }
 
     nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo outputFileURL: URL,
                                from connections: [AVCaptureConnection]) {
         Task { @MainActor in
             if self.phase == .finishing { self.resource.stopRecording(self.output) }
-            else if self.phase == .starting { self.phase = .recording }
+            else if self.phase == .starting {
+                self.phase = .recording
+                self.monitor.start()
+            }
         }
     }
 
@@ -76,9 +88,33 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 .compactMap { $0 }.joined(separator: "\n")
         } ?? ""
         Task { @MainActor in
-            self.resource.removeRecordingOutput(self.output)
-            self.message = message
+            self.monitor.stop()
+            self.resource.removeRecordingOutput(self.output, monitor: self.monitor)
+            if !message.isEmpty { self.message = message }
             self.phase = successful ? .ready : .failed
+            if successful { self.save() }
+        }
+    }
+
+    func save() {
+        guard phase == .ready else { return }
+        do {
+            let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask)[0]
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+            let name = formatter.string(from: Date())
+            var destination = movies.appendingPathComponent("\(name).mov")
+            var suffix = 2
+            while FileManager.default.fileExists(atPath: destination.path) {
+                destination = movies.appendingPathComponent("\(name)-\(suffix).mov")
+                suffix += 1
+            }
+            try FileManager.default.moveItem(at: url, to: destination)
+            savedURL = destination
+            phase = .saved
+        } catch {
+            message = "Could not save the recording: \(error.localizedDescription). Click Done to retry."
         }
     }
 
