@@ -36,3 +36,10 @@ game_id,period,clock,team,player,result,description,loc_x,loc_y,shot_distance,je
 0012600061,1,PT11M33.00S,SAS,Vassell,missed,MISS Vassell 27' 3PT Jump Shot,,,,,
 0012600061,1,PT11M14.00S,SAC,LaVine,made,LaVine 20' Jump Shot (2 PTS),,,,,
 ```
+
+# Build
+
+```shell
+.venv/bin/activate
+pyinstaller --onefile main.py
+```
