@@ -5,3 +5,4 @@
 - Thumbnail generation
 - Bigger video in preview view (not recording view)
 - Read teams from the scoreboard?
+- Boxscore in the end
