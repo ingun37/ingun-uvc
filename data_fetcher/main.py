@@ -7,6 +7,7 @@ from datetime import date
 import re
 import sys
 import time
+from pathlib import Path
 
 from nba_api.stats.endpoints import CommonTeamRoster, LeagueGameFinder, PlayByPlayV3, ShotChartDetail
 
@@ -130,6 +131,8 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
             if number and number.lower() != "nan":
                 jersey_numbers[int(player.PLAYER_ID)] = number
             player_names[int(player.PLAYER_ID)] = str(player.PLAYER)
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
     with destination as stream:
         writer = csv.writer(stream)
