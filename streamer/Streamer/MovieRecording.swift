@@ -1,4 +1,5 @@
 import AVFoundation
+import Metal
 import Observation
 
 /// Owns one temporary movie and keeps its capture session alive through finalization.
@@ -24,14 +25,18 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     let url: URL
     private let directory: URL
     private let output = AVCaptureMovieFileOutput()
-    @ObservationIgnored private let monitor = VideoFreezeMonitor()
+    @ObservationIgnored private let monitor: VideoFreezeMonitor
     var phase: Phase = .starting
     var message = ""
     var savedURL: URL?
 
     init(resource: CaptureResource, audioDevice: AVCaptureDevice) throws {
+        guard let monitor = VideoFreezeMonitor(metalDevice: MTLCreateSystemDefaultDevice()) else {
+            throw CaptureFailure.freezeMonitorUnavailable
+        }
         self.resource = resource
         self.audioDevice = audioDevice
+        self.monitor = monitor
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         url = directory.appendingPathComponent("Recording.mov")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

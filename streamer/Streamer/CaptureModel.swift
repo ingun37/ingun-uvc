@@ -116,7 +116,13 @@ final class CaptureResource: @unchecked Sendable {
 
 enum CaptureFailure: LocalizedError {
     case unsupported
-    var errorDescription: String? { "This device cannot be added to a video capture session." }
+    case freezeMonitorUnavailable
+    var errorDescription: String? {
+        switch self {
+        case .unsupported: "This device cannot be added to a video capture session."
+        case .freezeMonitorUnavailable: "Metal video comparison is unavailable on this Mac."
+        }
+    }
 }
 
 @Observable
