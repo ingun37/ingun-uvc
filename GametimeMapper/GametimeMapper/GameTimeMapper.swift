@@ -62,6 +62,31 @@ nonisolated enum GameTimeMapper {
                              video_start_seconds: start, video_end_seconds: end))
     }
 
+    static func mergeContinuousIntervals(_ entries: [Entry]) -> [Entry] {
+        var merged: [Entry] = []
+        for entry in entries {
+            if let last = merged.indices.last {
+                let previous = merged[last]
+                let videoGap = entry.video_start_seconds - previous.video_end_seconds
+                let gameGap = previous.game_end_seconds - entry.game_start_seconds
+                let previousPaused = previous.game_start_seconds == previous.game_end_seconds
+                let entryPaused = entry.game_start_seconds == entry.game_end_seconds
+                let continuous = !previousPaused && !entryPaused && gameGap >= 0 &&
+                    abs(videoGap - gameGap) <= 1
+                let samePausedTime = previousPaused && entryPaused &&
+                    previous.game_end_seconds == entry.game_start_seconds
+                if previous.period == entry.period, videoGap >= -0.000001,
+                   (continuous || samePausedTime) {
+                    merged[last].game_end_seconds = entry.game_end_seconds
+                    merged[last].video_end_seconds = entry.video_end_seconds
+                    continue
+                }
+            }
+            merged.append(entry)
+        }
+        return merged
+    }
+
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
 
     static func map(videoURL: URL, outputURL: URL, bottomDivisor: Int = 1,
@@ -170,6 +195,7 @@ nonisolated enum GameTimeMapper {
             try process(pending)
         }
         guard reader.status == .completed else { throw reader.error ?? MappingError.readerFailed }
+        entries = mergeContinuousIntervals(entries)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try (encoder.encode(entries) + Data([0x0a])).write(to: outputURL, options: .atomic)

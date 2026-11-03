@@ -84,6 +84,65 @@ struct GametimeMapperTests {
         #expect(entries == [.init(period: "2ND", game_start_seconds: 116, game_end_seconds: 59.8,
                                   video_start_seconds: 69, video_end_seconds: 145)])
     }
+
+    @Test func postprocessesOnlyMatchingGaps() {
+        let entries: [GameTimeMapper.Entry] = [
+            .init(period: "2ND", game_start_seconds: 216, game_end_seconds: 214,
+                  video_start_seconds: 0, video_end_seconds: 1.5),
+            .init(period: "2ND", game_start_seconds: 212, game_end_seconds: 211,
+                  video_start_seconds: 4, video_end_seconds: 5),
+            .init(period: "2ND", game_start_seconds: 210, game_end_seconds: 209,
+                  video_start_seconds: 5, video_end_seconds: 6.039366666666667),
+            .init(period: "2ND", game_start_seconds: 180, game_end_seconds: 179,
+                  video_start_seconds: 7, video_end_seconds: 8)
+        ]
+        let merged = GameTimeMapper.mergeContinuousIntervals(entries)
+        #expect(merged.count == 2)
+        #expect(merged[0] == .init(period: "2ND", game_start_seconds: 216,
+                                  game_end_seconds: 209, video_start_seconds: 0,
+                                  video_end_seconds: 6.039366666666667))
+        #expect(merged[1] == entries[3])
+    }
+
+    @Test func postprocessKeepsPausedBoundaries() {
+        let entries: [GameTimeMapper.Entry] = [
+            .init(period: "2ND", game_start_seconds: 216, game_end_seconds: 214,
+                  video_start_seconds: 0, video_end_seconds: 2),
+            .init(period: "2ND", game_start_seconds: 214, game_end_seconds: 214,
+                  video_start_seconds: 2, video_end_seconds: 3),
+            .init(period: "2ND", game_start_seconds: 214, game_end_seconds: 214,
+                  video_start_seconds: 4, video_end_seconds: 5),
+            .init(period: "2ND", game_start_seconds: 213, game_end_seconds: 212,
+                  video_start_seconds: 5, video_end_seconds: 6),
+            .init(period: "2ND", game_start_seconds: 212, game_end_seconds: 212,
+                  video_start_seconds: 6, video_end_seconds: 7),
+            .init(period: "2ND", game_start_seconds: 211, game_end_seconds: 211,
+                  video_start_seconds: 7, video_end_seconds: 8)
+        ]
+        let merged = GameTimeMapper.mergeContinuousIntervals(entries)
+        #expect(merged.count == 5)
+        #expect(merged[0] == entries[0])
+        #expect(merged[1] == .init(period: "2ND", game_start_seconds: 214,
+                                  game_end_seconds: 214, video_start_seconds: 2,
+                                  video_end_seconds: 5))
+        #expect(merged[2] == entries[3])
+        #expect(merged[3] == entries[4])
+        #expect(merged[4] == entries[5])
+    }
+
+    @Test func mergesInterruptedContinuousVideoWithVision() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/interrupted-continuous.mp4")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output)
+        #expect(entries == [.init(period: "2ND", game_start_seconds: 216,
+                                  game_end_seconds: 209, video_start_seconds: 0,
+                                  video_end_seconds: 6.039366666666667)])
+        let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
+        #expect(decoded == entries)
+    }
     @Test func parsesPeriodAndClock() {
         #expect(GameTimeMapper.parse(["1ST", "07:20"]) == .init(period: "1ST", gameSecond: 440))
         #expect(GameTimeMapper.parse(["2ND 00:59.9"]) == .init(period: "2ND", gameSecond: 59.9))

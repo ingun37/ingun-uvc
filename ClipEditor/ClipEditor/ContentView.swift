@@ -291,7 +291,7 @@ private struct ClipPreview: View {
     @State private var player = AVPlayer()
 
     var body: some View {
-        VideoPlayer(player: player)
+        NativePlayerView(player: player)
             .onAppear {
                 player.replaceCurrentItem(with: AVPlayerItem(url: url))
                 resetRange()
@@ -312,6 +312,25 @@ private struct ClipPreview: View {
         player.pause()
         player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: end, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+    }
+}
+
+// AVKit's SwiftUI VideoPlayer bridge can abort during metadata initialization in
+// archived Release builds. Use the native macOS player view directly instead.
+private struct NativePlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .floating
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        if view.player !== player {
+            view.player = player
+        }
     }
 }
 
