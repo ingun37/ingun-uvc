@@ -157,12 +157,13 @@ struct ContentView: View {
 private struct RecordView: View {
     let recording: MovieRecording
     let returnToPreview: () -> Void
+    @State private var timerHours = 0
     @State private var timerMinutes = 5
     @State private var timerSeconds = 0
     @State private var timerDeadline: TimeInterval?
     @State private var timeRemaining: Int?
 
-    private var timerDuration: Int { timerMinutes * 60 + timerSeconds }
+    private var timerDuration: Int { timerHours * 3600 + timerMinutes * 60 + timerSeconds }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -186,8 +187,9 @@ private struct RecordView: View {
             GroupBox("Recording timer") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Stepper("Minutes: \(timerMinutes)", value: $timerMinutes, in: 0...240)
-                        Stepper("Seconds: \(timerSeconds)", value: $timerSeconds, in: 0...59)
+                        timerInput("Hours", value: $timerHours, range: 0...240)
+                        timerInput("Minutes", value: $timerMinutes, range: 0...59)
+                        timerInput("Seconds", value: $timerSeconds, range: 0...59)
                     }
                     .disabled(timerDeadline != nil || recording.phase != .recording)
                     HStack {
@@ -236,6 +238,20 @@ private struct RecordView: View {
 
     private func formattedTime(_ seconds: Int) -> String {
         String(format: "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
+    }
+
+    private func timerInput(_ label: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
+        Stepper(value: value, in: range) {
+            HStack(spacing: 4) {
+                Text("\(label):")
+                TextField(label, value: value, format: .number)
+                    .frame(width: 42)
+                    .accessibilityLabel(label)
+            }
+        }
+        .onChange(of: value.wrappedValue) { _, newValue in
+            value.wrappedValue = min(max(newValue, range.lowerBound), range.upperBound)
+        }
     }
 }
 
