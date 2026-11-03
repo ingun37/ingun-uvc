@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @State private var model = CaptureModel()
+    @State private var previewWidth = 1280.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -31,29 +32,28 @@ struct ContentView: View {
             }
             // Keep the same preview layer connected while changing capture steps.
             // Detaching/recreating it during movie startup changes session connections.
-            if let (_, resource) = model.screen.capture {
-                CapturePreview(session: resource.session)
-                    .frame(width: 400, height: 225)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Live video preview")
-            }
-            switch model.screen {
-            case let .detail(device, _):
-                if model.audioDevices.isEmpty {
-                    Text("No audio sources found. Connect an audio device and reopen this video source.").foregroundStyle(.orange)
-                } else {
-                    Picker("Audio source", selection: $model.selectedAudioID) {
-                        ForEach(model.audioDevices, id: \.uniqueID) { audio in
-                            Text(audio.localizedName).tag(audio.uniqueID)
+            if let (device, resource) = model.screen.capture {
+                let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                let aspectRatio = CGFloat(dimensions.width) / CGFloat(dimensions.height)
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        CapturePreview(session: resource.session)
+                            .aspectRatio(aspectRatio, contentMode: .fit)
+                            .frame(width: previewWidth, height: previewWidth / aspectRatio)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .accessibilityLabel("Live video preview")
+                        HStack {
+                            Slider(value: $previewWidth, in: 320...2560, step: 10) {
+                                Text("Preview width")
+                            }
+                            .frame(width: 300)
+                            Text("\(Int(previewWidth)) pt")
+                                .monospacedDigit()
                         }
                     }
-                    .disabled(model.preparingRecording || device.hasMediaType(.audio))
+                    captureDetails(for: device)
+                        .frame(width: 440, height: max(320, previewWidth / aspectRatio), alignment: .top)
                 }
-                DeviceDetail(device: device)
-            case let .record(device, recording):
-                RecordView(recording: recording) { model.screen = .detail(device, recording.resource) }
-            default:
-                EmptyView()
             }
             if !model.streamMessage.isEmpty {
                 Label(model.streamMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
@@ -75,6 +75,30 @@ struct ContentView: View {
                let session = notification.object as? AVCaptureSession, session === resource.session {
                 model.streamMessage = ""
             }
+        }
+    }
+
+    @ViewBuilder
+    private func captureDetails(for device: AVCaptureDevice) -> some View {
+        switch model.screen {
+        case .detail:
+            VStack(alignment: .leading, spacing: 20) {
+                if model.audioDevices.isEmpty {
+                    Text("No audio sources found. Connect an audio device and reopen this video source.").foregroundStyle(.orange)
+                } else {
+                    Picker("Audio source", selection: $model.selectedAudioID) {
+                        ForEach(model.audioDevices, id: \.uniqueID) { audio in
+                            Text(audio.localizedName).tag(audio.uniqueID)
+                        }
+                    }
+                    .disabled(model.preparingRecording || device.hasMediaType(.audio))
+                }
+                DeviceDetail(device: device)
+            }
+        case let .record(_, recording):
+            RecordView(recording: recording) { model.screen = .detail(device, recording.resource) }
+        default:
+            EmptyView()
         }
     }
 
