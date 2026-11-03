@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import AppKit
+import Combine
 
 struct ContentView: View {
     @State private var model = CaptureModel()
@@ -156,6 +157,12 @@ struct ContentView: View {
 private struct RecordView: View {
     let recording: MovieRecording
     let returnToPreview: () -> Void
+    @State private var timerMinutes = 5
+    @State private var timerSeconds = 0
+    @State private var timerDeadline: TimeInterval?
+    @State private var timeRemaining: Int?
+
+    private var timerDuration: Int { timerMinutes * 60 + timerSeconds }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -176,6 +183,33 @@ private struct RecordView: View {
             }
             Text(recording.phase.label).font(.headline)
             Text("Audio: \(recording.audioDevice.localizedName)").foregroundStyle(.secondary)
+            GroupBox("Recording timer") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Stepper("Minutes: \(timerMinutes)", value: $timerMinutes, in: 0...240)
+                        Stepper("Seconds: \(timerSeconds)", value: $timerSeconds, in: 0...59)
+                    }
+                    .disabled(timerDeadline != nil || recording.phase != .recording)
+                    HStack {
+                        Button(timerDeadline == nil ? "Start timer" : "Cancel timer") {
+                            if timerDeadline == nil {
+                                timeRemaining = timerDuration
+                                timerDeadline = ProcessInfo.processInfo.systemUptime + TimeInterval(timerDuration)
+                            } else {
+                                timerDeadline = nil
+                                timeRemaining = nil
+                            }
+                        }
+                        .disabled(recording.phase != .recording || (timerDeadline == nil && timerDuration == 0))
+                        if let timeRemaining {
+                            Text("Time left: \(formattedTime(timeRemaining))")
+                                .monospacedDigit()
+                                .font(.headline)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             Text(recording.savedURL == nil ? "Temporary file" : "Saved file").foregroundStyle(.secondary)
             Text((recording.savedURL ?? recording.url).path).textSelection(.enabled)
             if !recording.message.isEmpty {
@@ -184,6 +218,24 @@ private struct RecordView: View {
             Spacer()
         }
         .onDisappear { recording.finish() }
+        .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { _ in
+            guard let timerDeadline else { return }
+            guard recording.phase == .recording else {
+                self.timerDeadline = nil
+                timeRemaining = nil
+                return
+            }
+            let remaining = max(0, Int(ceil(timerDeadline - ProcessInfo.processInfo.systemUptime)))
+            timeRemaining = remaining
+            if remaining == 0 {
+                self.timerDeadline = nil
+                recording.finish(reason: "Recording timer finished.")
+            }
+        }
+    }
+
+    private func formattedTime(_ seconds: Int) -> String {
+        String(format: "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
     }
 }
 
