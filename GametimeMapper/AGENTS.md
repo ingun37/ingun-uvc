@@ -7,8 +7,10 @@ stored properties where practical, and prefer immutable values.
 ## Code and behavior
 
 - `GametimeMapper/Command.swift` accepts input video path and output JSON path,
-  plus optional `--bottom-divisor N` to OCR the bottom `1/N` of each frame
-  (default `N=1`, the whole frame). It prints per-sampled-frame OCR text,
+  plus optional `--bottom-divisor N` to OCR the bottom `1/N` of each frame,
+  and `--left-divisor N` or `--right-divisor N` to OCR the corresponding
+  horizontal `1/N` (default `N=1`, the whole frame). Left and right cannot
+  be combined; either can be combined with bottom. It prints per-sampled-frame OCR text,
   recognized game time, and OCR duration in milliseconds.
 - `GametimeMapper/GameTimeMapper.swift` samples every 0.5 seconds. Parse a
   clock only when a recognized period (`1ST`, `2ND`, `3RD`,

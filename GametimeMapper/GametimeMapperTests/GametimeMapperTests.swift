@@ -10,6 +10,24 @@ struct GametimeMapperTests {
                 CGRect(x: 0.75, y: 0, width: 0.25, height: 0.5))
     }
 
+    @Test func cropsFromLeftAndBottomTogether() {
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 1, rightDivisor: 1, leftDivisor: 3) ==
+                CGRect(x: 0, y: 0, width: 1.0 / 3, height: 1))
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 2, rightDivisor: 1, leftDivisor: 4) ==
+                CGRect(x: 0, y: 0, width: 0.25, height: 0.5))
+    }
+
+    @Test func rejectsLeftAndRightDivisorsTogether() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/divisor-hstack-reversed.mp4")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+        await #expect(throws: Error.self) {
+            try await GameTimeMapper.map(videoURL: video, outputURL: output,
+                                         rightDivisor: 3, leftDivisor: 3)
+        }
+    }
+
     @Test func mergesFrozenClockAcrossMissingReadings() {
         var entries: [GameTimeMapper.Entry] = []
         GameTimeMapper.add(.init(period: "3RD", gameSecond: 252), at: 0, until: 0.5, to: &entries)
@@ -129,12 +147,17 @@ struct GametimeMapperTests {
         try await expectFrozenScoreboard(in: "divisor-hstack.mp4", bottomDivisor: 1, rightDivisor: 3)
     }
 
+    @Test func mapsLeftThirdOfHorizontalStackWithVision() async throws {
+        try await expectFrozenScoreboard(in: "divisor-hstack-reversed.mp4", bottomDivisor: 1,
+                                         rightDivisor: 1, leftDivisor: 3)
+    }
+
     @Test func mapsBottomRightTileOfSquareStackWithVision() async throws {
         try await expectFrozenScoreboard(in: "divisor-square.mp4", bottomDivisor: 3, rightDivisor: 3)
     }
 
     private func expectFrozenScoreboard(in name: String, bottomDivisor: Int,
-                                        rightDivisor: Int) async throws {
+                                        rightDivisor: Int, leftDivisor: Int = 1) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let video = root.appendingPathComponent("test-data/\(name)")
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
@@ -142,13 +165,14 @@ struct GametimeMapperTests {
 
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output,
                                                    bottomDivisor: bottomDivisor,
-                                                   rightDivisor: rightDivisor)
+                                                   rightDivisor: rightDivisor,
+                                                   leftDivisor: leftDivisor)
         #expect(entries.count == 1)
         #expect(entries.first?.game_start_seconds == 357)
         #expect(entries.first?.game_end_seconds == 357)
         #expect(entries.first?.video_start_seconds == 0)
         let duration = try await AVURLAsset(url: video).load(.duration).seconds
-        #expect(duration > 2.9 && duration <= 3)
+        #expect(duration > 2.9 && duration < 3.1)
         #expect(entries.first?.video_end_seconds == duration)
     }
 
