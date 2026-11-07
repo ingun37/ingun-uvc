@@ -6,7 +6,25 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA000001000000000000000A /* GametimeMapper/GameTimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		929CE471309F40E300B71319 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9270EEFE3093216E002C2249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 929CE463309F40E200B71319;
+			remoteInfo = GametimeMapperUI;
+		};
+		929CE47B309F40E300B71319 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9270EEFE3093216E002C2249 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 929CE463309F40E200B71319;
+			remoteInfo = GametimeMapperUI;
+		};
 		AA0000010000000000000009 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 9270EEFE3093216E002C2249 /* Project object */;
@@ -16,9 +34,6 @@
 		};
 /* End PBXContainerItemProxy section */
 
-/* Begin PBXBuildFile section */
-		AA000001000000000000000A = {isa = PBXBuildFile; fileRef = AA000001000000000000000B; };
-/* End PBXBuildFile section */
 /* Begin PBXCopyFilesBuildPhase section */
 		9270EF043093216E002C2249 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -32,14 +47,32 @@
 
 /* Begin PBXFileReference section */
 		9270EF063093216E002C2249 /* GametimeMapper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = GametimeMapper; sourceTree = BUILT_PRODUCTS_DIR; };
+		929CE464309F40E200B71319 /* GametimeMapperUI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GametimeMapperUI.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		929CE470309F40E300B71319 /* GametimeMapperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GametimeMapperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		929CE47A309F40E300B71319 /* GametimeMapperUIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GametimeMapperUIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000010000000000000001 /* GametimeMapperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GametimeMapperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA000001000000000000000B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GametimeMapper/GameTimeMapper.swift; sourceTree = "<group>"; };
+		AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GametimeMapper/GameTimeMapper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9270EF083093216E002C2249 /* GametimeMapper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = GametimeMapper;
+			sourceTree = "<group>";
+		};
+		929CE465309F40E200B71319 /* GametimeMapperUI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GametimeMapperUI;
+			sourceTree = "<group>";
+		};
+		929CE473309F40E300B71319 /* GametimeMapperUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GametimeMapperUITests;
+			sourceTree = "<group>";
+		};
+		929CE47D309F40E300B71319 /* GametimeMapperUIUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = GametimeMapperUIUITests;
 			sourceTree = "<group>";
 		};
 		AA0000010000000000000002 /* GametimeMapperTests */ = {
@@ -55,6 +88,21 @@
 			files = (
 			);
 		};
+		929CE461309F40E200B71319 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		929CE46D309F40E300B71319 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		929CE477309F40E300B71319 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -63,7 +111,10 @@
 			children = (
 				9270EF083093216E002C2249 /* GametimeMapper */,
 				AA0000010000000000000002 /* GametimeMapperTests */,
-				AA000001000000000000000B,
+				AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */,
+				929CE465309F40E200B71319 /* GametimeMapperUI */,
+				929CE473309F40E300B71319 /* GametimeMapperUITests */,
+				929CE47D309F40E300B71319 /* GametimeMapperUIUITests */,
 				9270EF073093216E002C2249 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +124,9 @@
 			children = (
 				9270EF063093216E002C2249 /* GametimeMapper */,
 				AA0000010000000000000001 /* GametimeMapperTests.xctest */,
+				929CE464309F40E200B71319 /* GametimeMapperUI.app */,
+				929CE470309F40E300B71319 /* GametimeMapperUITests.xctest */,
+				929CE47A309F40E300B71319 /* GametimeMapperUIUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -97,6 +151,66 @@
 			productName = GametimeMapper;
 			productReference = 9270EF063093216E002C2249 /* GametimeMapper */;
 			productType = "com.apple.product-type.tool";
+		};
+		929CE463309F40E200B71319 /* GametimeMapperUI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 929CE486309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUI" */;
+			buildPhases = (
+				929CE460309F40E200B71319 /* Sources */,
+				929CE461309F40E200B71319 /* Frameworks */,
+				929CE462309F40E200B71319 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				929CE465309F40E200B71319 /* GametimeMapperUI */,
+			);
+			name = GametimeMapperUI;
+			productName = GametimeMapperUI;
+			productReference = 929CE464309F40E200B71319 /* GametimeMapperUI.app */;
+			productType = "com.apple.product-type.application";
+		};
+		929CE46F309F40E300B71319 /* GametimeMapperUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 929CE487309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUITests" */;
+			buildPhases = (
+				929CE46C309F40E300B71319 /* Sources */,
+				929CE46D309F40E300B71319 /* Frameworks */,
+				929CE46E309F40E300B71319 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				929CE472309F40E300B71319 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				929CE473309F40E300B71319 /* GametimeMapperUITests */,
+			);
+			name = GametimeMapperUITests;
+			productName = GametimeMapperUITests;
+			productReference = 929CE470309F40E300B71319 /* GametimeMapperUITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		929CE479309F40E300B71319 /* GametimeMapperUIUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 929CE488309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUIUITests" */;
+			buildPhases = (
+				929CE476309F40E300B71319 /* Sources */,
+				929CE477309F40E300B71319 /* Frameworks */,
+				929CE478309F40E300B71319 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				929CE47C309F40E300B71319 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				929CE47D309F40E300B71319 /* GametimeMapperUIUITests */,
+			);
+			name = GametimeMapperUIUITests;
+			productName = GametimeMapperUIUITests;
+			productReference = 929CE47A309F40E300B71319 /* GametimeMapperUIUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		AA0000010000000000000003 /* GametimeMapperTests */ = {
 			isa = PBXNativeTarget;
@@ -124,11 +238,22 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2710;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2710;
 				TargetAttributes = {
 					9270EF053093216E002C2249 = {
 						CreatedOnToolsVersion = 27.1;
+					};
+					929CE463309F40E200B71319 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					929CE46F309F40E300B71319 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 929CE463309F40E200B71319;
+					};
+					929CE479309F40E300B71319 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 929CE463309F40E200B71319;
 					};
 				};
 			};
@@ -148,9 +273,30 @@
 			targets = (
 				9270EF053093216E002C2249 /* GametimeMapper */,
 				AA0000010000000000000003 /* GametimeMapperTests */,
+				929CE463309F40E200B71319 /* GametimeMapperUI */,
+				929CE46F309F40E300B71319 /* GametimeMapperUITests */,
+				929CE479309F40E300B71319 /* GametimeMapperUIUITests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		929CE462309F40E200B71319 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		929CE46E309F40E300B71319 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		929CE478309F40E300B71319 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		9270EF023093216E002C2249 /* Sources */ = {
@@ -158,15 +304,40 @@
 			files = (
 			);
 		};
+		929CE460309F40E200B71319 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		929CE46C309F40E300B71319 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		929CE476309F40E300B71319 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		AA0000010000000000000004 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
-				AA000001000000000000000A,
+				AA000001000000000000000A /* GametimeMapper/GameTimeMapper.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		929CE472309F40E300B71319 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 929CE463309F40E200B71319 /* GametimeMapperUI */;
+			targetProxy = 929CE471309F40E300B71319 /* PBXContainerItemProxy */;
+		};
+		929CE47C309F40E300B71319 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 929CE463309F40E200B71319 /* GametimeMapperUI */;
+			targetProxy = 929CE47B309F40E300B71319 /* PBXContainerItemProxy */;
+		};
 		AA0000010000000000000008 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 9270EF053093216E002C2249 /* GametimeMapper */;
@@ -315,6 +486,142 @@
 			};
 			name = Release;
 		};
+		929CE480309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUI" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		929CE481309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUI" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUI;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		929CE482309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GametimeMapperUI.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GametimeMapperUI";
+			};
+			name = Debug;
+		};
+		929CE483309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GametimeMapperUI.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/GametimeMapperUI";
+			};
+			name = Release;
+		};
+		929CE484309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUIUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUIUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = GametimeMapperUI;
+			};
+			name = Debug;
+		};
+		929CE485309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUIUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUIUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = GametimeMapperUI;
+			};
+			name = Release;
+		};
 		AA0000010000000000000006 /* Debug configuration for PBXNativeTarget "GametimeMapperTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -349,6 +656,30 @@
 			buildConfigurations = (
 				9270EF0E3093216E002C2249 /* Debug configuration for PBXNativeTarget "GametimeMapper" */,
 				9270EF0F3093216E002C2249 /* Release configuration for PBXNativeTarget "GametimeMapper" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		929CE486309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				929CE480309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUI" */,
+				929CE481309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUI" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		929CE487309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				929CE482309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUITests" */,
+				929CE483309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		929CE488309F40E300B71319 /* Build configuration list for PBXNativeTarget "GametimeMapperUIUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				929CE484309F40E300B71319 /* Debug configuration for PBXNativeTarget "GametimeMapperUIUITests" */,
+				929CE485309F40E300B71319 /* Release configuration for PBXNativeTarget "GametimeMapperUIUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};
