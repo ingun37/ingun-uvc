@@ -3,6 +3,17 @@ import Foundation
 import Testing
 
 struct GametimeMapperTests {
+    @Test func retainsReadingsUntilExplicitMerge() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/minutes-seconds.mp4")
+        let raw = try await GameTimeMapper.sample(videoURL: video, recognize: { _ in ["1ST", "07:20"] })
+        #expect(raw.samples.count > 1)
+        #expect(raw.samples.allSatisfy { $0.reading?.gameSecond == 440 })
+        let merged = GameTimeMapper.merge(raw)
+        #expect(merged.count < raw.samples.count)
+        #expect(merged.first?.game_start_seconds == 440)
+    }
+
     @Test func cropsFromRightAndBottomTogether() {
         #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 1, rightDivisor: 2) ==
                 CGRect(x: 0.5, y: 0, width: 0.5, height: 1))

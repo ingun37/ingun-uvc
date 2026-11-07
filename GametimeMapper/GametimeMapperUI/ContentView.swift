@@ -20,7 +20,7 @@ struct ContentView: View {
 
     private enum ProcessEvent: Sendable {
         case sample(GameTimeMapper.Sample)
-        case finished([GameTimeMapper.Entry])
+        case finished(GameTimeMapper.RawReadings)
         case failed(String)
     }
 
@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var logLines: [String] = []
     @State private var chartSamples: [ChartSample] = []
     @State private var chartSegment = 0
+    @State private var rawReadings: GameTimeMapper.RawReadings?
     @State private var entries: [GameTimeMapper.Entry]?
     @State private var processing = false
     @State private var errorMessage: String?
@@ -88,7 +89,7 @@ struct ContentView: View {
                     Spacer()
                     Button("Next") { showSavePanel() }
                         .keyboardShortcut(.defaultAction)
-                        .disabled(entries == nil || processing)
+                        .disabled(rawReadings == nil || processing)
                 } else if step == .save {
                     Button("Back to Log") { step = .process }
                     Spacer()
@@ -168,10 +169,13 @@ struct ContentView: View {
                     .font(.title3.bold())
                 Spacer()
                 if processing { ProgressView().controlSize(.small) }
-                else if let entries { Text("Finished · \(entries.count) ranges").foregroundStyle(.green) }
+                else if let rawReadings {
+                    Text("Finished · \(rawReadings.samples.count) samples").foregroundStyle(.green)
+                }
             }
             Text(processing ? "Reading frames and recognizing the game clock…" :
-                    entries == nil ? "Processing stopped. Review the error below." : "Mapping complete. Review the log before continuing.")
+                    rawReadings == nil ? "Processing stopped. Review the error below." :
+                    "Sampling complete. Review the readings before merging.")
                 .foregroundStyle(.secondary)
             ZStack {
                 Chart(chartSamples) { sample in
@@ -217,7 +221,7 @@ struct ContentView: View {
                     if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
                 }
             }
-            if !processing && entries == nil {
+            if !processing && rawReadings == nil {
                 Button("Try Again") { beginProcessing() }
             }
         }
@@ -273,6 +277,7 @@ struct ContentView: View {
                 preferredTransform = transform
                 currentTime = 0
                 selectedRegion = nil
+                rawReadings = nil
                 entries = nil
                 savedURL = nil
                 logLines = []
@@ -292,6 +297,7 @@ struct ContentView: View {
         player.pause()
         step = .process
         processing = true
+        rawReadings = nil
         entries = nil
         errorMessage = nil
         logLines = []
@@ -303,7 +309,7 @@ struct ContentView: View {
         let events = AsyncStream<ProcessEvent> { continuation in
             Task.detached(priority: .userInitiated) {
                 do {
-                    let result = try await GameTimeMapper.map(
+                    let result = try await GameTimeMapper.sample(
                         videoURL: videoURL, regionOfInterest: visionRegion,
                         onSample: { continuation.yield(.sample($0)) })
                     continuation.yield(.finished(result))
@@ -333,7 +339,7 @@ struct ContentView: View {
                         chartSegment += 1
                     }
                 case .finished(let result):
-                    entries = result
+                    rawReadings = result
                     processing = false
                 case .failed(let message):
                     errorMessage = message
@@ -345,7 +351,9 @@ struct ContentView: View {
     }
 
     private func showSavePanel() {
-        guard let videoURL, let entries else { return }
+        guard let videoURL, let rawReadings else { return }
+        let merged = GameTimeMapper.merge(rawReadings)
+        entries = merged
         step = .save
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -355,7 +363,7 @@ struct ContentView: View {
         panel.message = "Save the game time mapping"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
         do {
-            try GameTimeMapper.save(entries, to: outputURL)
+            try GameTimeMapper.save(merged, to: outputURL)
             savedURL = outputURL
             errorMessage = nil
         } catch {

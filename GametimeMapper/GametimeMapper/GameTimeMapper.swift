@@ -22,6 +22,11 @@ nonisolated enum GameTimeMapper {
         let logLine: String
     }
 
+    struct RawReadings: Sendable {
+        let samples: [Sample]
+        let duration: Double
+    }
+
     static func parse(_ texts: [String]) -> Reading? {
         let normalized = texts.map {
             $0.uppercased().replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
@@ -46,8 +51,8 @@ nonisolated enum GameTimeMapper {
     }
 
     static func add(_ reading: Reading, at start: Double, until end: Double,
-                    discontinuous: Bool = false, to entries: inout [Entry]) {
-        if !discontinuous, let last = entries.indices.last {
+                    to entries: inout [Entry]) {
+        if let last = entries.indices.last {
             let entry = entries[last]
             let frozen = entry.game_start_seconds == entry.game_end_seconds &&
                 entry.game_end_seconds == reading.gameSecond
@@ -102,6 +107,21 @@ nonisolated enum GameTimeMapper {
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in },
                     onSample: (Sample) -> Void = { _ in }) async throws -> [Entry] {
+        let raw = try await sample(videoURL: videoURL, bottomDivisor: bottomDivisor,
+                                   rightDivisor: rightDivisor, leftDivisor: leftDivisor,
+                                   centerDivisor: centerDivisor, regionOfInterest: regionOfInterest,
+                                   recognize: recognize, log: log, onSample: onSample)
+        let entries = merge(raw)
+        if let outputURL { try save(entries, to: outputURL) }
+        return entries
+    }
+
+    static func sample(videoURL: URL, bottomDivisor: Int = 1,
+                       rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
+                       regionOfInterest: CGRect? = nil,
+                       recognize: Recognizer? = nil,
+                       log: (String) -> Void = { _ in },
+                       onSample: (Sample) -> Void = { _ in }) async throws -> RawReadings {
         guard bottomDivisor > 0 else { throw MappingError.invalidBottomDivisor }
         guard rightDivisor > 0 else { throw MappingError.invalidRightDivisor }
         guard leftDivisor > 0 else { throw MappingError.invalidLeftDivisor }
@@ -135,14 +155,9 @@ nonisolated enum GameTimeMapper {
         guard reader.startReading() else { throw reader.error ?? MappingError.readerSetup }
         defer { reader.cancelReading() }
 
-        var entries: [Entry] = []
+        var samples: [Sample] = []
         let interval = 0.5
         var nextSample = 0.0
-        var previousReading: Reading?
-        var repeatedSince = 0.0
-        var pending: (time: Double, buffer: CVPixelBuffer)?
-        var inDuplicateRun = false
-        var discontinuous = false
         func process(_ frame: (time: Double, buffer: CVPixelBuffer)) throws {
             let sampleTime = frame.time
             let buffer = frame.buffer
@@ -154,28 +169,9 @@ nonisolated enum GameTimeMapper {
                        reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
                        texts.description, elapsed)
             log(logLine)
-            onSample(Sample(videoSecond: sampleTime, reading: reading, logLine: logLine))
-            if let reading {
-                if reading != previousReading { repeatedSince = sampleTime }
-                if !discontinuous, sampleTime - repeatedSince >= 1.5,
-                   let last = entries.indices.last,
-                   entries[last].game_start_seconds != reading.gameSecond,
-                   entries[last].video_start_seconds < repeatedSince {
-                    entries[last].video_end_seconds = repeatedSince
-                    entries[last].game_end_seconds = reading.gameSecond
-                    entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
-                                         game_end_seconds: reading.gameSecond,
-                                         video_start_seconds: repeatedSince,
-                                         video_end_seconds: min(sampleTime + interval, duration)))
-                } else {
-                    add(reading, at: sampleTime, until: min(sampleTime + interval, duration),
-                        discontinuous: discontinuous, to: &entries)
-                }
-                previousReading = reading
-            } else {
-                previousReading = nil
-            }
-            discontinuous = false
+            let sample = Sample(videoSecond: sampleTime, reading: reading, logLine: logLine)
+            samples.append(sample)
+            onSample(sample)
         }
         while let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
@@ -187,70 +183,47 @@ nonisolated enum GameTimeMapper {
             }
             guard nextSample < duration,
                   let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-            let current = (time: nextSample, buffer: buffer)
-            if let previous = pending {
-                if identicalPixels(previous.buffer, current.buffer) {
-                    if !inDuplicateRun, let reading = previousReading,
-                       let last = entries.indices.last,
-                       entries[last].period == reading.period,
-                       entries[last].game_end_seconds == reading.gameSecond {
-                        if entries[last].video_start_seconds >= repeatedSince {
-                            entries.removeLast()
-                        } else if entries[last].video_end_seconds > repeatedSince {
-                            entries[last].video_end_seconds = repeatedSince
-                        }
-                    }
-                    inDuplicateRun = true
-                    discontinuous = true
-                    previousReading = nil
-                } else if inDuplicateRun {
-                    inDuplicateRun = false
-                    previousReading = nil
-                } else {
-                    try process(previous)
-                }
-            }
-            pending = current
+            try process((time: nextSample, buffer: buffer))
             nextSample += interval
         }
-        if let pending, !inDuplicateRun {
-            try process(pending)
-        }
         guard reader.status == .completed else { throw reader.error ?? MappingError.readerFailed }
-        entries = mergeContinuousIntervals(entries)
-        if let outputURL {
-            try save(entries, to: outputURL)
+        return RawReadings(samples: samples, duration: duration)
+    }
+
+    static func merge(_ raw: RawReadings) -> [Entry] {
+        var entries: [Entry] = []
+        var previousReading: Reading?
+        var repeatedSince = 0.0
+        for sample in raw.samples {
+                guard let reading = sample.reading else {
+                    previousReading = nil
+                    continue
+                }
+                let sampleTime = sample.videoSecond
+                if reading != previousReading { repeatedSince = sampleTime }
+                if sampleTime - repeatedSince >= 1.5,
+                   let last = entries.indices.last,
+                   entries[last].game_start_seconds != reading.gameSecond,
+                   entries[last].video_start_seconds < repeatedSince {
+                    entries[last].video_end_seconds = repeatedSince
+                    entries[last].game_end_seconds = reading.gameSecond
+                    entries.append(Entry(period: reading.period, game_start_seconds: reading.gameSecond,
+                                         game_end_seconds: reading.gameSecond,
+                                         video_start_seconds: repeatedSince,
+                                         video_end_seconds: min(sampleTime + 0.5, raw.duration)))
+                } else {
+                    add(reading, at: sampleTime, until: min(sampleTime + 0.5, raw.duration),
+                        to: &entries)
+                }
+                previousReading = reading
         }
-        return entries
+        return mergeContinuousIntervals(entries)
     }
 
     static func save(_ entries: [Entry], to outputURL: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try (encoder.encode(entries) + Data([0x0a])).write(to: outputURL, options: .atomic)
-    }
-
-    private static func identicalPixels(_ lhs: CVPixelBuffer, _ rhs: CVPixelBuffer) -> Bool {
-        guard CVPixelBufferGetWidth(lhs) == CVPixelBufferGetWidth(rhs),
-              CVPixelBufferGetHeight(lhs) == CVPixelBufferGetHeight(rhs),
-              CVPixelBufferGetPixelFormatType(lhs) == CVPixelBufferGetPixelFormatType(rhs),
-              CVPixelBufferLockBaseAddress(lhs, .readOnly) == kCVReturnSuccess else { return false }
-        defer { CVPixelBufferUnlockBaseAddress(lhs, .readOnly) }
-        guard CVPixelBufferLockBaseAddress(rhs, .readOnly) == kCVReturnSuccess else { return false }
-        defer { CVPixelBufferUnlockBaseAddress(rhs, .readOnly) }
-        guard let left = CVPixelBufferGetBaseAddress(lhs),
-              let right = CVPixelBufferGetBaseAddress(rhs) else { return false }
-        let width = CVPixelBufferGetWidth(lhs) * 4
-        let height = CVPixelBufferGetHeight(lhs)
-        let leftStride = CVPixelBufferGetBytesPerRow(lhs)
-        let rightStride = CVPixelBufferGetBytesPerRow(rhs)
-        for row in 0..<height {
-            if memcmp(left.advanced(by: row * leftStride),
-                      right.advanced(by: row * rightStride), width) != 0 {
-                return false
-            }
-        }
-        return true
     }
 
     static func regionOfInterest(bottomDivisor: Int, rightDivisor: Int,
