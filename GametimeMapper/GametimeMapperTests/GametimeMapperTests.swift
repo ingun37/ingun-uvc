@@ -173,10 +173,16 @@ struct GametimeMapperTests {
         let video = root.appendingPathComponent("test-data/\(name)")
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         defer { try? FileManager.default.removeItem(at: output) }
+        var samples: [GameTimeMapper.Sample] = []
+        var logs: [String] = []
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output, recognize: { _ in
             ["1ST", name == "minutes-seconds.mp4" ? "07:20" : ":06.1"]
-        })
+        }, log: { logs.append($0) }, onSample: { samples.append($0) })
         #expect(!entries.isEmpty)
+        #expect(!samples.isEmpty)
+        #expect(samples.map(\.logLine) == logs)
+        #expect(samples.allSatisfy { $0.reading?.period == "1ST" })
+        #expect(samples.map(\.videoSecond) == samples.map(\.videoSecond).sorted())
         #expect(entries.allSatisfy { $0.period == "1ST" && $0.video_start_seconds < $0.video_end_seconds })
         #expect(entries.first?.game_start_seconds == (name == "minutes-seconds.mp4" ? 440 : 6.1))
         let decoded = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))

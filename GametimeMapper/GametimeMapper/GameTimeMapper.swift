@@ -16,6 +16,12 @@ nonisolated enum GameTimeMapper {
         var video_end_seconds: Double
     }
 
+    struct Sample: Sendable {
+        let videoSecond: Double
+        let reading: Reading?
+        let logLine: String
+    }
+
     static func parse(_ texts: [String]) -> Reading? {
         let normalized = texts.map {
             $0.uppercased().replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
@@ -94,7 +100,8 @@ nonisolated enum GameTimeMapper {
                     rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
                     regionOfInterest: CGRect? = nil,
                     recognize: Recognizer? = nil,
-                    log: (String) -> Void = { _ in }) async throws -> [Entry] {
+                    log: (String) -> Void = { _ in },
+                    onSample: (Sample) -> Void = { _ in }) async throws -> [Entry] {
         guard bottomDivisor > 0 else { throw MappingError.invalidBottomDivisor }
         guard rightDivisor > 0 else { throw MappingError.invalidRightDivisor }
         guard leftDivisor > 0 else { throw MappingError.invalidLeftDivisor }
@@ -143,9 +150,11 @@ nonisolated enum GameTimeMapper {
             let texts = try recognizeFrame(buffer)
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
             let reading = parse(texts)
-            log(String(format: "%.1fs → %@ | OCR %@ | %.1f ms", sampleTime,
+            let logLine = String(format: "%.1fs → %@ | OCR %@ | %.1f ms", sampleTime,
                        reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
-                       texts.description, elapsed))
+                       texts.description, elapsed)
+            log(logLine)
+            onSample(Sample(videoSecond: sampleTime, reading: reading, logLine: logLine))
             if let reading {
                 if reading != previousReading { repeatedSince = sampleTime }
                 if !discontinuous, sampleTime - repeatedSince >= 1.5,

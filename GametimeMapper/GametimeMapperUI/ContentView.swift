@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Charts
 import Combine
 import SwiftUI
 import UniformTypeIdentifiers
@@ -7,6 +8,20 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     private enum Step: Int {
         case choose, select, process, save
+    }
+
+    private struct ChartSample: Identifiable {
+        let id: Int
+        let videoSecond: Double
+        let gameSecond: Double
+        let period: String
+        let segment: Int
+    }
+
+    private enum ProcessEvent: Sendable {
+        case sample(GameTimeMapper.Sample)
+        case finished([GameTimeMapper.Entry])
+        case failed(String)
     }
 
     @State private var step: Step = .choose
@@ -20,6 +35,8 @@ struct ContentView: View {
     @State private var isPlaying = false
     @State private var selectedRegion: CGRect?
     @State private var logLines: [String] = []
+    @State private var chartSamples: [ChartSample] = []
+    @State private var chartSegment = 0
     @State private var entries: [GameTimeMapper.Entry]?
     @State private var processing = false
     @State private var errorMessage: String?
@@ -156,6 +173,31 @@ struct ContentView: View {
             Text(processing ? "Reading frames and recognizing the game clock…" :
                     entries == nil ? "Processing stopped. Review the error below." : "Mapping complete. Review the log before continuing.")
                 .foregroundStyle(.secondary)
+            ZStack {
+                Chart(chartSamples) { sample in
+                    LineMark(x: .value("Video time", sample.videoSecond),
+                             y: .value("Game time", sample.gameSecond),
+                             series: .value("Segment", sample.segment))
+                        .foregroundStyle(.blue)
+                    PointMark(x: .value("Video time", sample.videoSecond),
+                              y: .value("Game time", sample.gameSecond))
+                        .foregroundStyle(.blue)
+                        .symbolSize(12)
+                }
+                .chartXScale(domain: 0...max(duration, 1))
+                .chartXAxisLabel("Video time (s)")
+                .chartYAxisLabel("Game time (s)")
+                if chartSamples.isEmpty {
+                    Text("Detected game clock readings will appear here")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 210)
+            .padding(12)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            Text("Processing log")
+                .font(.headline)
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 3) {
@@ -234,6 +276,8 @@ struct ContentView: View {
                 entries = nil
                 savedURL = nil
                 logLines = []
+                chartSamples = []
+                chartSegment = 0
                 errorMessage = nil
                 step = .select
             } catch {
@@ -251,22 +295,52 @@ struct ContentView: View {
         entries = nil
         errorMessage = nil
         logLines = []
+        chartSamples = []
+        chartSegment = 0
         let visionRegion = VideoRegionGeometry.visionRegion(displaySelection: selectedRegion,
                                                            naturalSize: naturalSize,
                                                            preferredTransform: preferredTransform)
-        Task {
-            do {
-                let result = try await GameTimeMapper.map(videoURL: videoURL,
-                                                           regionOfInterest: visionRegion,
-                                                           log: { line in
-                    Task { @MainActor in logLines.append(line) }
-                })
-                entries = result
-            } catch {
-                errorMessage = error.localizedDescription
-                logLines.append("Error: \(error.localizedDescription)")
+        let events = AsyncStream<ProcessEvent> { continuation in
+            Task.detached(priority: .userInitiated) {
+                do {
+                    let result = try await GameTimeMapper.map(
+                        videoURL: videoURL, regionOfInterest: visionRegion,
+                        onSample: { continuation.yield(.sample($0)) })
+                    continuation.yield(.finished(result))
+                } catch {
+                    continuation.yield(.failed(error.localizedDescription))
+                }
+                continuation.finish()
             }
-            processing = false
+        }
+        Task {
+            for await event in events {
+                switch event {
+                case .sample(let sample):
+                    logLines.append(sample.logLine)
+                    if let reading = sample.reading {
+                        if let previous = chartSamples.last,
+                           (previous.period != reading.period ||
+                            sample.videoSecond - previous.videoSecond > 1.000001) {
+                            chartSegment += 1
+                        }
+                        chartSamples.append(ChartSample(id: chartSamples.count,
+                                                        videoSecond: sample.videoSecond,
+                                                        gameSecond: reading.gameSecond,
+                                                        period: reading.period,
+                                                        segment: chartSegment))
+                    } else {
+                        chartSegment += 1
+                    }
+                case .finished(let result):
+                    entries = result
+                    processing = false
+                case .failed(let message):
+                    errorMessage = message
+                    logLines.append("Error: \(message)")
+                    processing = false
+                }
+            }
         }
     }
 
