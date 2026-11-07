@@ -87,13 +87,12 @@ struct VideoCompilation {
                 let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime - 0.5, preferredTimescale: 600), actualTime: nil)
                 let basketRight = frame.map { BasketSide.isRight($0) } ?? true
                 let point = BasketSide.project(caption.location, right: basketRight)
-                let label = CATextLayer()
                 let font = NSFont.systemFont(ofSize: max(24, size.height * 0.045), weight: .semibold)
-                let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-                label.string = NSAttributedString(string: caption.text, attributes: attributes)
-                label.alignmentMode = .center
-                label.isWrapped = true
-                label.contentsScale = 2
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.alignment = .center
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: font, .foregroundColor: NSColor.white, .paragraphStyle: paragraph
+                ]
                 let padding: CGFloat = 16
                 let naturalWidth = caption.text.components(separatedBy: "\n")
                     .map { ($0 as NSString).size(withAttributes: attributes).width }.max() ?? 0
@@ -108,8 +107,13 @@ struct VideoCompilation {
                 box.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
                                    y: min(max((1 - point.y) * size.height, 0), size.height - height),
                                    width: width, height: height)
-                label.frame = CGRect(x: padding, y: (height - ceil(textBounds.height)) / 2,
-                                     width: width - padding * 2, height: ceil(textBounds.height))
+                let labelSize = CGSize(width: width - padding * 2, height: ceil(textBounds.height))
+                guard let renderedText = captionImage(caption.text, size: labelSize, attributes: attributes) else { continue }
+                let label = CALayer()
+                label.frame = CGRect(x: padding, y: (height - labelSize.height) / 2,
+                                     width: labelSize.width, height: labelSize.height)
+                label.contents = renderedText
+                label.contentsScale = 2
                 box.addSublayer(label)
                 let start = max(0, time - 0.5), end = min(cursor.seconds, time + 1.5)
                 let visibility = CAKeyframeAnimation(keyPath: "opacity")
@@ -142,6 +146,26 @@ struct VideoCompilation {
         } else {
             try FileManager.default.moveItem(at: staged, to: destination)
         }
+    }
+
+    private static func captionImage(_ text: String, size: CGSize,
+                                     attributes: [NSAttributedString.Key: Any]) -> CGImage? {
+        let scale = 2
+        guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
+            pixelsWide: Int(ceil(size.width)) * scale, pixelsHigh: Int(ceil(size.height)) * scale,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
+            let context = NSGraphicsContext(bitmapImageRep: bitmap) else { return nil }
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = context
+        defer { NSGraphicsContext.current = previous }
+        // Finish drawing before AVFoundation begins compositing the first caption frame.
+        context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
+        (text as NSString).draw(with: CGRect(origin: .zero, size: size),
+                                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                attributes: attributes, context: nil)
+        context.flushGraphics()
+        return bitmap.cgImage
     }
 
     enum CompilationError: LocalizedError {
