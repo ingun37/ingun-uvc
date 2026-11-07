@@ -17,6 +17,13 @@ struct GametimeMapperTests {
                 CGRect(x: 0, y: 0, width: 0.25, height: 0.5))
     }
 
+    @Test func cropsFromCenterAndBottomTogether() {
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 1, rightDivisor: 1, centerDivisor: 3) ==
+                CGRect(x: 1.0 / 3, y: 0, width: 1.0 / 3, height: 1))
+        #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 2, rightDivisor: 1, centerDivisor: 4) ==
+                CGRect(x: 0.375, y: 0, width: 0.25, height: 0.5))
+    }
+
     @Test func rejectsLeftAndRightDivisorsTogether() async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let video = root.appendingPathComponent("test-data/divisor-hstack-reversed.mp4")
@@ -215,12 +222,18 @@ struct GametimeMapperTests {
                                          rightDivisor: 1, leftDivisor: 3)
     }
 
+    @Test func mapsCenterThirdOfHorizontalStackWithVision() async throws {
+        try await expectFrozenScoreboard(in: "divisor-hstack-center.mp4", bottomDivisor: 1,
+                                         rightDivisor: 1, centerDivisor: 3)
+    }
+
     @Test func mapsBottomRightTileOfSquareStackWithVision() async throws {
         try await expectFrozenScoreboard(in: "divisor-square.mp4", bottomDivisor: 3, rightDivisor: 3)
     }
 
     private func expectFrozenScoreboard(in name: String, bottomDivisor: Int,
-                                        rightDivisor: Int, leftDivisor: Int = 1) async throws {
+                                        rightDivisor: Int, leftDivisor: Int = 1,
+                                        centerDivisor: Int = 1) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let video = root.appendingPathComponent("test-data/\(name)")
         let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
@@ -229,7 +242,8 @@ struct GametimeMapperTests {
         let entries = try await GameTimeMapper.map(videoURL: video, outputURL: output,
                                                    bottomDivisor: bottomDivisor,
                                                    rightDivisor: rightDivisor,
-                                                   leftDivisor: leftDivisor)
+                                                   leftDivisor: leftDivisor,
+                                                   centerDivisor: centerDivisor)
         #expect(entries.count == 1)
         #expect(entries.first?.game_start_seconds == 357)
         #expect(entries.first?.game_end_seconds == 357)

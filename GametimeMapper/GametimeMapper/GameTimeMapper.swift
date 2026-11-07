@@ -91,16 +91,20 @@ nonisolated enum GameTimeMapper {
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
 
     static func map(videoURL: URL, outputURL: URL, bottomDivisor: Int = 1,
-                    rightDivisor: Int = 1, leftDivisor: Int = 1,
+                    rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in }) async throws -> [Entry] {
         guard bottomDivisor > 0 else { throw MappingError.invalidBottomDivisor }
         guard rightDivisor > 0 else { throw MappingError.invalidRightDivisor }
         guard leftDivisor > 0 else { throw MappingError.invalidLeftDivisor }
-        guard leftDivisor == 1 || rightDivisor == 1 else { throw MappingError.conflictingHorizontalDivisors }
+        guard centerDivisor > 0 else { throw MappingError.invalidCenterDivisor }
+        guard [rightDivisor, leftDivisor, centerDivisor].filter({ $0 > 1 }).count <= 1 else {
+            throw MappingError.conflictingHorizontalDivisors
+        }
         let recognizeFrame = recognize ?? { try visionTexts($0, bottomDivisor: bottomDivisor,
                                                             rightDivisor: rightDivisor,
-                                                            leftDivisor: leftDivisor) }
+                                                            leftDivisor: leftDivisor,
+                                                            centerDivisor: centerDivisor) }
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw MappingError.noVideo }
         let trackStart = try await track.load(.timeRange).start.seconds
@@ -227,20 +231,24 @@ nonisolated enum GameTimeMapper {
     }
 
     static func regionOfInterest(bottomDivisor: Int, rightDivisor: Int,
-                                 leftDivisor: Int = 1) -> CGRect {
-        let width = 1 / CGFloat(max(rightDivisor, leftDivisor))
-        return CGRect(x: leftDivisor > 1 ? 0 : 1 - width, y: 0,
+                                 leftDivisor: Int = 1, centerDivisor: Int = 1) -> CGRect {
+        let width = 1 / CGFloat(max(rightDivisor, leftDivisor, centerDivisor))
+        let x = leftDivisor > 1 ? 0 : (centerDivisor > 1 ?
+            CGFloat(centerDivisor - 1) / CGFloat(2 * centerDivisor) : 1 - width)
+        return CGRect(x: x, y: 0,
                       width: width, height: 1 / CGFloat(bottomDivisor))
     }
 
     private static func visionTexts(_ buffer: CVPixelBuffer, bottomDivisor: Int,
-                                    rightDivisor: Int, leftDivisor: Int) throws -> [String] {
+                                    rightDivisor: Int, leftDivisor: Int,
+                                    centerDivisor: Int) throws -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
         request.regionOfInterest = regionOfInterest(bottomDivisor: bottomDivisor,
                                                     rightDivisor: rightDivisor,
-                                                    leftDivisor: leftDivisor)
+                                                    leftDivisor: leftDivisor,
+                                                    centerDivisor: centerDivisor)
         try VNImageRequestHandler(cvPixelBuffer: buffer).perform([request])
         return (request.results ?? []).compactMap { $0.topCandidates(1).first }
             .filter { $0.confidence >= 0.5 }.map(\.string)
@@ -248,6 +256,7 @@ nonisolated enum GameTimeMapper {
 
     private enum MappingError: LocalizedError {
         case noVideo, invalidDuration, invalidBottomDivisor, invalidRightDivisor, invalidLeftDivisor,
+             invalidCenterDivisor,
              conflictingHorizontalDivisors, readerSetup, readerFailed
         var errorDescription: String? {
             switch self {
@@ -256,7 +265,8 @@ nonisolated enum GameTimeMapper {
             case .invalidBottomDivisor: "The bottom divisor must be a positive integer."
             case .invalidRightDivisor: "The right divisor must be a positive integer."
             case .invalidLeftDivisor: "The left divisor must be a positive integer."
-            case .conflictingHorizontalDivisors: "The left and right divisors cannot be used together."
+            case .invalidCenterDivisor: "The center divisor must be a positive integer."
+            case .conflictingHorizontalDivisors: "The left, center, and right divisors cannot be used together."
             case .readerSetup: "Could not set up video decoding."
             case .readerFailed: "Video decoding failed."
             }
