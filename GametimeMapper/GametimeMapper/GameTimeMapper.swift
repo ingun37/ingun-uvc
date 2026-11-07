@@ -90,8 +90,9 @@ nonisolated enum GameTimeMapper {
 
     typealias Recognizer = (CVPixelBuffer) throws -> [String]
 
-    static func map(videoURL: URL, outputURL: URL, bottomDivisor: Int = 1,
+    static func map(videoURL: URL, outputURL: URL? = nil, bottomDivisor: Int = 1,
                     rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
+                    regionOfInterest: CGRect? = nil,
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in }) async throws -> [Entry] {
         guard bottomDivisor > 0 else { throw MappingError.invalidBottomDivisor }
@@ -101,10 +102,17 @@ nonisolated enum GameTimeMapper {
         guard [rightDivisor, leftDivisor, centerDivisor].filter({ $0 > 1 }).count <= 1 else {
             throw MappingError.conflictingHorizontalDivisors
         }
+        if let regionOfInterest {
+            guard regionOfInterest.width > 0, regionOfInterest.height > 0,
+                  CGRect(x: 0, y: 0, width: 1, height: 1).contains(regionOfInterest) else {
+                throw MappingError.invalidRegion
+            }
+        }
         let recognizeFrame = recognize ?? { try visionTexts($0, bottomDivisor: bottomDivisor,
                                                             rightDivisor: rightDivisor,
                                                             leftDivisor: leftDivisor,
-                                                            centerDivisor: centerDivisor) }
+                                                            centerDivisor: centerDivisor,
+                                                            selectedRegion: regionOfInterest) }
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw MappingError.noVideo }
         let trackStart = try await track.load(.timeRange).start.seconds
@@ -201,10 +209,16 @@ nonisolated enum GameTimeMapper {
         }
         guard reader.status == .completed else { throw reader.error ?? MappingError.readerFailed }
         entries = mergeContinuousIntervals(entries)
+        if let outputURL {
+            try save(entries, to: outputURL)
+        }
+        return entries
+    }
+
+    static func save(_ entries: [Entry], to outputURL: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try (encoder.encode(entries) + Data([0x0a])).write(to: outputURL, options: .atomic)
-        return entries
     }
 
     private static func identicalPixels(_ lhs: CVPixelBuffer, _ rhs: CVPixelBuffer) -> Bool {
@@ -241,11 +255,11 @@ nonisolated enum GameTimeMapper {
 
     private static func visionTexts(_ buffer: CVPixelBuffer, bottomDivisor: Int,
                                     rightDivisor: Int, leftDivisor: Int,
-                                    centerDivisor: Int) throws -> [String] {
+                                    centerDivisor: Int, selectedRegion: CGRect?) throws -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
-        request.regionOfInterest = regionOfInterest(bottomDivisor: bottomDivisor,
+        request.regionOfInterest = selectedRegion ?? regionOfInterest(bottomDivisor: bottomDivisor,
                                                     rightDivisor: rightDivisor,
                                                     leftDivisor: leftDivisor,
                                                     centerDivisor: centerDivisor)
@@ -255,13 +269,14 @@ nonisolated enum GameTimeMapper {
     }
 
     private enum MappingError: LocalizedError {
-        case noVideo, invalidDuration, invalidBottomDivisor, invalidRightDivisor, invalidLeftDivisor,
+        case noVideo, invalidDuration, invalidRegion, invalidBottomDivisor, invalidRightDivisor, invalidLeftDivisor,
              invalidCenterDivisor,
              conflictingHorizontalDivisors, readerSetup, readerFailed
         var errorDescription: String? {
             switch self {
             case .noVideo: "The file does not contain a video track."
             case .invalidDuration: "The video duration is invalid."
+            case .invalidRegion: "The selected scoreboard region is invalid."
             case .invalidBottomDivisor: "The bottom divisor must be a positive integer."
             case .invalidRightDivisor: "The right divisor must be a positive integer."
             case .invalidLeftDivisor: "The left divisor must be a positive integer."

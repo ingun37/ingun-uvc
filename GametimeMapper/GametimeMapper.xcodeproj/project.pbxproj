@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AA000001000000000000000A /* GametimeMapper/GameTimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
+		AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in UI Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -307,6 +308,7 @@
 		929CE460309F40E200B71319 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in UI Sources */,
 			);
 		};
 		929CE46C309F40E300B71319 /* Sources */ = {
@@ -496,7 +498,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -526,7 +528,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (

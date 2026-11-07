@@ -209,6 +209,21 @@ struct GametimeMapperTests {
         #expect(entries.last?.video_end_seconds == 3)
     }
 
+    @Test func mapsSelectedRegionThenSavesJSON() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let video = root.appendingPathComponent("test-data/trimmed-only.mov")
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: output) }
+
+        let entries = try await GameTimeMapper.map(videoURL: video,
+                                                   regionOfInterest: CGRect(x: 0, y: 0, width: 1, height: 0.5))
+        #expect(entries.map(\.game_start_seconds) == [442])
+        #expect(!FileManager.default.fileExists(atPath: output.path))
+        try GameTimeMapper.save(entries, to: output)
+        let saved = try JSONDecoder().decode([GameTimeMapper.Entry].self, from: Data(contentsOf: output))
+        #expect(saved == entries)
+    }
+
     @Test func mapsBottomThirdOfVerticalStackWithVision() async throws {
         try await expectFrozenScoreboard(in: "divisor-vstack.mp4", bottomDivisor: 3, rightDivisor: 1)
     }
