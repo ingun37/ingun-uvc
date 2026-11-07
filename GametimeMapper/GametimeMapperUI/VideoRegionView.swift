@@ -79,8 +79,7 @@ final class RegionView: NSView {
 
     private var videoRect: CGRect {
         let rect = playerLayer.videoRect
-        return CGRect(x: rect.minX, y: bounds.height - rect.maxY,
-                      width: rect.width, height: rect.height)
+        return rect
     }
 
     private func updateOutline() {
@@ -91,7 +90,7 @@ final class RegionView: NSView {
         }
         let video = playerLayer.videoRect
         let rect = CGRect(x: video.minX + selection.minX * video.width,
-                          y: video.minY + (1 - selection.maxY) * video.height,
+                          y: video.minY + selection.minY * video.height,
                           width: selection.width * video.width,
                           height: selection.height * video.height)
         outlineLayer.path = CGPath(rect: rect, transform: nil)

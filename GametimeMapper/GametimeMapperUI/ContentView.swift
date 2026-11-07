@@ -141,9 +141,6 @@ struct ContentView: View {
                     .font(.caption)
                     .frame(width: 120, alignment: .trailing)
             }
-            if selectedRegion != nil {
-                Button("Clear Selection") { selectedRegion = nil }
-            }
         }
     }
 
