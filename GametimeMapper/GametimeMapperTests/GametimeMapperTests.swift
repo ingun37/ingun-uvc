@@ -14,6 +14,28 @@ struct GametimeMapperTests {
         #expect(merged.first?.game_start_seconds == 440)
     }
 
+    @Test func removesOutlierBeforeMerge() {
+        let samples = [
+            GameTimeMapper.Sample(id: 0, videoSecond: 0,
+                                  reading: .init(period: "1ST", gameSecond: 100),
+                                  ocrTexts: ["1ST", "1:40"], logLine: "first"),
+            GameTimeMapper.Sample(id: 1, videoSecond: 0.5,
+                                  reading: .init(period: "1ST", gameSecond: 500),
+                                  ocrTexts: ["1ST", "8:20"], logLine: "outlier"),
+            GameTimeMapper.Sample(id: 2, videoSecond: 1,
+                                  reading: .init(period: "1ST", gameSecond: 99),
+                                  ocrTexts: ["1ST", "1:39"], logLine: "last")
+        ]
+        let raw = GameTimeMapper.RawReadings(samples: samples, duration: 1.5)
+        #expect(GameTimeMapper.merge(raw).count == 3)
+        let filtered = raw.removingSample(id: 1)
+        #expect(filtered.samples.map(\.id) == [0, 2])
+        #expect(GameTimeMapper.merge(filtered) == [
+            .init(period: "1ST", game_start_seconds: 100, game_end_seconds: 99,
+                  video_start_seconds: 0, video_end_seconds: 1.5)
+        ])
+    }
+
     @Test func cropsFromRightAndBottomTogether() {
         #expect(GameTimeMapper.regionOfInterest(bottomDivisor: 1, rightDivisor: 2) ==
                 CGRect(x: 0.5, y: 0, width: 0.5, height: 1))
@@ -192,6 +214,7 @@ struct GametimeMapperTests {
         #expect(!entries.isEmpty)
         #expect(!samples.isEmpty)
         #expect(samples.map(\.logLine) == logs)
+        #expect(samples.allSatisfy { $0.ocrTexts.count == 2 })
         #expect(samples.allSatisfy { $0.reading?.period == "1ST" })
         #expect(samples.map(\.videoSecond) == samples.map(\.videoSecond).sorted())
         #expect(entries.allSatisfy { $0.period == "1ST" && $0.video_start_seconds < $0.video_end_seconds })

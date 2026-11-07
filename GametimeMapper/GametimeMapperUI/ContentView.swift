@@ -36,7 +36,9 @@ struct ContentView: View {
     @State private var selectedRegion: CGRect?
     @State private var logLines: [String] = []
     @State private var chartSamples: [ChartSample] = []
-    @State private var chartSegment = 0
+    @State private var hoveredSampleID: Int?
+    @State private var hoverLocation: CGPoint?
+    @State private var selectedSampleID: Int?
     @State private var rawReadings: GameTimeMapper.RawReadings?
     @State private var entries: [GameTimeMapper.Entry]?
     @State private var processing = false
@@ -177,7 +179,8 @@ struct ContentView: View {
                     rawReadings == nil ? "Processing stopped. Review the error below." :
                     "Sampling complete. Review the readings before merging.")
                 .foregroundStyle(.secondary)
-            ZStack {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
                 Chart(chartSamples) { sample in
                     LineMark(x: .value("Video time", sample.videoSecond),
                              y: .value("Game time", sample.gameSecond),
@@ -185,21 +188,59 @@ struct ContentView: View {
                         .foregroundStyle(.blue)
                     PointMark(x: .value("Video time", sample.videoSecond),
                               y: .value("Game time", sample.gameSecond))
-                        .foregroundStyle(.blue)
-                        .symbolSize(12)
+                        .foregroundStyle(sample.id == selectedSampleID ? .orange : .blue)
+                        .symbolSize(sample.id == selectedSampleID ? 70 : 35)
                 }
                 .chartXScale(domain: 0...max(duration, 1))
                 .chartXAxisLabel("Video time (s)")
                 .chartYAxisLabel("Game time (s)")
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active(let location):
+                                    hoveredSampleID = nearestSample(to: location, proxy: proxy,
+                                                                    geometry: geometry)?.id
+                                    hoverLocation = location
+                                case .ended:
+                                    hoveredSampleID = nil
+                                    hoverLocation = nil
+                                }
+                            }
+                            .gesture(SpatialTapGesture().onEnded { gesture in
+                                guard !processing, rawReadings != nil else { return }
+                                selectedSampleID = nearestSample(to: gesture.location,
+                                                                 proxy: proxy, geometry: geometry)?.id
+                            })
+                        if let hoveredSampleID, let hoverLocation,
+                           let hovered = chartSamples.first(where: { $0.id == hoveredSampleID }) {
+                            Text("\(hovered.period) · \(formatGameTime(hovered.gameSecond))")
+                                .font(.caption.monospacedDigit())
+                                .padding(6)
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                                .position(x: min(max(hoverLocation.x, 60), geometry.size.width - 60),
+                                          y: max(hoverLocation.y - 25, 15))
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
                 if chartSamples.isEmpty {
-                    Text("Detected game clock readings will appear here")
+                    Text(processing ? "Graph will appear when processing finishes" :
+                         "No game clock readings to display")
                         .foregroundStyle(.secondary)
                 }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 250)
+                .padding(12)
+                .background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                sampleDetail
+                    .frame(width: 240, height: 274)
             }
-            .frame(height: 210)
-            .padding(12)
-            .background(Color(nsColor: .textBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             Text("Processing log")
                 .font(.headline)
             ScrollViewReader { proxy in
@@ -225,6 +266,108 @@ struct ContentView: View {
                 Button("Try Again") { beginProcessing() }
             }
         }
+    }
+
+    private var sampleDetail: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let rawReadings, let selectedSampleID,
+               let index = rawReadings.samples.firstIndex(where: { $0.id == selectedSampleID }),
+               let reading = rawReadings.samples[index].reading {
+                let sample = rawReadings.samples[index]
+                Text("Sample details").font(.headline)
+                Text("Video: \(String(format: "%.1f", sample.videoSecond)) s")
+                Text("Game: \(reading.period) \(formatGameTime(reading.gameSecond))")
+                if let previous = rawReadings.samples[..<index].last(where: { $0.reading != nil }),
+                   let previousReading = previous.reading {
+                    Text("Previous: \(previousReading.period) \(formatGameTime(previousReading.gameSecond))")
+                    Text(changeDescription(reading.gameSecond - previousReading.gameSecond))
+                } else {
+                    Text("No previous clock reading")
+                        .foregroundStyle(.secondary)
+                }
+                Divider()
+                Text("OCR readings").font(.subheadline.bold())
+                ScrollView {
+                    if sample.ocrTexts.isEmpty {
+                        Text("No text recognized")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(Array(sample.ocrTexts.enumerated()), id: \.offset) { _, text in
+                                Text(text)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 0)
+                Button("Remove Sample", role: .destructive) {
+                    let filtered = rawReadings.removingSample(id: selectedSampleID)
+                    self.rawReadings = filtered
+                    chartSamples = chartSamplesFor(filtered.samples)
+                    self.selectedSampleID = nil
+                    hoveredSampleID = nil
+                    entries = nil
+                }
+                .disabled(processing)
+            } else {
+                Text("Sample details").font(.headline)
+                Text("Click a point to inspect its OCR readings and remove an incorrect sample.")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func nearestSample(to location: CGPoint, proxy: ChartProxy,
+                               geometry: GeometryProxy) -> ChartSample? {
+        guard let plotFrame = proxy.plotFrame else { return nil }
+        let origin = geometry[plotFrame].origin
+        return chartSamples.compactMap { sample -> (ChartSample, CGFloat)? in
+            guard let x = proxy.position(forX: sample.videoSecond),
+                  let y = proxy.position(forY: sample.gameSecond) else { return nil }
+            let distance = hypot(location.x - origin.x - x, location.y - origin.y - y)
+            return distance <= 18 ? (sample, distance) : nil
+        }.min(by: { $0.1 < $1.1 })?.0
+    }
+
+    private func chartSamplesFor(_ samples: [GameTimeMapper.Sample]) -> [ChartSample] {
+        var result: [ChartSample] = []
+        var segment = 0
+        for sample in samples {
+            guard let reading = sample.reading else {
+                segment += 1
+                continue
+            }
+            if let previous = result.last,
+               (previous.period != reading.period || sample.videoSecond - previous.videoSecond > 1.000001) {
+                segment += 1
+            }
+            result.append(ChartSample(id: sample.id, videoSecond: sample.videoSecond,
+                                      gameSecond: reading.gameSecond, period: reading.period,
+                                      segment: segment))
+        }
+        return result
+    }
+
+    private func changeDescription(_ change: Double) -> String {
+        if abs(change) < 0.000001 { return "Game time unchanged" }
+        return String(format: "Game time %@ by %.1f s", change > 0 ? "increased" : "decreased", abs(change))
+    }
+
+    private func formatGameTime(_ seconds: Double) -> String {
+        let minutes = Int(seconds / 60)
+        let remainder = seconds - Double(minutes * 60)
+        if remainder == remainder.rounded() {
+            return String(format: "%d:%02d", minutes, Int(remainder))
+        }
+        return String(format: "%d:%04.1f", minutes, remainder)
     }
 
     private var saveView: some View {
@@ -282,7 +425,9 @@ struct ContentView: View {
                 savedURL = nil
                 logLines = []
                 chartSamples = []
-                chartSegment = 0
+                selectedSampleID = nil
+                hoveredSampleID = nil
+                hoverLocation = nil
                 errorMessage = nil
                 step = .select
             } catch {
@@ -302,7 +447,9 @@ struct ContentView: View {
         errorMessage = nil
         logLines = []
         chartSamples = []
-        chartSegment = 0
+        selectedSampleID = nil
+        hoveredSampleID = nil
+        hoverLocation = nil
         let visionRegion = VideoRegionGeometry.visionRegion(displaySelection: selectedRegion,
                                                            naturalSize: naturalSize,
                                                            preferredTransform: preferredTransform)
@@ -324,22 +471,9 @@ struct ContentView: View {
                 switch event {
                 case .sample(let sample):
                     logLines.append(sample.logLine)
-                    if let reading = sample.reading {
-                        if let previous = chartSamples.last,
-                           (previous.period != reading.period ||
-                            sample.videoSecond - previous.videoSecond > 1.000001) {
-                            chartSegment += 1
-                        }
-                        chartSamples.append(ChartSample(id: chartSamples.count,
-                                                        videoSecond: sample.videoSecond,
-                                                        gameSecond: reading.gameSecond,
-                                                        period: reading.period,
-                                                        segment: chartSegment))
-                    } else {
-                        chartSegment += 1
-                    }
                 case .finished(let result):
                     rawReadings = result
+                    chartSamples = chartSamplesFor(result.samples)
                     processing = false
                 case .failed(let message):
                     errorMessage = message

@@ -17,14 +17,20 @@ nonisolated enum GameTimeMapper {
     }
 
     struct Sample: Sendable {
+        let id: Int
         let videoSecond: Double
         let reading: Reading?
+        let ocrTexts: [String]
         let logLine: String
     }
 
     struct RawReadings: Sendable {
         let samples: [Sample]
         let duration: Double
+
+        func removingSample(id: Int) -> RawReadings {
+            RawReadings(samples: samples.filter { $0.id != id }, duration: duration)
+        }
     }
 
     static func parse(_ texts: [String]) -> Reading? {
@@ -169,7 +175,8 @@ nonisolated enum GameTimeMapper {
                        reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
                        texts.description, elapsed)
             log(logLine)
-            let sample = Sample(videoSecond: sampleTime, reading: reading, logLine: logLine)
+            let sample = Sample(id: samples.count, videoSecond: sampleTime,
+                                reading: reading, ocrTexts: texts, logLine: logLine)
             samples.append(sample)
             onSample(sample)
         }
