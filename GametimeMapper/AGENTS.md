@@ -1,31 +1,44 @@
-# GametimeMapper CLI
+# GametimeMapper
 
-Target the current macOS SDK. Use AVFoundation to decode video and Vision for
-OCR; the project has no UI or selected subregion. Follow RAII, avoid nullable
-stored properties where practical, and prefer immutable values.
+This project has a macOS Swift CLI (`GametimeMapper`) and SwiftUI app
+(`GametimeMapperUI`) that share `GametimeMapper/GameTimeMapper.swift`. Target the
+current macOS SDK. Use AVFoundation for video decoding, Vision for OCR, and Swift
+Charts for the app's graph. Follow RAII, avoid nullable stored properties where
+practical, and prefer immutable values.
 
 ## Code and behavior
 
-- `GametimeMapper/Command.swift` accepts input video path and output JSON path,
-  plus optional `--bottom-divisor N` to OCR the bottom `1/N` of each frame,
-  and `--left-divisor N` or `--right-divisor N` to OCR the corresponding
-  horizontal `1/N` (default `N=1`, the whole frame). Left and right cannot
-  be combined; either can be combined with bottom. It prints per-sampled-frame OCR text,
-  recognized game time, and OCR duration in milliseconds.
-- `GametimeMapper/GameTimeMapper.swift` samples every 0.5 seconds. Parse a
-  clock only when a recognized period (`1ST`, `2ND`, `3RD`,
-  `4TH`, or `OT`) is present. Supported clocks include `mm:ss`, `:ss.s`, and `ss.s`.
+- `GametimeMapper/Command.swift` accepts input video and output JSON paths.
+  `--bottom-divisor N` selects the bottom `1/N` of the frame;
+  `--left-divisor N`, `--center-divisor N`, or `--right-divisor N` selects a
+  horizontal `1/N` region. At most one horizontal option may be used. The CLI
+  logs each sampled frame and saves the merged output in one run.
+- `GametimeMapper/GameTimeMapper.swift` samples every 0.5 seconds. `sample(...)`
+  returns `RawReadings`, retaining each sampled frame's video time, OCR texts,
+  optional parsed period and clock, and log line. There is no repeated-frame
+  comparison. Keep the `recognize` callback injectable for deterministic tests.
+- Parse a clock only when a recognized period (`1ST`, `2ND`, `3RD`, `4TH`, or
+  `OT`) is present. Supported clocks include `mm:ss`, `:ss.s`, and `ss.s`.
   Additional overtime labels are not defined yet.
-- Output is a chronological JSON array with `period`, `game_start_seconds`,
-  `game_end_seconds`, `video_start_seconds`, and `video_end_seconds`. Video
-  range ends are exclusive; equal game endpoints mean a stopped clock.
-  Samples with the same period merge while the game clock advances continuously
-  at video speed, allowing for OCR clock rounding, the transition to tenths
-  below one minute, and up to one second of missing readings when the next
-  clock confirms continuity. Identical stopped-clock readings can also merge
-  across longer OCR gaps. Other longer gaps and clock jumps split entries.
-- Keep the `recognize` callback injectable so decoding and range behavior can
-  be tested with deterministic OCR readings.
+- `RawReadings.removingSample(id:)` removes an individual reading before
+  `merge(...)`. `merge(...)` first builds intervals from readings that advance
+  continuously at video speed (with OCR rounding tolerance and stopped clocks),
+  then merges intervals whose video and game-clock gaps match or whose paused
+  clock values match. Preserve this order so UI filtering affects the raw data.
+- The output is a chronological JSON array with `period`,
+  `game_start_seconds`, `game_end_seconds`, `video_start_seconds`, and
+  `video_end_seconds`. Video range ends are exclusive; equal game endpoints
+  represent a stopped clock.
+- `GametimeMapperUI/ContentView.swift` implements video selection, scoreboard
+  rectangle selection, processing and review, and JSON saving. The process log
+  updates for each sample. Build the Swift Charts graph once processing finishes;
+  do not redraw it for every sample. Hovering shows game time; clicking shows
+  the prior clock change and all OCR texts, with a button to remove that raw
+  sample. The UI calls `merge(...)` only when the user clicks **Next** after
+  review. The save dialog defaults to the video directory and `<video name>.json`.
+- `GametimeMapperUI/VideoRegionView.swift` handles the one-at-a-time rectangle
+  and converts displayed video coordinates to Vision's region of interest,
+  including video rotation.
 
 ## Build and test
 
@@ -34,10 +47,16 @@ From the repository root:
 ```sh
 xcodebuild -project GametimeMapper/GametimeMapper.xcodeproj \
   -scheme GametimeMapper -configuration Debug -destination 'platform=macOS' \
-  -derivedDataPath /tmp/gametime-mapper-xcode CODE_SIGNING_ALLOWED=NO test
+  -derivedDataPath /tmp/gametime-mapper-xcode CODE_SIGNING_ALLOWED=NO \
+  -parallel-testing-enabled NO test
+
+xcodebuild -project GametimeMapper/GametimeMapper.xcodeproj \
+  -scheme GametimeMapperUI -configuration Debug -destination 'platform=macOS' \
+  -derivedDataPath /tmp/gametime-mapper-ui-xcode CODE_SIGNING_ALLOWED=NO build
 ```
 
-`GametimeMapperTests/` covers parsing, deterministic decoding with the small
-MP4 fixtures, and live Vision OCR on the full-frame MOV clips in `test-data/`.
-When changing sampling or parsing, run the full suite. Xcode's macOS test
+`GametimeMapperTests/` covers parsing, deterministic decoding, raw sample
+filtering and merging, and Vision OCR on fixtures in `test-data/`.
+`GametimeMapperUITests/` covers video coordinate conversion. When changing
+sampling, parsing, or merging, run the full mapper suite. Xcode's macOS test
 runner may need execution outside the command sandbox.
