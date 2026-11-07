@@ -1,9 +1,30 @@
 import AVFoundation
+import CoreGraphics
 import Foundation
 import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func darkerHalfDeterminesBasketSide() throws {
+        let detector = try BasketSide()
+        func image(left: CGFloat, right: CGFloat) throws -> CGImage {
+            guard let context = CGContext(data: nil, width: 8, height: 4, bitsPerComponent: 8,
+                                          bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+                throw BasketSide.DetectionError.computeFailed
+            }
+            context.setFillColor(CGColor(gray: left, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+            context.setFillColor(CGColor(gray: right, alpha: 1))
+            context.fill(CGRect(x: 4, y: 0, width: 4, height: 4))
+            guard let result = context.makeImage() else { throw BasketSide.DetectionError.computeFailed }
+            return result
+        }
+        #expect(try detector.isRight(image(left: 1, right: 0)))
+        #expect(try !detector.isRight(image(left: 0, right: 1)))
+        #expect(try !detector.isRight(image(left: 0.5, right: 0.5)))
+    }
+
     @Test func usesExplicitClockEndpointsForStoppedClockRange() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

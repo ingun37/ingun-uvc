@@ -83,9 +83,12 @@ struct VideoCompilation {
             parent.addSublayer(videoLayer)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            let basketSide = try BasketSide()
             for (time, caption) in overlays {
-                let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime - 0.5, preferredTimescale: 600), actualTime: nil)
-                let basketRight = frame.map { BasketSide.isRight($0) } ?? true
+                let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime, preferredTimescale: 600), actualTime: nil)
+                let basketRight = try frame.map { try basketSide.isRight($0) } ?? true
                 let point = BasketSide.project(caption.location, right: basketRight)
                 let font = NSFont.systemFont(ofSize: max(24, size.height * 0.045), weight: .semibold)
                 let paragraph = NSMutableParagraphStyle()
