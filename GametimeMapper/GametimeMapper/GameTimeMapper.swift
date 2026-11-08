@@ -3,6 +3,62 @@ import Foundation
 import Vision
 
 nonisolated enum GameTimeMapper {
+    enum Period: String, CaseIterable, Identifiable, Sendable {
+        case first = "First Quarter", second = "Second Quarter"
+        case third = "Third Quarter", fourth = "Fourth Quarter"
+        case firstOvertime = "First Overtime", secondOvertime = "Second Overtime"
+        case thirdOvertime = "Third Overtime"
+
+        var id: String { rawValue }
+        var shortLabel: String {
+            switch self {
+            case .first: "1ST"
+            case .second: "2ND"
+            case .third: "3RD"
+            case .fourth: "4TH"
+            case .firstOvertime, .secondOvertime, .thirdOvertime: "OT"
+            }
+        }
+        var longLabel: String {
+            switch self {
+            case .first: "FIRST QUARTER"
+            case .second: "SECOND QUARTER"
+            case .third: "THIRD QUARTER"
+            case .fourth: "FOURTH QUARTER"
+            case .firstOvertime, .secondOvertime, .thirdOvertime: "OVERTIME"
+            }
+        }
+    }
+
+    enum PeriodStyle: String, CaseIterable, Sendable { case short, long }
+    enum UnderMinuteStyle: String, CaseIterable, Sendable { case colon, natural }
+
+    struct ScoreboardFormat: Equatable, Sendable {
+        var periodStyles: [Period: PeriodStyle]
+        var underMinuteStyle: UnderMinuteStyle
+
+        init(periodStyle: PeriodStyle, underMinuteStyle: UnderMinuteStyle) {
+            self.periodStyles = Dictionary(uniqueKeysWithValues: Period.allCases.map { ($0, periodStyle) })
+            self.underMinuteStyle = underMinuteStyle
+        }
+
+        enum Preset: String, CaseIterable, Identifiable {
+            case a = "Preset A — Short Period, Digital Time"
+            case b = "Preset B — Long Period, Natural Time"
+            case c = "Preset C — Short Period, Natural Time"
+            var id: String { rawValue }
+            var format: ScoreboardFormat {
+                switch self {
+                case .a: ScoreboardFormat(periodStyle: .short, underMinuteStyle: .colon)
+                case .b: ScoreboardFormat(periodStyle: .long, underMinuteStyle: .natural)
+                case .c: ScoreboardFormat(periodStyle: .short, underMinuteStyle: .natural)
+                }
+            }
+        }
+
+        var preset: Preset? { Preset.allCases.first { $0.format == self } }
+    }
+
     struct Reading: Equatable, Sendable {
         let period: String
         let gameSecond: Double
@@ -33,19 +89,46 @@ nonisolated enum GameTimeMapper {
         }
     }
 
-    static func parse(_ texts: [String]) -> Reading? {
+    static func parse(_ texts: [String], format: ScoreboardFormat? = nil) -> Reading? {
         let normalized = texts.map {
             $0.uppercased().replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
         }
         let combined = texts.joined(separator: " ").uppercased()
             .replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
         let candidates = normalized + [combined]
-        guard let period = candidates.compactMap({ text -> String? in
-            guard let range = text.range(of: #"(?<![A-Z0-9])(?:1ST|2ND|3RD|4TH|OT)(?![A-Z0-9])"#, options: .regularExpression) else { return nil }
-            return String(text[range])
+        var labels: [(label: String, canonical: String)] = format.map { selection in
+            Period.allCases.map { period in
+                (selection.periodStyles[period] == .long ? period.longLabel : period.shortLabel,
+                 period.shortLabel)
+            }
+        } ?? ["1ST", "2ND", "3RD", "4TH", "OT"].map { ($0, $0) }
+        // Vision can substitute visually similar Cyrillic glyphs in short labels.
+        if labels.contains(where: { $0.label == "4TH" }) {
+            labels += [("4ТH", "4TH"), ("4ТН", "4TH")]
+        }
+        if labels.contains(where: { $0.label == "OT" }) {
+            labels += [("ОT", "OT"), ("ОТ", "OT")]
+        }
+        guard let period = candidates.lazy.compactMap({ text -> String? in
+            for (label, canonical) in labels {
+                let escaped = NSRegularExpression.escapedPattern(for: label)
+                    .replacingOccurrences(of: "\\ ", with: #"\s+"#)
+                if text.range(of: "(?<![A-Z0-9])\(escaped)(?![A-Z0-9])",
+                              options: .regularExpression) != nil { return canonical }
+            }
+            return nil
         }).first else { return nil }
+        let clockPattern: String
+        switch format?.underMinuteStyle {
+        case .colon:
+            clockPattern = #"(?:\d{1,2}:[0-5]\d|:[0-5]\d\.\d)"#
+        case .natural:
+            clockPattern = #"(?:\d{1,2}:[0-5]\d|(?:[1-5]\d|[0-9])\.\d)"#
+        case nil:
+            clockPattern = #"(?:\d{1,2}:\d{2}(?:\.\d+)?|:?\d{1,2}\.\d+)"#
+        }
         for text in candidates {
-            guard let clockRange = text.range(of: #"(?<![\d:])(?:\d{1,2}:\d{2}(?:\.\d+)?|:?\d{1,2}\.\d+)(?![\d.])"#,
+            guard let clockRange = text.range(of: "(?<![0-9:.])\(clockPattern)(?![0-9.])",
                                               options: .regularExpression) else { continue }
             let parts = text[clockRange].split(separator: ":", omittingEmptySubsequences: false)
             let secondsText = parts.count == 2 ? parts[1] : parts[0]
@@ -110,12 +193,14 @@ nonisolated enum GameTimeMapper {
     static func map(videoURL: URL, outputURL: URL? = nil, bottomDivisor: Int = 1,
                     rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
                     regionOfInterest: CGRect? = nil,
+                    format: ScoreboardFormat? = nil,
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in },
                     onSample: (Sample) -> Void = { _ in }) async throws -> [Entry] {
         let raw = try await sample(videoURL: videoURL, bottomDivisor: bottomDivisor,
                                    rightDivisor: rightDivisor, leftDivisor: leftDivisor,
                                    centerDivisor: centerDivisor, regionOfInterest: regionOfInterest,
+                                   format: format,
                                    recognize: recognize, log: log, onSample: onSample)
         let entries = merge(raw)
         if let outputURL { try save(entries, to: outputURL) }
@@ -125,6 +210,7 @@ nonisolated enum GameTimeMapper {
     static func sample(videoURL: URL, bottomDivisor: Int = 1,
                        rightDivisor: Int = 1, leftDivisor: Int = 1, centerDivisor: Int = 1,
                        regionOfInterest: CGRect? = nil,
+                       format: ScoreboardFormat? = nil,
                        recognize: Recognizer? = nil,
                        log: (String) -> Void = { _ in },
                        onSample: (Sample) -> Void = { _ in }) async throws -> RawReadings {
@@ -170,7 +256,7 @@ nonisolated enum GameTimeMapper {
             let start = CFAbsoluteTimeGetCurrent()
             let texts = try recognizeFrame(buffer)
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000
-            let reading = parse(texts)
+            let reading = parse(texts, format: format)
             let logLine = String(format: "%.1fs → %@ | OCR %@ | %.1f ms", sampleTime,
                        reading.map { "\($0.period) game clock \($0.gameSecond)s" } ?? "no clock or period detected",
                        texts.description, elapsed)
@@ -247,6 +333,8 @@ nonisolated enum GameTimeMapper {
                                     centerDivisor: Int, selectedRegion: CGRect?) throws -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        request.automaticallyDetectsLanguage = false
         request.usesLanguageCorrection = false
         request.regionOfInterest = selectedRegion ?? regionOfInterest(bottomDivisor: bottomDivisor,
                                                     rightDivisor: rightDivisor,

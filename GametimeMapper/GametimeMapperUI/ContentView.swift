@@ -10,7 +10,7 @@ struct ContentView: View {
     let launchVideoURL: URL?
 
     private enum Step: Int {
-        case choose, select, process, save
+        case choose, select, format, process, save
     }
 
     private struct ChartSample: Identifiable {
@@ -37,6 +37,7 @@ struct ContentView: View {
     @State private var currentTime = 0.0
     @State private var isPlaying = false
     @State private var selectedRegion: CGRect?
+    @State private var scoreboardFormat = GameTimeMapper.ScoreboardFormat.Preset.a.format
     @State private var logLines: [String] = []
     @State private var chartSamples: [ChartSample] = []
     @State private var hoveredSampleID: Int?
@@ -60,7 +61,7 @@ struct ContentView: View {
                 Text("Game Time Mapper")
                     .font(.title2.bold())
                 Spacer()
-                Text("\(step.rawValue + 1 - (skipsVideoStep ? 1 : 0)) of \(4 - (outputURL == nil ? 0 : 1) - (skipsVideoStep ? 1 : 0))")
+                Text("\(step.rawValue + 1 - (skipsVideoStep ? 1 : 0)) of \(5 - (outputURL == nil ? 0 : 1) - (skipsVideoStep ? 1 : 0))")
                     .foregroundStyle(.secondary)
             }
 
@@ -70,6 +71,7 @@ struct ContentView: View {
                 switch step {
                 case .choose: chooseView
                 case .select: selectView
+                case .format: formatView
                 case .process: processView
                 case .save: saveView
                 }
@@ -86,12 +88,17 @@ struct ContentView: View {
                 if step == .select {
                     Button("Choose Another Video") { chooseVideo() }
                     Spacer()
-                    Button("Next") { beginProcessing() }
+                    Button("Next") { player.pause(); step = .format }
                         .keyboardShortcut(.defaultAction)
                         .disabled(selectedRegion == nil)
+                } else if step == .format {
+                    Button("Back to Selection") { step = .select }
+                    Spacer()
+                    Button("Start Processing") { beginProcessing() }
+                        .keyboardShortcut(.defaultAction)
                 } else if step == .process {
                     if !processing {
-                        Button("Back to Selection") { step = .select }
+                        Button("Back to Formats") { step = .format }
                     }
                     Spacer()
                     Button(outputURL == nil ? "Next" : "Save JSON") { saveMapping() }
@@ -284,6 +291,52 @@ struct ContentView: View {
         }
     }
 
+    private var formatView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Scoreboard text formats")
+                .font(.title3.bold())
+            Text("Choose the text shown by this scoreboard. Each component uses one format throughout the game.")
+                .foregroundStyle(.secondary)
+            Picker("Preset", selection: Binding(
+                get: { scoreboardFormat.preset?.rawValue ?? "custom" },
+                set: { value in
+                    if let preset = GameTimeMapper.ScoreboardFormat.Preset(rawValue: value) {
+                        scoreboardFormat = preset.format
+                    }
+                })) {
+                    ForEach(GameTimeMapper.ScoreboardFormat.Preset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset.rawValue)
+                    }
+                    if scoreboardFormat.preset == nil { Text("Custom").tag("custom") }
+                }
+                .frame(maxWidth: 360, alignment: .leading)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(GameTimeMapper.Period.allCases) { period in
+                        Picker(period.rawValue, selection: Binding(
+                            get: { scoreboardFormat.periodStyles[period] ?? .short },
+                            set: { scoreboardFormat.periodStyles[period] = $0 })) {
+                                Text(period.shortLabel).tag(GameTimeMapper.PeriodStyle.short)
+                                Text(period.longLabel).tag(GameTimeMapper.PeriodStyle.long)
+                            }
+                            .frame(maxWidth: 480)
+                    }
+                    Picker("Clock over a minute", selection: .constant("minutes")) {
+                        Text("mm:ss or m:ss").tag("minutes")
+                    }
+                    .disabled(true)
+                    .frame(maxWidth: 480)
+                    Picker("Clock under a minute", selection: $scoreboardFormat.underMinuteStyle) {
+                        Text(":ss.s (e.g. :06.1)").tag(GameTimeMapper.UnderMinuteStyle.colon)
+                        Text("ss.s or s.s (e.g. 16.1, 6.1)").tag(GameTimeMapper.UnderMinuteStyle.natural)
+                    }
+                    .frame(maxWidth: 480)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
     private var sampleDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let rawReadings, let selectedSampleID,
@@ -440,6 +493,7 @@ struct ContentView: View {
                 preferredTransform = transform
                 currentTime = 0
                 selectedRegion = nil
+                scoreboardFormat = GameTimeMapper.ScoreboardFormat.Preset.a.format
                 rawReadings = nil
                 entries = nil
                 savedURL = nil
@@ -474,11 +528,12 @@ struct ContentView: View {
         let visionRegion = VideoRegionGeometry.visionRegion(displaySelection: selectedRegion,
                                                            naturalSize: naturalSize,
                                                            preferredTransform: preferredTransform)
+        let format = scoreboardFormat
         let events = AsyncStream<ProcessEvent> { continuation in
             Task.detached(priority: .userInitiated) {
                 do {
                     let result = try await GameTimeMapper.sample(
-                        videoURL: videoURL, regionOfInterest: visionRegion,
+                        videoURL: videoURL, regionOfInterest: visionRegion, format: format,
                         onSample: { continuation.yield(.sample($0)) })
                     continuation.yield(.finished(result))
                 } catch {

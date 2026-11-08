@@ -200,6 +200,46 @@ struct GametimeMapperTests {
         #expect(GameTimeMapper.parse(["OT", "60.0"]) == nil)
     }
 
+    @Test func selectedScoreboardFormatsControlParsing() {
+        let digital = GameTimeMapper.ScoreboardFormat.Preset.a.format
+        let long = GameTimeMapper.ScoreboardFormat.Preset.b.format
+        let natural = GameTimeMapper.ScoreboardFormat.Preset.c.format
+        #expect(GameTimeMapper.parse(["1ST", "11:01"], format: digital) ==
+                .init(period: "1ST", gameSecond: 661))
+        #expect(GameTimeMapper.parse(["2ND", ":06.1"], format: digital) ==
+                .init(period: "2ND", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["2ND", "6.1"], format: digital) == nil)
+        #expect(GameTimeMapper.parse(["FIRST QUARTER", "8:11"], format: long) ==
+                .init(period: "1ST", gameSecond: 491))
+        #expect(GameTimeMapper.parse(["SECOND QUARTER", "16.1"], format: long) ==
+                .init(period: "2ND", gameSecond: 16.1))
+        #expect(GameTimeMapper.parse(["THIRD QUARTER", "6.1"], format: long) ==
+                .init(period: "3RD", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["FOURTH QUARTER", ":06.1"], format: long) == nil)
+        #expect(GameTimeMapper.parse(["OVERTIME", "6.1"], format: long) ==
+                .init(period: "OT", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["1ST", "06.1"], format: natural) == nil)
+        #expect(GameTimeMapper.parse(["4TH", "59.9"], format: natural) ==
+                .init(period: "4TH", gameSecond: 59.9))
+        var custom = digital
+        custom.periodStyles[.second] = .long
+        #expect(GameTimeMapper.parse(["SECOND QUARTER", ":09.8"], format: custom) ==
+                .init(period: "2ND", gameSecond: 9.8))
+        #expect(GameTimeMapper.parse(["2ND", ":09.8"], format: custom) == nil)
+    }
+
+    @Test func parsesCyrillicLookalikesInShortPeriodLabels() {
+        let short = GameTimeMapper.ScoreboardFormat.Preset.a.format
+        let long = GameTimeMapper.ScoreboardFormat.Preset.b.format
+        for (ocr, period) in [("4тH", "4TH"), ("4тн", "4TH"),
+                              ("оT", "OT"), ("от", "OT")] {
+            let expected = GameTimeMapper.Reading(period: period, gameSecond: 76)
+            #expect(GameTimeMapper.parse([ocr, "1:16"]) == expected)
+            #expect(GameTimeMapper.parse([ocr, "1:16"], format: short) == expected)
+            #expect(GameTimeMapper.parse([ocr, "1:16"], format: long) == nil)
+        }
+    }
+
     @Test(arguments: ["minutes-seconds.mp4", "seconds-fractional.mp4"])
     func mapsBundledVideo(_ name: String) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
