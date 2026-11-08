@@ -4,9 +4,9 @@ import { resolve, extname, join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 
-const [background, home, away, destination] = process.argv.slice(2)
-if (!background || !home || !away || !destination) {
-  throw new Error('Usage: node render-thumbnail.mjs BACKGROUND HOME AWAY OUTPUT')
+const [background, home, away, date, destination] = process.argv.slice(2)
+if (!background || !home || !away || !date || !destination) {
+  throw new Error('Usage: node render-thumbnail.mjs BACKGROUND HOME AWAY DATE OUTPUT')
 }
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), 'dist')
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' }
@@ -26,7 +26,7 @@ let browser
 try {
   browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 })
-  const url = `http://127.0.0.1:${server.address().port}/?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&image=background.jpg`
+  const url = `http://127.0.0.1:${server.address().port}/?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&date=${encodeURIComponent(date)}&image=background.jpg`
   await page.goto(url)
   await page.locator('.thumbnail__background').evaluate(image => image.decode())
   await page.screenshot({ path: destination, type: 'jpeg', quality: 90 })

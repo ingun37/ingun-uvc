@@ -45,6 +45,20 @@
     line-height: 0;
 }
 
+.thumbnail__date {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: rgb(247, 239, 190);
+    font-family: var(--date-font-family);
+    font-size: var(--date-font-size);
+    font-weight: 800;
+    white-space: nowrap;
+    text-shadow: 0 3px 12px black, 0 0 3px black;
+}
+
 .thumbnail__brick--home {
     left: var(--brick-home-left-margin);
     bottom: var(--brick-home-bottom-margin);

@@ -188,10 +188,14 @@ private final class Workflow {
                 videoURL.deletingPathExtension().lastPathComponent + "-thumbnail.jpg")
             let script = Runner.root.appending(path: "thumbnail-web/render-thumbnail.mjs")
             let shell = URL(fileURLWithPath: "/bin/zsh")
+            let inputDate = ISO8601DateFormatter().date(from: selectedGame.date + "T00:00:00Z")
+            let displayDate = inputDate.map { date in
+                date.formatted(.dateTime.month(.abbreviated).day().year().locale(Locale(identifier: "en_US_POSIX")))
+            } ?? selectedGame.date
             _ = try await Task.detached {
                 try Runner.run(shell, arguments: ["-ic", "exec node \"$@\"", "thumbnail-render",
                                                   script.path, background.path, selectedGame.home,
-                                                  selectedGame.away, output.path])
+                                                  selectedGame.away, displayDate, output.path])
             }.value
             guard FileManager.default.fileExists(atPath: output.path) else { throw Runner.RunError.missingOutput(output.path) }
             scene = .done
