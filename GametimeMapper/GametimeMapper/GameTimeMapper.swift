@@ -96,6 +96,8 @@ nonisolated enum GameTimeMapper {
                                       with: "$1:", options: .regularExpression)
                 .replacingOccurrences(of: #":\s+(?=\d)"#, with: ":", options: .regularExpression)
                 .replacingOccurrences(of: #"(?<=\d)\s*\.\s*(?=\d)"#, with: ".", options: .regularExpression)
+                .replacingOccurrences(of: #"(?<=:[0-5])Б(?![\p{L}0-9])"#,
+                                      with: "6", options: .regularExpression)
         }
         let normalized = texts.map(normalizedClockText)
         let combined = normalizedClockText(texts.joined(separator: " "))

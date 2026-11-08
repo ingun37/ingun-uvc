@@ -259,6 +259,15 @@ struct GametimeMapperTests {
                 .init(period: "1ST", gameSecond: 42.1))
     }
 
+    @Test func parsesCyrillicSixInMinuteClock() {
+        let format = GameTimeMapper.ScoreboardFormat.Preset.a.format
+        for (clock, seconds) in [("7:1б", 436.0), ("6:4Б", 406.0), ("2:0Б", 126.0)] {
+            #expect(GameTimeMapper.parse(["4TH", clock], format: format) ==
+                    .init(period: "4TH", gameSecond: seconds))
+        }
+        #expect(GameTimeMapper.parse(["4TH", "7:1Г"], format: format) == nil)
+    }
+
     @Test(arguments: ["minutes-seconds.mp4", "seconds-fractional.mp4"])
     func mapsBundledVideo(_ name: String) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
