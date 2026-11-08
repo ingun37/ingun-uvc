@@ -88,17 +88,22 @@ def list_games(args: argparse.Namespace) -> None:
     games = {}
     for row in rows.itertuples(index=False):
         game_id = str(row.GAME_ID).zfill(10)
-        game = games.setdefault(game_id, {"date": str(row.GAME_DATE), "teams": set()})
+        game = games.setdefault(game_id, {"date": str(row.GAME_DATE), "teams": set(), "home": "", "away": ""})
         game["teams"].add(str(row.TEAM_ABBREVIATION))
+        matchup = str(row.MATCHUP)
+        if " vs. " in matchup:
+            game["home"] = str(row.TEAM_ABBREVIATION)
+        elif " @ " in matchup:
+            game["away"] = str(row.TEAM_ABBREVIATION)
     ordered = sorted(games.items(), key=lambda item: (item[1]["date"], item[0]), reverse=True)
     start = (args.page - 1) * args.page_size
     page = ordered[start:start + args.page_size]
     if not page:
         print(f"No games on page {args.page} ({len(ordered)} games in {args.season}, {args.season_type}).")
         return
-    print("GAME_ID     DATE        TEAMS")
+    print("GAME_ID     DATE        HOME AWAY")
     for game_id, game in page:
-        print(f"{game_id}  {game['date']}  {' vs '.join(sorted(game['teams']))}")
+        print(f"{game_id}  {game['date']}  {game['home']} {game['away']}")
     print(f"Page {args.page} of {(len(ordered) + args.page_size - 1) // args.page_size}; {len(ordered)} games total.")
 
 

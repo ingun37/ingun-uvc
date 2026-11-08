@@ -30,7 +30,7 @@ function App() {
     const home = teamFromParameter(params.get('home'), DEFAULT_HOME)
     const away = teamFromParameter(params.get('away'), DEFAULT_AWAY)
     const image = params.get('image')?.split('/').pop() || DEFAULT_BACKGROUND
-    const background = `${import.meta.env.BASE_URL}${encodeURIComponent(image)}`
+    const background = image === 'background.jpg' ? '/background.jpg' : `${import.meta.env.BASE_URL}${encodeURIComponent(image)}`
     const HomeLogo = Icons[home]
     const AwayLogo = Icons[away]
 

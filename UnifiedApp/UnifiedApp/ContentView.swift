@@ -1,4 +1,6 @@
 import AppKit
+import AVFoundation
+import Combine
 import Foundation
 import Observation
 import SwiftUI
@@ -7,14 +9,16 @@ private struct Game: Identifiable {
     let id: String
     let date: String
     let teams: String
+    let home: String
+    let away: String
 
     static func parse(_ output: String) -> [Game] {
         output.split(whereSeparator: \.isNewline).compactMap { line in
             let parts = line.split(whereSeparator: \.isWhitespace)
-            guard parts.count >= 3, parts[0].count == 10,
+            guard parts.count >= 4, parts[0].count == 10,
                   parts[0].allSatisfy(\.isNumber) else { return nil }
             return Game(id: String(parts[0]), date: String(parts[1]),
-                        teams: parts.dropFirst(2).joined(separator: " "))
+                        teams: "\(parts[2]) vs \(parts[3])", home: String(parts[2]), away: String(parts[3]))
         }
     }
 }
@@ -79,13 +83,14 @@ private enum Runner {
 
 @MainActor @Observable
 private final class Workflow {
-    enum Scene { case games, attempts, mapper, editor, done }
+    enum Scene { case games, attempts, mapper, editor, thumbnail, done }
     var scene: Scene = .games
     var page = "1"
     var games: [Game] = []
     var message = ""
     var busy = false
     var selectedGame: Game?
+    var videoURL: URL?
     private let tempDirectory = FileManager.default.temporaryDirectory
         .appending(path: "unified-app-\(UUID().uuidString)", directoryHint: .isDirectory)
     private var csvURL: URL { tempDirectory.appending(path: "attempts.csv") }
@@ -137,6 +142,7 @@ private final class Workflow {
             guard FileManager.default.fileExists(atPath: json.path) else { throw Runner.RunError.missingOutput(json.path) }
             let videoPath = try String(contentsOf: handoff, encoding: .utf8)
             guard !videoPath.isEmpty else { throw Runner.RunError.missingOutput(handoff.path) }
+            videoURL = URL(fileURLWithPath: videoPath)
             scene = .editor
             message = "ClipEditor is open. Finish the compilation there."
             await runEditor(videoPath: videoPath)
@@ -154,8 +160,42 @@ private final class Workflow {
             let arguments = ["--video", videoPath, "--json", jsonURL.path,
                              "--csv", csvURL.path, "--output", output.path]
             _ = try await Task.detached { try Runner.run(executable, arguments: arguments) }.value
+            scene = .thumbnail
+            message = "Select a frame region for the thumbnail."
+        } catch { message = error.localizedDescription }
+    }
+
+    func generateThumbnail(selection: CGRect, time: Double) async {
+        guard let videoURL, let selectedGame else { return }
+        busy = true
+        message = "Generating thumbnail…"
+        defer { busy = false }
+        do {
+            let asset = AVURLAsset(url: videoURL)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            let frame = try generator.copyCGImage(at: CMTime(seconds: time, preferredTimescale: 600), actualTime: nil)
+            let width = CGFloat(frame.width), height = CGFloat(frame.height)
+            let crop = CGRect(x: selection.minX * width, y: selection.minY * height,
+                              width: selection.width * width, height: selection.height * height).integral
+            guard let image = frame.cropping(to: crop),
+                  let data = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else {
+                throw Runner.RunError.failed("Could not crop the selected frame region.")
+            }
+            let background = tempDirectory.appending(path: "thumbnail-background.jpg")
+            try data.write(to: background)
+            let output = videoURL.deletingLastPathComponent().appendingPathComponent(
+                videoURL.deletingPathExtension().lastPathComponent + "-thumbnail.jpg")
+            let script = Runner.root.appending(path: "thumbnail-web/render-thumbnail.mjs")
+            let shell = URL(fileURLWithPath: "/bin/zsh")
+            _ = try await Task.detached {
+                try Runner.run(shell, arguments: ["-ic", "exec node \"$@\"", "thumbnail-render",
+                                                  script.path, background.path, selectedGame.home,
+                                                  selectedGame.away, output.path])
+            }.value
+            guard FileManager.default.fileExists(atPath: output.path) else { throw Runner.RunError.missingOutput(output.path) }
             scene = .done
-            message = "ClipEditor closed."
+            message = "Thumbnail saved to \(output.path)."
         } catch { message = error.localizedDescription }
     }
 }
@@ -199,6 +239,12 @@ struct ContentView: View {
                     Button("Retry GametimeMapperUI") { Task { await workflow.runMapper() } }
                 }
                 Spacer()
+            case .thumbnail:
+                if let videoURL = workflow.videoURL {
+                    ThumbnailSelectionView(videoURL: videoURL, busy: workflow.busy) { selection, time in
+                        Task { await workflow.generateThumbnail(selection: selection, time: time) }
+                    }
+                }
             case .done:
                 Label("Workflow complete", systemImage: "checkmark.circle.fill")
                 Spacer()
@@ -209,5 +255,131 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 700, minHeight: 500)
+    }
+}
+
+private struct ThumbnailSelectionView: View {
+    let videoURL: URL
+    let busy: Bool
+    let generate: (CGRect, Double) -> Void
+    @State private var player = AVPlayer()
+    @State private var selection: CGRect?
+    @State private var currentTime = 0.0
+    @State private var duration = 1.0
+    @State private var playing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Thumbnail Generation").font(.title2.bold())
+            Text("Play or scrub to a frame, then drag one rectangle over the video. Drag again to replace it.")
+            ThumbnailRegionView(player: player, selection: $selection)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            HStack {
+                Button(playing ? "Pause" : "Play") {
+                    if playing { player.pause() } else { player.play() }
+                }
+                Slider(value: $currentTime, in: 0...max(duration, 0.01)) { editing in
+                    if !editing { player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600)) }
+                }
+                Text(String(format: "%.1f / %.1f s", currentTime, duration)).monospacedDigit()
+            }
+            Button(busy ? "Generating…" : "Generate Thumbnail") {
+                if let selection { generate(selection, currentTime) }
+            }
+            .disabled(selection == nil || busy)
+        }
+        .task {
+            let asset = AVURLAsset(url: videoURL)
+            duration = (try? await asset.load(.duration).seconds) ?? 1
+            player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
+        }
+        .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { _ in
+            playing = player.rate != 0
+            if playing { currentTime = player.currentTime().seconds }
+        }
+        .onDisappear { player.pause(); player.replaceCurrentItem(with: nil) }
+    }
+}
+
+private struct ThumbnailRegionView: NSViewRepresentable {
+    let player: AVPlayer
+    @Binding var selection: CGRect?
+
+    func makeNSView(context: Context) -> ThumbnailRegionNSView {
+        let view = ThumbnailRegionNSView()
+        view.playerLayer.player = player
+        view.onChange = { context.coordinator.selection.wrappedValue = $0 }
+        return view
+    }
+    func updateNSView(_ view: ThumbnailRegionNSView, context: Context) {
+        context.coordinator.selection = $selection
+        view.playerLayer.player = player
+        view.selection = selection
+        view.onChange = { context.coordinator.selection.wrappedValue = $0 }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
+    final class Coordinator {
+        var selection: Binding<CGRect?>
+        init(selection: Binding<CGRect?>) { self.selection = selection }
+    }
+}
+
+private final class ThumbnailRegionNSView: NSView {
+    let playerLayer = AVPlayerLayer()
+    private let outline = CAShapeLayer()
+    var selection: CGRect? { didSet { drawOutline() } }
+    var onChange: ((CGRect?) -> Void)?
+    private var start: CGPoint?
+    override var isFlipped: Bool { true }
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+        playerLayer.videoGravity = .resizeAspect
+        layer?.addSublayer(playerLayer)
+        outline.strokeColor = NSColor.systemYellow.cgColor
+        outline.fillColor = NSColor.systemYellow.withAlphaComponent(0.15).cgColor
+        outline.lineWidth = 2
+        layer?.addSublayer(outline)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    override func layout() {
+        super.layout()
+        playerLayer.frame = bounds
+        outline.frame = bounds
+        drawOutline()
+    }
+    private func drawOutline() {
+        guard let selection else { outline.path = nil; return }
+        let video = playerLayer.videoRect
+        outline.path = CGPath(rect: CGRect(x: video.minX + selection.minX * video.width,
+                                           y: video.minY + selection.minY * video.height,
+                                           width: selection.width * video.width,
+                                           height: selection.height * video.height), transform: nil)
+    }
+    private func point(_ event: NSEvent) -> CGPoint {
+        let p = convert(event.locationInWindow, from: nil), video = playerLayer.videoRect
+        return CGPoint(x: min(max(p.x, video.minX), video.maxX),
+                       y: min(max(p.y, video.minY), video.maxY))
+    }
+    override func mouseDown(with event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        guard playerLayer.videoRect.contains(p) else { return }
+        start = point(event)
+        selection = nil
+        onChange?(nil)
+    }
+    override func mouseDragged(with event: NSEvent) { update(event, finished: false) }
+    override func mouseUp(with event: NSEvent) { update(event, finished: true); start = nil }
+    private func update(_ event: NSEvent, finished: Bool) {
+        guard let start else { return }
+        let end = point(event), video = playerLayer.videoRect
+        let rect = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
+                          width: abs(start.x - end.x), height: abs(start.y - end.y))
+        selection = finished && (rect.width < 4 || rect.height < 4) ? nil :
+            CGRect(x: (rect.minX - video.minX) / video.width,
+                   y: (rect.minY - video.minY) / video.height,
+                   width: rect.width / video.width, height: rect.height / video.height)
+        onChange?(selection)
     }
 }
