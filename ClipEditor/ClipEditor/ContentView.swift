@@ -131,6 +131,8 @@ struct ContentView: View {
     let mappingURL: URL?
     let attemptsURL: URL?
     let outputURL: URL?
+    private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
 
@@ -148,6 +150,10 @@ struct ContentView: View {
                 Text("ClipEditor").font(.largeTitle.bold())
                 Spacer()
                 Text(stepTitle).foregroundStyle(.secondary)
+                Text("Version \(version) (\(build))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
             Divider()
             switch model.scene {
