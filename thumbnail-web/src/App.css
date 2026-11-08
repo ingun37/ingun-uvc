@@ -1,40 +1,75 @@
 .thumbnail {
-  position: relative;
-  width: 1280px;
-  height: 720px;
-  overflow: hidden;
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
 }
 
 .thumbnail__background,
 .thumbnail__frame {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
 }
 
 .thumbnail__background {
-  object-fit: cover;
+    object-fit: cover;
 }
 
 .thumbnail__frame {
-  object-fit: fill;
+    object-fit: fill;
 }
 
 .thumbnail__logo {
-  position: absolute;
-  z-index: 1;
-  width: var(--logo-size);
-  height: var(--logo-size);
-  line-height: 0;
+    position: absolute;
+    z-index: 2;
+    width: var(--logo-size);
+    height: var(--logo-size);
+    line-height: 0;
 }
 
 .thumbnail__logo--home {
-  left: var(--logo-margin);
-  bottom: var(--logo-margin);
+    left: var(--logo-home-left-margin);
+    top: var(--logo-home-top-margin);
 }
 
 .thumbnail__logo--away {
-  right: var(--logo-margin);
-  top: var(--logo-margin);
+    right: var(--logo-away-right-margin);
+    top: var(--logo-away-top-margin);
+}
+
+.thumbnail__brick {
+    position: absolute;
+    z-index: 1;
+    line-height: 0;
+}
+
+.thumbnail__brick--home {
+    left: var(--brick-home-left-margin);
+    bottom: var(--brick-home-bottom-margin);
+}
+
+.thumbnail__brick--away {
+    right: var(--brick-away-right-margin);
+    bottom: var(--brick-away-bottom-margin);
+}
+
+.left-shade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 30%;
+    height: 100%;
+    background-color: black;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, rgba(1, 1, 1, 0.5) 50%, rgba(1, 1, 1, 0) 100%);
+}
+
+.right-shade {
+    position: absolute;
+    right: 0;
+    width: 30%;
+    height: 100%;
+    background-color: black;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(1, 1, 1, 0.5) 50%, rgba(1, 1, 1, 0.5) 100%);
 }
