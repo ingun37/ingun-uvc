@@ -240,6 +240,25 @@ struct GametimeMapperTests {
         }
     }
 
+    @Test func prioritizesClockFormatsAndLargerUnderMinuteReading() {
+        let digital = GameTimeMapper.ScoreboardFormat.Preset.a.format
+        let natural = GameTimeMapper.ScoreboardFormat.Preset.c.format
+        #expect(GameTimeMapper.parse(["1ST", ":59.9", "1:02"], format: digital) ==
+                .init(period: "1ST", gameSecond: 62))
+        #expect(GameTimeMapper.parse(["1ST :59.9 1:02"], format: digital) ==
+                .init(period: "1ST", gameSecond: 62))
+        #expect(GameTimeMapper.parse(["1ST", ":08.3", ":42.1"], format: digital) ==
+                .init(period: "1ST", gameSecond: 42.1))
+        #expect(GameTimeMapper.parse(["1ST :08.3 :42.1"], format: digital) ==
+                .init(period: "1ST", gameSecond: 42.1))
+        #expect(GameTimeMapper.parse(["1ST", "59.9", "1:02"], format: natural) ==
+                .init(period: "1ST", gameSecond: 62))
+        #expect(GameTimeMapper.parse(["1ST 8.3 42.1"], format: natural) ==
+                .init(period: "1ST", gameSecond: 42.1))
+        #expect(GameTimeMapper.parse(["1ST", "1:60", ":42.1"], format: digital) ==
+                .init(period: "1ST", gameSecond: 42.1))
+    }
+
     @Test(arguments: ["minutes-seconds.mp4", "seconds-fractional.mp4"])
     func mapsBundledVideo(_ name: String) async throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

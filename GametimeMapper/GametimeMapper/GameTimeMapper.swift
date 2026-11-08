@@ -90,11 +90,15 @@ nonisolated enum GameTimeMapper {
     }
 
     static func parse(_ texts: [String], format: ScoreboardFormat? = nil) -> Reading? {
-        let normalized = texts.map {
-            $0.uppercased().replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
+        func normalizedClockText(_ text: String) -> String {
+            text.uppercased()
+                .replacingOccurrences(of: #"(?<![\d.])(\d{1,2})\s*:\s*(?=\d)"#,
+                                      with: "$1:", options: .regularExpression)
+                .replacingOccurrences(of: #":\s+(?=\d)"#, with: ":", options: .regularExpression)
+                .replacingOccurrences(of: #"(?<=\d)\s*\.\s*(?=\d)"#, with: ".", options: .regularExpression)
         }
-        let combined = texts.joined(separator: " ").uppercased()
-            .replacingOccurrences(of: #"\s*([:.])\s*"#, with: "$1", options: .regularExpression)
+        let normalized = texts.map(normalizedClockText)
+        let combined = normalizedClockText(texts.joined(separator: " "))
         let candidates = normalized + [combined]
         var labels: [(label: String, canonical: String)] = format.map { selection in
             Period.allCases.map { period in
@@ -127,16 +131,23 @@ nonisolated enum GameTimeMapper {
         case nil:
             clockPattern = #"(?:\d{1,2}:\d{2}(?:\.\d+)?|:?\d{1,2}\.\d+)"#
         }
+        guard let clockRegex = try? NSRegularExpression(
+            pattern: "(?<![0-9:.])\(clockPattern)(?![0-9.])") else { return nil }
+        var greatestUnderMinute: Double?
         for text in candidates {
-            guard let clockRange = text.range(of: "(?<![0-9:.])\(clockPattern)(?![0-9.])",
-                                              options: .regularExpression) else { continue }
-            let parts = text[clockRange].split(separator: ":", omittingEmptySubsequences: false)
-            let secondsText = parts.count == 2 ? parts[1] : parts[0]
-            guard let seconds = Double(secondsText), seconds < 60 else { continue }
-            let minutes = parts.count == 2 ? (Int(parts[0]) ?? 0) : 0
-            return Reading(period: period, gameSecond: Double(minutes * 60) + seconds)
+            let matches = clockRegex.matches(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text))
+            for match in matches {
+                guard let range = Range(match.range, in: text) else { continue }
+                let parts = text[range].split(separator: ":", omittingEmptySubsequences: false)
+                let secondsText = parts.count == 2 ? parts[1] : parts[0]
+                guard let seconds = Double(secondsText), seconds < 60 else { continue }
+                if parts.count == 2, let minutes = Int(parts[0]) {
+                    return Reading(period: period, gameSecond: Double(minutes * 60) + seconds)
+                }
+                greatestUnderMinute = max(greatestUnderMinute ?? seconds, seconds)
+            }
         }
-        return nil
+        return greatestUnderMinute.map { Reading(period: period, gameSecond: $0) }
     }
 
     static func add(_ reading: Reading, at start: Double, until end: Double,
