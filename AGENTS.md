@@ -16,6 +16,8 @@ This repository contains multiple projects:
 - `TestDataGenerator/`: native macOS Swift CLI for per-attempt clips and metadata.
   Before working on this project, read and follow
   [TestDataGenerator/AGENTS.md](TestDataGenerator/AGENTS.md).
-
+- `thumbnail-web/`: HTML template for creating video thumbnail.
+  Before working on this project, read and follow
+  [thumbnail-web/AGENTS.md](thumbnail-web/AGENTS.md).
 Project-specific instructions apply only to their respective project directories.
 For changes that cross project boundaries, follow each affected project's guide.
