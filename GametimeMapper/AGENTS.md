@@ -17,9 +17,15 @@ practical, and prefer immutable values.
   returns `RawReadings`, retaining each sampled frame's video time, OCR texts,
   optional parsed period and clock, and log line. There is no repeated-frame
   comparison. Keep the `recognize` callback injectable for deterministic tests.
-- Parse a clock only when a recognized period (`1ST`, `2ND`, `3RD`, `4TH`, or
-  `OT`) is present. Supported clocks include `mm:ss`, `:ss.s`, and `ss.s`.
-  Additional overtime labels are not defined yet.
+- Parse a clock only when a period selected by `ScoreboardFormat` is present.
+  The UI offers presets A (short/digital), B (long/natural), and C
+  (short/natural), plus per-period choices. The CLI retains the legacy parser
+  default. Normalize known Cyrillic lookalikes for `4TH`, `OT`, and the final
+  clock digit `Б` to `6`; keep the original OCR text in samples and logs.
+  Vision requests English recognition without automatic language detection.
+  Prefer any valid over-minute clock to under-minute clocks; if only
+  under-minute clocks occur, choose the greatest value. Overtime labels still
+  map to `OT` in output without overtime numbering.
 - `RawReadings.removingSample(id:)` removes an individual reading before
   `merge(...)`. `merge(...)` first builds intervals from readings that advance
   continuously at video speed (with OCR rounding tolerance and stopped clocks),
@@ -30,7 +36,8 @@ practical, and prefer immutable values.
   `video_end_seconds`. Video range ends are exclusive; equal game endpoints
   represent a stopped clock.
 - `GametimeMapperUI/ContentView.swift` implements video selection, scoreboard
-  rectangle selection, processing and review, and JSON saving. The process log
+  rectangle selection, text-format selection, processing and review, and JSON
+  saving. It shows the bundle version in the top-right corner. The process log
   updates for each sample. Build the Swift Charts graph once processing finishes;
   do not redraw it for every sample. Hovering shows game time; clicking shows
   the prior clock change and all OCR texts, with a button to remove that raw

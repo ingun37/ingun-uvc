@@ -10,6 +10,8 @@ UnifiedApp connects the repository's NBA data, game-clock mapping, clip editing,
 
 The workflow expects the three executables at the paths above. Missing executables or outputs appear as errors in the app. Temporary CSV and JSON files are created in a `unified-app-*` directory under the system temporary directory. Thumbnail rendering uses `thumbnail-web/dist`, Playwright, and Node loaded through interactive zsh (`~/.zshrc`), so build the web template with `cd thumbnail-web && npm run build` first.
 
+UnifiedApp shows its bundle version in the top-right corner. GametimeMapperUI and ClipEditor show their own versions there too. ClipEditor is built without App Sandbox so it can open the video, mapping, attempts, and output paths passed by UnifiedApp.
+
 Build UnifiedApp from the repository root:
 
 ```sh

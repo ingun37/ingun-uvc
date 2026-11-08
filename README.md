@@ -16,8 +16,9 @@ Open `GametimeMapper/GametimeMapper.xcodeproj` and run the `GametimeMapperUI` sc
 
 1. Choose a game recording.
 2. Play or scrub the video and drag a rectangle around the scoreboard. Drawing again replaces the selection.
-3. Process the video. The OCR log updates as samples arrive; the game-clock graph appears when processing finishes. Hover a point to see its game time, or click it to inspect the OCR texts and its change from the previous clock reading. Remove incorrect points before continuing.
-4. Click **Next** to merge the retained readings, then choose where to save the JSON. The save dialog starts in the video's folder with `<video name>.json` as the suggested name.
+3. Choose a scoreboard text preset (A: short periods and `:ss.s`; B: long periods and `ss.s`/`s.s`; C: short periods and `ss.s`/`s.s`), or customize each period and the under-minute clock format. Over-minute clocks use `mm:ss` or `m:ss`.
+4. Process the video. The OCR log updates as samples arrive; the game-clock graph appears when processing finishes. Hover a point to see its game time, or click it to inspect the OCR texts and its change from the previous clock reading. Remove incorrect points before continuing.
+5. Click **Next** to merge the retained readings, then choose where to save the JSON. The save dialog starts in the video's folder with `<video name>.json` as the suggested name.
 
 Launch `GametimeMapperUI` with optional `--video/-v <path>` to load a video directly and skip its picker, and `--output/-o <path>` to save JSON directly after review. Both options can be combined.
 
@@ -28,6 +29,8 @@ GametimeMapper <video-path> <output-json-path> [--bottom-divisor N] [--left-divi
 ```
 
 The optional divisors restrict OCR to a fraction of the frame. The UI uses the drawn rectangle instead. Both produce a chronological JSON array with `period`, `game_start_seconds`, `game_end_seconds`, `video_start_seconds`, and `video_end_seconds`. Video end times are exclusive.
+
+The UI displays its bundle version in the top-right corner. OCR is configured for English, and parsing also accepts known Cyrillic lookalikes in short period labels and `Б` as a final clock digit `6`. When multiple clocks are recognized, an over-minute clock takes priority; otherwise the largest under-minute reading is used.
 
 To build the app or run the mapper tests from the repository root:
 
