@@ -104,7 +104,10 @@ def list_games(args: argparse.Namespace) -> None:
 
 def field_goal_attempts(args: argparse.Namespace) -> None:
     endpoint = PlayByPlayV3(game_id=args.game_id, get_request=False)
-    endpoint.get_request()
+    try:
+        endpoint.get_request()
+    except ValueError as exc:
+        raise RuntimeError(f"NBA play-by-play data is unavailable for game {args.game_id}: {exc}") from exc
     rows = endpoint.play_by_play.get_data_frame()
     if rows.empty:
         print("No play-by-play data found for this game.")
@@ -115,8 +118,11 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     chart = ShotChartDetail(team_id=0, player_id=0, game_id_nullable=args.game_id,
                            season_nullable=season, season_type_all_star=season_type,
                            context_measure_simple="FGA", get_request=False)
-    chart.get_request()
-    shot_rows = list(chart.shot_chart_detail.get_data_frame().itertuples(index=False))
+    try:
+        chart.get_request()
+        shot_rows = list(chart.shot_chart_detail.get_data_frame().itertuples(index=False))
+    except ValueError:
+        shot_rows = []
     used: set[int] = set()
     jersey_numbers: dict[int, str] = {}
     player_names: dict[int, str] = {}
@@ -125,8 +131,12 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     for team_id in team_ids:
         time.sleep(1)
         roster = CommonTeamRoster(team_id=team_id, season=season, get_request=False)
-        roster.get_request()
-        for player in roster.common_team_roster.get_data_frame().itertuples(index=False):
+        try:
+            roster.get_request()
+            players = roster.common_team_roster.get_data_frame().itertuples(index=False)
+        except ValueError:
+            continue
+        for player in players:
             number = str(player.NUM).strip()
             if number and number.lower() != "nan":
                 jersey_numbers[int(player.PLAYER_ID)] = number

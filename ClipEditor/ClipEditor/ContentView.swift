@@ -100,12 +100,18 @@ private final class EditorModel {
         }
     }
 
-    func export() async {
+    func export(to outputURL: URL? = nil) async {
         guard let video = videoURL, !selectedClips.isEmpty else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.mpeg4Movie]
-        panel.nameFieldStringValue = "Missed Field Goals.mp4"
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let destination: URL
+        if let outputURL {
+            destination = outputURL
+        } else {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.mpeg4Movie]
+            panel.nameFieldStringValue = "Missed Field Goals.mp4"
+            guard panel.runModal() == .OK, let selectedURL = panel.url else { return }
+            destination = selectedURL
+        }
         let access = FileAccess(destination)
         isBusy = true
         message = "Exporting compilation…"
@@ -113,7 +119,7 @@ private final class EditorModel {
         do {
             try await VideoCompilation.export(videoURL: video, clips: selectedClips, destination: destination)
             exportedURL = destination
-            message = "Compilation saved."
+            message = "Compilation saved to \(destination.path)."
         } catch {
             message = error.localizedDescription
         }
@@ -121,7 +127,20 @@ private final class EditorModel {
 }
 
 struct ContentView: View {
+    let videoURL: URL?
+    let mappingURL: URL?
+    let attemptsURL: URL?
+    let outputURL: URL?
     @State private var model = EditorModel()
+    @State private var didLoadLaunchInputs = false
+
+    init(videoURL: URL? = nil, mappingURL: URL? = nil,
+         attemptsURL: URL? = nil, outputURL: URL? = nil) {
+        self.videoURL = videoURL
+        self.mappingURL = mappingURL
+        self.attemptsURL = attemptsURL
+        self.outputURL = outputURL
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -144,12 +163,26 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 850, minHeight: 620)
+        .onAppear {
+            guard !didLoadLaunchInputs else { return }
+            didLoadLaunchInputs = true
+            var invalidPaths: [String] = []
+            for (kind, url) in [(InputKind.video, videoURL), (.mapping, mappingURL),
+                                (.attempts, attemptsURL)] {
+                if let url, !model.accept(url, for: kind) {
+                    invalidPaths.append("\(kind.rawValue): \(url.path)")
+                }
+            }
+            if !invalidPaths.isEmpty {
+                model.message = "Could not use launch inputs: \(invalidPaths.joined(separator: ", "))."
+            }
+        }
     }
 
     private var stepTitle: String {
         switch model.scene {
-        case .choose: "1 of 3 · Choose files"
-        case .edit: "2 of 3 · Edit clips"
+        case .choose: "1 of \(outputURL == nil ? 3 : 2) · Choose files"
+        case .edit: "2 of \(outputURL == nil ? 3 : 2) · Edit clips"
         case .compilation: "3 of 3 · Compilation"
         }
     }
@@ -210,8 +243,14 @@ struct ContentView: View {
             HStack {
                 Button("Back") { model.scene = .choose }
                 Spacer()
-                Button("Next") { model.scene = .compilation }
-                    .disabled(model.selectedClips.isEmpty)
+                Button(outputURL == nil ? "Next" : (model.isBusy ? "Exporting…" : "Export")) {
+                    if let outputURL {
+                        Task { await model.export(to: outputURL) }
+                    } else {
+                        model.scene = .compilation
+                    }
+                }
+                    .disabled(model.selectedClips.isEmpty || model.isBusy)
                     .keyboardShortcut(.defaultAction)
             }
         }

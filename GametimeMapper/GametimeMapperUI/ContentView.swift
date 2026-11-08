@@ -6,6 +6,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    let outputURL: URL?
+    let launchVideoURL: URL?
+
     private enum Step: Int {
         case choose, select, process, save
     }
@@ -46,6 +49,8 @@ struct ContentView: View {
     @State private var savedURL: URL?
     @State private var didPresentOpenPanel = false
 
+    private var skipsVideoStep: Bool { launchVideoURL != nil && videoURL != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
@@ -55,7 +60,7 @@ struct ContentView: View {
                 Text("Game Time Mapper")
                     .font(.title2.bold())
                 Spacer()
-                Text("\(step.rawValue + 1) of 4")
+                Text("\(step.rawValue + 1 - (skipsVideoStep ? 1 : 0)) of \(4 - (outputURL == nil ? 0 : 1) - (skipsVideoStep ? 1 : 0))")
                     .foregroundStyle(.secondary)
             }
 
@@ -89,9 +94,9 @@ struct ContentView: View {
                         Button("Back to Selection") { step = .select }
                     }
                     Spacer()
-                    Button("Next") { showSavePanel() }
+                    Button(outputURL == nil ? "Next" : "Save JSON") { saveMapping() }
                         .keyboardShortcut(.defaultAction)
-                        .disabled(rawReadings == nil || processing)
+                        .disabled(rawReadings == nil || processing || (outputURL != nil && savedURL != nil))
                 } else if step == .save {
                     Button("Back to Log") { step = .process }
                     Spacer()
@@ -106,7 +111,13 @@ struct ContentView: View {
             guard !didPresentOpenPanel else { return }
             didPresentOpenPanel = true
             if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
-                DispatchQueue.main.async { chooseVideo() }
+                DispatchQueue.main.async {
+                    if let launchVideoURL {
+                        loadVideo(launchVideoURL)
+                    } else {
+                        chooseVideo()
+                    }
+                }
             }
         }
         .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { _ in
@@ -265,6 +276,11 @@ struct ContentView: View {
             if !processing && rawReadings == nil {
                 Button("Try Again") { beginProcessing() }
             }
+            if outputURL != nil, let savedURL {
+                Label("Mapping saved to \(savedURL.path)", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .textSelection(.enabled)
+            }
         }
     }
 
@@ -398,6 +414,10 @@ struct ContentView: View {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a recording of a basketball game"
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadVideo(url)
+    }
+
+    private func loadVideo(_ url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         Task {
             do {
@@ -413,6 +433,9 @@ struct ContentView: View {
                 player.pause()
                 if hasSecurityScope { videoURL?.stopAccessingSecurityScopedResource() }
                 videoURL = url
+                if let handoffPath = ProcessInfo.processInfo.environment["UNIFIED_APP_VIDEO_PATH_FILE"] {
+                    try url.path.write(toFile: handoffPath, atomically: true, encoding: .utf8)
+                }
                 hasSecurityScope = scoped
                 player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
                 duration = seconds
@@ -444,6 +467,7 @@ struct ContentView: View {
         processing = true
         rawReadings = nil
         entries = nil
+        savedURL = nil
         errorMessage = nil
         logLines = []
         chartSamples = []
@@ -484,10 +508,23 @@ struct ContentView: View {
         }
     }
 
-    private func showSavePanel() {
+    private func saveMapping() {
         guard let videoURL, let rawReadings else { return }
         let merged = GameTimeMapper.merge(rawReadings)
         entries = merged
+        if let outputURL {
+            save(merged, to: outputURL)
+            return
+        }
+        showSavePanel(videoURL: videoURL, entries: merged)
+    }
+
+    private func showSavePanel() {
+        guard let videoURL, let entries else { return }
+        showSavePanel(videoURL: videoURL, entries: entries)
+    }
+
+    private func showSavePanel(videoURL: URL, entries: [GameTimeMapper.Entry]) {
         step = .save
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -496,8 +533,12 @@ struct ContentView: View {
         panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".json"
         panel.message = "Save the game time mapping"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
+        save(entries, to: outputURL)
+    }
+
+    private func save(_ entries: [GameTimeMapper.Entry], to outputURL: URL) {
         do {
-            try GameTimeMapper.save(merged, to: outputURL)
+            try GameTimeMapper.save(entries, to: outputURL)
             savedURL = outputURL
             errorMessage = nil
         } catch {

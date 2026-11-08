@@ -2,3 +2,4 @@
 /main.spec
 /.venv
 /build
+/__pycache__
