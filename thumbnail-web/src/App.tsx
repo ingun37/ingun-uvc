@@ -6,6 +6,7 @@ function App() {
   return (
     <>
         <img src={frame} />
+        <img src="/sample-bg.jpg"/>
         <Icons.CLE />
         <Icons.DAL />
     </>
