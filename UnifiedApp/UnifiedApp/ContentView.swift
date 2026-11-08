@@ -148,7 +148,11 @@ private final class Workflow {
         defer { busy = false }
         do {
             let executable = try Runner.appExecutable("ClipEditor/build/ClipEditor.app", name: "ClipEditor")
-            let arguments = ["--video", videoPath, "--json", jsonURL.path, "--csv", csvURL.path]
+            let video = URL(fileURLWithPath: videoPath)
+            let output = video.deletingLastPathComponent().appendingPathComponent(
+                video.deletingPathExtension().lastPathComponent + "-compilation.mp4")
+            let arguments = ["--video", videoPath, "--json", jsonURL.path,
+                             "--csv", csvURL.path, "--output", output.path]
             _ = try await Task.detached { try Runner.run(executable, arguments: arguments) }.value
             scene = .done
             message = "ClipEditor closed."
