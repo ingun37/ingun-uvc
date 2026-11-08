@@ -4,6 +4,7 @@ import Combine
 import Foundation
 import Observation
 import SwiftUI
+import UniformTypeIdentifiers
 
 private struct Game: Identifiable {
     let id: String
@@ -83,7 +84,7 @@ private enum Runner {
 
 @MainActor @Observable
 private final class Workflow {
-    enum Scene { case games, attempts, mapper, editor, thumbnail, done }
+    enum Scene { case games, attempts, video, mapper, editor, thumbnail, done }
     var scene: Scene = .games
     var page = "1"
     var games: [Game] = []
@@ -95,7 +96,16 @@ private final class Workflow {
         .appending(path: "unified-app-\(UUID().uuidString)", directoryHint: .isDirectory)
     private var csvURL: URL { tempDirectory.appending(path: "attempts.csv") }
     private var jsonURL: URL { tempDirectory.appending(path: "mapping.json") }
-    private var videoPathURL: URL { tempDirectory.appending(path: "video-path.txt") }
+
+    func chooseVideo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.movie, .video, .mpeg4Movie]
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        videoURL = url
+        scene = .mapper
+        Task { await runMapper() }
+    }
 
     func query() async {
         guard let number = Int(page), number > 0 else { message = "Enter a positive page number."; return }
@@ -122,30 +132,25 @@ private final class Workflow {
             let csv = csvURL
             _ = try await Task.detached { try Runner.run(executable, arguments: ["attempts", game.id, "--output", csv.path]) }.value
             guard FileManager.default.fileExists(atPath: csv.path) else { throw Runner.RunError.missingOutput(csv.path) }
-            scene = .mapper
-            message = "Open GametimeMapperUI and save the mapping."
-            await runMapper()
+            scene = .video
+            message = "Choose the source video."
         } catch { message = error.localizedDescription }
     }
 
     func runMapper() async {
+        guard let videoURL else { return }
         busy = true
         defer { busy = false }
         do {
             let executable = try Runner.appExecutable("GametimeMapper/build/GametimeMapperUI.app", name: "GametimeMapperUI")
             let json = jsonURL
-            let handoff = videoPathURL
             _ = try await Task.detached {
-                try Runner.run(executable, arguments: ["--output", json.path],
-                               environment: ["UNIFIED_APP_VIDEO_PATH_FILE": handoff.path])
+                try Runner.run(executable, arguments: ["--video", videoURL.path, "--output", json.path])
             }.value
             guard FileManager.default.fileExists(atPath: json.path) else { throw Runner.RunError.missingOutput(json.path) }
-            let videoPath = try String(contentsOf: handoff, encoding: .utf8)
-            guard !videoPath.isEmpty else { throw Runner.RunError.missingOutput(handoff.path) }
-            videoURL = URL(fileURLWithPath: videoPath)
             scene = .editor
             message = "ClipEditor is open. Finish the compilation there."
-            await runEditor(videoPath: videoPath)
+            await runEditor(videoPath: videoURL.path)
         } catch { message = error.localizedDescription }
     }
 
@@ -242,6 +247,9 @@ struct ContentView: View {
                 } else if workflow.scene == .mapper {
                     Button("Retry GametimeMapperUI") { Task { await workflow.runMapper() } }
                 }
+                Spacer()
+            case .video:
+                Button("Choose Video…") { workflow.chooseVideo() }
                 Spacer()
             case .thumbnail:
                 if let videoURL = workflow.videoURL {

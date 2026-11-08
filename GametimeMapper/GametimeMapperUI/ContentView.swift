@@ -433,9 +433,6 @@ struct ContentView: View {
                 player.pause()
                 if hasSecurityScope { videoURL?.stopAccessingSecurityScopedResource() }
                 videoURL = url
-                if let handoffPath = ProcessInfo.processInfo.environment["UNIFIED_APP_VIDEO_PATH_FILE"] {
-                    try url.path.write(toFile: handoffPath, atomically: true, encoding: .utf8)
-                }
                 hasSecurityScope = scoped
                 player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
                 duration = seconds

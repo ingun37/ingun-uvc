@@ -7,6 +7,8 @@ This repository contains several tools for basketball video workflows:
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
 - `ClipEditor/`: macOS app for missed-shot video compilations.
 - `TestDataGenerator/`: macOS CLI that generates per-attempt clips and metadata.
+- `thumbnail-web/`: React template and screenshot renderer for video thumbnails.
+- `UnifiedApp/`: macOS app that runs the complete games → attempts → mapper → editor → thumbnail workflow. See [its README](UnifiedApp/README.md).
 
 ## GametimeMapper
 
@@ -16,6 +18,8 @@ Open `GametimeMapper/GametimeMapper.xcodeproj` and run the `GametimeMapperUI` sc
 2. Play or scrub the video and drag a rectangle around the scoreboard. Drawing again replaces the selection.
 3. Process the video. The OCR log updates as samples arrive; the game-clock graph appears when processing finishes. Hover a point to see its game time, or click it to inspect the OCR texts and its change from the previous clock reading. Remove incorrect points before continuing.
 4. Click **Next** to merge the retained readings, then choose where to save the JSON. The save dialog starts in the video's folder with `<video name>.json` as the suggested name.
+
+Launch `GametimeMapperUI` with optional `--video/-v <path>` to load a video directly and skip its picker, and `--output/-o <path>` to save JSON directly after review. Both options can be combined.
 
 The CLI runs sampling and merging in one command:
 
