@@ -298,8 +298,15 @@ private struct ThumbnailSelectionView: View {
                 Button(playing ? "Pause" : "Play") {
                     if playing { player.pause() } else { player.play() }
                 }
-                Slider(value: $currentTime, in: 0...max(duration, 0.01)) { editing in
-                    if !editing { player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600)) }
+                Slider(value: Binding(
+                    get: { currentTime },
+                    set: { time in
+                        currentTime = time
+                        player.seek(to: CMTime(seconds: time, preferredTimescale: 600),
+                                    toleranceBefore: .zero, toleranceAfter: .zero)
+                    }
+                ), in: 0...max(duration, 0.01)) { editing in
+                    if editing { player.pause() }
                 }
                 Text(String(format: "%.1f / %.1f s", currentTime, duration)).monospacedDigit()
             }
