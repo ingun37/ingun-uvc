@@ -44,13 +44,3 @@ xcodebuild -project GametimeMapper/GametimeMapper.xcodeproj \
   -derivedDataPath /tmp/gametime-mapper-xcode CODE_SIGNING_ALLOWED=NO \
   -parallel-testing-enabled NO test
 ```
-
-## Streamer TODO
-
-- [x] Bigger video in preview view
-- [x] Terminate when last window close
-- [x] Stop recording when frozen
-- [x] Timeout for recording
-- [ ] Thumbnail generation
-- [ ] Read teams from the scoreboard?
-- [ ] Boxscore in the end
