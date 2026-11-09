@@ -214,7 +214,15 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Unified App").font(.largeTitle.bold())
+            HStack(alignment: .firstTextBaseline) {
+                Text("Unified App").font(.largeTitle.bold())
+                Spacer()
+                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                    Text("v\(version)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Divider()
             switch workflow.scene {
             case .games:

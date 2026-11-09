@@ -101,6 +101,9 @@ struct ContentView: View {
                         Button("Back to Formats") { step = .format }
                     }
                     Spacer()
+                    if !processing && rawReadings != nil {
+                        Button("Export Log…") { exportLog() }
+                    }
                     Button(outputURL == nil ? "Next" : "Save JSON") { saveMapping() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(rawReadings == nil || processing || (outputURL != nil && savedURL != nil))
@@ -569,6 +572,23 @@ struct ContentView: View {
             return
         }
         showSavePanel(videoURL: videoURL, entries: merged)
+    }
+
+    private func exportLog() {
+        guard let videoURL, rawReadings != nil else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.canCreateDirectories = true
+        panel.directoryURL = videoURL.deletingLastPathComponent()
+        panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".log.txt"
+        panel.message = "Export the processing log"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try (logLines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Could not export log: \(error.localizedDescription)"
+        }
     }
 
     private func showSavePanel() {

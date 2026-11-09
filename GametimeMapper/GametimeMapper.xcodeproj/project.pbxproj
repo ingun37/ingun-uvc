@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AA000001000000000000000A /* GametimeMapper/GameTimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
-		AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in UI Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
+		AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000001000000000000000B /* GametimeMapper/GameTimeMapper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -308,7 +308,7 @@
 		929CE460309F40E200B71319 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
-				AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in UI Sources */,
+				AA000001000000000000000C /* GametimeMapper/GameTimeMapper.swift in Sources */,
 			);
 		};
 		929CE46C309F40E300B71319 /* Sources */ = {
@@ -505,7 +505,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -535,7 +535,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.GametimeMapperUI;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

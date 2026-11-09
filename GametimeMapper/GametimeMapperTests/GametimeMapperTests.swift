@@ -187,6 +187,11 @@ struct GametimeMapperTests {
         #expect(GameTimeMapper.parse(["1ST", "07:20"]) == .init(period: "1ST", gameSecond: 440))
         #expect(GameTimeMapper.parse(["2ND 00:59.9"]) == .init(period: "2ND", gameSecond: 59.9))
         #expect(GameTimeMapper.parse(["3RD", ":06.1"]) == .init(period: "3RD", gameSecond: 6.1))
+        for (ocr, period) in [("1 ST", "1ST"), ("2 ND", "2ND"),
+                              ("3 RD", "3RD"), ("4 TH", "4TH")] {
+            #expect(GameTimeMapper.parse([ocr, "07:20"]) ==
+                    .init(period: period, gameSecond: 440))
+        }
         #expect(GameTimeMapper.parse(["3RD", "06.1"]) == .init(period: "3RD", gameSecond: 6.1))
         #expect(GameTimeMapper.parse(["3RD", "6.1"]) == .init(period: "3RD", gameSecond: 6.1))
         #expect(GameTimeMapper.parse(["4TH 59.9"]) == .init(period: "4TH", gameSecond: 59.9))
