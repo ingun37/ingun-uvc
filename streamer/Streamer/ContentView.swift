@@ -30,14 +30,13 @@ struct ContentView: View {
             case .record:
                 Text("Record").font(.title2.bold())
             }
-            // Keep the same preview layer connected while changing capture steps.
-            // Detaching/recreating it during movie startup changes session connections.
+            // Keep the same data output and Metal preview while changing capture steps.
             if let (device, resource) = model.screen.capture {
                 let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
                 let aspectRatio = CGFloat(dimensions.width) / CGFloat(dimensions.height)
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 12) {
-                        CapturePreview(session: resource.session)
+                        CapturePreview(renderer: resource.preview)
                             .aspectRatio(aspectRatio, contentMode: .fit)
                             .frame(width: previewWidth, height: previewWidth / aspectRatio)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -311,35 +310,42 @@ private struct DeviceDetail: View {
 }
 
 private struct CapturePreview: NSViewRepresentable {
-    let session: AVCaptureSession
+    let renderer: MetalPreviewRenderer
 
     func makeNSView(context: Context) -> PreviewView {
-        let view = PreviewView()
-        view.previewLayer.videoGravity = .resizeAspect
-        view.previewLayer.session = session
-        return view
+        PreviewView(renderer: renderer)
     }
 
     func updateNSView(_ view: PreviewView, context: Context) {
-        if view.previewLayer.session !== session {
-            view.previewLayer.session = session
-        }
-    }
-
-    static func dismantleNSView(_ view: PreviewView, coordinator: ()) {
-        view.previewLayer.session = nil
+        view.renderer = renderer
     }
 }
 
 private final class PreviewView: NSView {
-    let previewLayer = AVCaptureVideoPreviewLayer()
+    var renderer: MetalPreviewRenderer {
+        didSet {
+            if oldValue !== renderer {
+                layer = renderer.layer
+                needsLayout = true
+            }
+        }
+    }
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
+    init(renderer: MetalPreviewRenderer) {
+        self.renderer = renderer
+        super.init(frame: .zero)
         wantsLayer = true
-        layer = previewLayer
-        previewLayer.backgroundColor = NSColor.black.cgColor
+        layer = renderer.layer
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layout() {
+        super.layout()
+        renderer.layer.contentsScale = window?.backingScaleFactor ?? 1
+        renderer.layer.drawableSize = CGSize(
+            width: bounds.width * renderer.layer.contentsScale,
+            height: bounds.height * renderer.layer.contentsScale
+        )
+    }
 }

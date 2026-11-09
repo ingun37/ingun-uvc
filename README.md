@@ -10,6 +10,27 @@ This repository contains several tools for basketball video workflows:
 - `thumbnail-web/`: React template and screenshot renderer for video thumbnails.
 - `UnifiedApp/`: macOS app that runs the complete games → attempts → mapper → editor → thumbnail workflow. See [its README](UnifiedApp/README.md).
 
+## Streamer
+
+Open `streamer/Streamer.xcodeproj` and run the `Streamer` scheme. Choose a capture
+card or camera to inspect its live video, source format, and available USB
+details. The preview width is adjustable, and an audio source can be selected
+before recording. **Record** creates a temporary `.mov`; **Done** finishes it
+and opens a save dialog.
+
+The preview uses `AVCaptureVideoDataOutput` to receive BGRA frames. Core Video
+maps each pixel buffer to a Metal texture, which is drawn into a `CAMetalLayer`
+with aspect-fit scaling. The same capture session and preview remain active
+when recording starts.
+
+Build from the repository root:
+
+```sh
+xcodebuild -project streamer/Streamer.xcodeproj -scheme Streamer \
+  -configuration Debug -derivedDataPath /tmp/ingun-uvc-streamer-build \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
 ## GametimeMapper
 
 Open `GametimeMapper/GametimeMapper.xcodeproj` and run the `GametimeMapperUI` scheme. The app lets you:

@@ -2,8 +2,9 @@
 
 This repository contains multiple projects:
 
-- `streamer/`: native macOS SwiftUI capture-card inspector. Before working on this
-  project, read and follow [streamer/AGENTS.md](streamer/AGENTS.md).
+- `streamer/`: native macOS SwiftUI capture-card inspector with a Metal live
+  preview. Before working on this project, read and follow
+  [streamer/AGENTS.md](streamer/AGENTS.md).
 - `GametimeMapper/`: native macOS SwiftUI app and Swift CLI for mapping video time
   to the basketball game clock. The app supports scoreboard selection and manual
   filtering of OCR samples before merging.

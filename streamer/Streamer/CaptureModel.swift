@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import Metal
 import Observation
 
 /// Balances the activity token automatically when the preview owner is released.
@@ -21,20 +22,29 @@ private final class PreviewActivity {
 /// Owns the session for exactly as long as the detail scene needs it.
 final class CaptureResource: @unchecked Sendable {
     let session: AVCaptureSession
+    let preview: MetalPreviewRenderer
     private let previewActivity: PreviewActivity
     private let queue = DispatchQueue(label: "dev.streamer.capture")
 
     init(device: AVCaptureDevice) throws {
         let session = AVCaptureSession()
         let input = try AVCaptureDeviceInput(device: device)
+        guard let metalDevice = MTLCreateSystemDefaultDevice() else { throw CaptureFailure.metalUnavailable }
+        let preview = try MetalPreviewRenderer(device: metalDevice)
+        let videoOutput = AVCaptureVideoDataOutput()
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.setSampleBufferDelegate(preview, queue: DispatchQueue(label: "dev.streamer.preview.frames"))
         session.beginConfiguration()
-        guard session.canAddInput(input) else {
+        guard session.canAddInput(input), session.canAddOutput(videoOutput) else {
             session.commitConfiguration()
             throw CaptureFailure.unsupported
         }
         session.addInput(input)
+        session.addOutput(videoOutput)
         session.commitConfiguration()
         self.session = session
+        self.preview = preview
         previewActivity = PreviewActivity()
     }
 
@@ -90,10 +100,12 @@ final class CaptureResource: @unchecked Sendable {
 
 enum CaptureFailure: LocalizedError {
     case unsupported
+    case metalUnavailable
     
     var errorDescription: String? {
         switch self {
-        case .unsupported: "This device cannot be added to a video capture session."
+        case .unsupported: "This device or its video output cannot be added to a capture session."
+        case .metalUnavailable: "Metal is unavailable, so the video preview cannot be displayed."
     
         }
     }

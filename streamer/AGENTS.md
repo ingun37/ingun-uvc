@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-27 (Asia/Seoul).
+Updated 2026-11-09 (Asia/Seoul).
 
 ## Scope and current state
 
@@ -11,8 +11,10 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 
 - Video device discovery through AVFoundation, including external capture
   devices and built-in cameras; Refresh rescans and sorts by name.
-- Selecting a device opens a capture session and shows device details plus a
-  400 × 225 live preview.
+- Selecting a device opens a capture session and shows device details plus an
+  adjustable-width live preview. AVCaptureVideoDataOutput supplies BGRA frames;
+  Core Video maps them to Metal textures for aspect-fit drawing in CAMetalLayer.
+  The reason why not using AVCaptureVideoPreviewLayer is that the AVCaptureVideoPreviewLayer works as a direct client of the capture session, minimizing the window forces the preview layer to cease drawing frames, which stalls the shared AVCaptureSession pipeline and freezes your AVCaptureFileOutput recording.
 - Camera permission instructions, capture errors/interruption messages, and
   selected-device disconnection handling.
 - Back returns to discovery and releases capture resources.
@@ -32,41 +34,45 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 
 ## Code map
 
-- `MyApp/MyApp.swift`: app entry and WindowGroup.
-- `MyApp/CaptureModel.swift`:
+- `Streamer/MyApp.swift`: app entry and WindowGroup.
+- `Streamer/CaptureModel.swift`:
   - `CaptureModel` is observable state and actions. `Screen` covers device
     discovery, opening, detail, and recording.
-  - `CaptureResource` owns AVCaptureSession and device input. Start/stop run on
-    a serial dispatch queue; deinit schedules stop and input removal.
+  - `CaptureResource` owns AVCaptureSession, device input, video data output,
+    and Metal preview renderer. Start/stop run on a serial dispatch queue;
+    deinit schedules stop and input removal.
   - `PreviewActivity` owns a ProcessInfo activity token with
     idleDisplaySleepDisabled and idleSystemSleepDisabled; deinit ends it.
   - `CaptureFailure` provides a readable unsupported-input error.
-- `MyApp/ContentView.swift`:
+- `Streamer/ContentView.swift`:
   - `ContentView` owns the model in @State, switches screens, and subscribes to
     capture notifications. `deviceList` renders discovery/permission states.
   - `DeviceDetail` builds metadata rows and displays preview and USB details.
   - `CapturePreview` bridges SwiftUI to AppKit using NSViewRepresentable.
-  - `PreviewView` hosts AVCaptureVideoPreviewLayer; teardown detaches session.
-- `MyApp/MovieRecording.swift`: owns the temporary movie, recording phases,
+  - `PreviewView` hosts the renderer's CAMetalLayer and sizes its drawable.
+- `Streamer/MetalPreviewRenderer.swift`: maps BGRA capture pixel buffers to
+  Metal textures with Core Video and draws an aspect-fit preview on the GPU.
+- `Streamer/MovieRecording.swift`: owns the temporary movie, recording phases,
   file-output delegate callbacks, and cleanup. `CaptureResource` retains the
   capture session while recording finalizes.
-- `MyApp/USBDetails.swift`: DetailRow value type and IOKit lookup.
+- `Streamer/USBDetails.swift`: DetailRow value type and IOKit lookup.
   Registry handles are released with defer. Identifier parsing is a best-effort
   match, not a universal guarantee for all AVFoundation devices.
-- `Untitled Project.xcodeproj/project.pbxproj`: synchronized source
-  folder, MyApp scheme, macOS 27 target, main-actor default isolation. Camera
+- `Streamer.xcodeproj/project.pbxproj`: synchronized source
+  folder, Streamer scheme, macOS 27 target, main-actor default isolation. Camera
   sandbox access and camera usage description exist. User-selected file access
   is read-write for saving recordings. Microphone usage description and audio-input sandbox capability are configured.
 
 ## Validation and known limits
 
-The preview implementation previously passed a Debug build and
-`git diff --check`. Live capture still needs hardware validation.
+The Metal preview implementation passed a Debug build and `git diff --check`.
+The user confirmed the live preview works with their capture setup. Recording
+and saving still need hardware validation with this preview pipeline.
 
 Build from the repository root:
 
 ```sh
-xcodebuild -project 'streamer/Untitled Project.xcodeproj' -scheme MyApp \
+xcodebuild -project streamer/Streamer.xcodeproj -scheme Streamer \
   -configuration Debug -derivedDataPath /tmp/ingun-uvc-build \
   CODE_SIGNING_ALLOWED=NO build
 ```
