@@ -6,6 +6,8 @@ import Combine
 struct ContentView: View {
     @State private var model = CaptureModel()
     @State private var previewWidth = 1280.0
+    private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -60,6 +62,12 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 720, minHeight: 580)
+        .overlay(alignment: .bottomTrailing) {
+            Text("Version \(version) (\(build))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(8)
+        }
         .task { await model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) { model.disconnected($0) }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.runtimeErrorNotification)) { model.sessionFailed($0) }
