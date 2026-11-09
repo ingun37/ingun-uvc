@@ -3,12 +3,12 @@
 UnifiedApp connects the repository's NBA data, game-clock mapping, clip editing, and thumbnail tools.
 
 1. Enter a positive page number and click **Query** to list games. The list includes each game's date and home and away team codes.
-2. Select a game. UnifiedApp runs `data_fetcher/dist/main attempts` and saves a temporary CSV. If the fetch fails, retry or return to the game list.
+2. Select a game. UnifiedApp runs `data_fetcher/main.py attempts` with the `data_fetcher/.venv` Python environment and saves a temporary CSV. If the fetch fails, retry or return to the game list.
 3. Choose the source video in UnifiedApp. It launches `GametimeMapper/build/GametimeMapperUI.app` with `--video` and `--output`, and waits for its temporary mapping JSON.
 4. It launches `ClipEditor/build/ClipEditor.app` with `--video`, `--json`, `--csv`, and `--output`. The compilation destination is `<video name>-compilation.mp4` beside the source video.
 5. After ClipEditor closes, play or scrub the source video and draw one rectangle. Click **Generate Thumbnail** to save `<video name>-thumbnail.jpg` beside the video. The thumbnail uses the selected frame region, the game date, and the home and away team codes.
 
-The workflow expects the three executables at the paths above. Missing executables or outputs appear as errors in the app. Temporary CSV and JSON files are created in a `unified-app-*` directory under the system temporary directory. Thumbnail rendering uses `thumbnail-web/dist`, Playwright, and Node loaded through interactive zsh (`~/.zshrc`), so build the web template with `cd thumbnail-web && npm run build` first.
+The workflow requires `data_fetcher/.venv/bin/activate` and `data_fetcher/main.py`; it launches them through interactive zsh before running Python. It also expects the two companion app executables at the paths above. Missing files or outputs appear as errors in the app. Temporary CSV and JSON files are created in a `unified-app-*` directory under the system temporary directory. Thumbnail rendering uses `thumbnail-web/dist`, Playwright, and Node loaded through interactive zsh (`~/.zshrc`), so build the web template with `cd thumbnail-web && npm run build` first.
 
 UnifiedApp shows its bundle version in the top-right corner. GametimeMapperUI and ClipEditor show their own versions there too. ClipEditor is built without App Sandbox so it can open the video, mapping, attempts, and output paths passed by UnifiedApp.
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env zsh
 
 set -e
-rm -rf streamer/build
-mkdir streamer/build
+rm -rf ./streamer/build
+mkdir ./streamer/build
 xcodebuild archive \
-  -project streamer/Streamer.xcodeproj \
+  -project ./streamer/Streamer.xcodeproj \
   -scheme Streamer \
   -archivePath ./streamer/build/Streamer.xcarchive
 

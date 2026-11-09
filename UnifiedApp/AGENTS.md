@@ -1,6 +1,6 @@
 # UnifiedApp
 
-This macOS SwiftUI app orchestrates `data_fetcher/dist/main`, `GametimeMapper/build/GametimeMapperUI.app`, `ClipEditor/build/ClipEditor.app`, and `thumbnail-web/render-thumbnail.mjs`. Read the affected projects' AGENTS.md files before changing an integration.
+This macOS SwiftUI app orchestrates `data_fetcher/main.py` through interactive zsh with `data_fetcher/.venv` activated, `GametimeMapper/build/GametimeMapperUI.app`, `ClipEditor/build/ClipEditor.app`, and `thumbnail-web/render-thumbnail.mjs`. Read the affected projects' AGENTS.md files before changing an integration.
 
 Keep the game ID as a 10-digit string. Parse `games` output as game ID, date, home team, and away team. Fetch attempts to a temporary CSV. Choose the video in UnifiedApp, then pass the same path to both child apps. Pass a temporary JSON output path to GametimeMapperUI and wait for it to exit and produce the file. Pass the video, JSON, CSV, and compilation output paths to ClipEditor and wait for it to exit.
 

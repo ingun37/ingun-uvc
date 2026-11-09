@@ -64,6 +64,20 @@ private enum Runner {
         return (try? String(contentsOf: output, encoding: .utf8)) ?? ""
     }
 
+    nonisolated static func runDataFetcher(arguments: [String]) throws -> String {
+        let activate = root.appending(path: "data_fetcher/.venv/bin/activate")
+        let script = root.appending(path: "data_fetcher/main.py")
+        guard FileManager.default.fileExists(atPath: activate.path) else {
+            throw RunError.missing("data_fetcher/.venv/bin/activate")
+        }
+        guard FileManager.default.fileExists(atPath: script.path) else {
+            throw RunError.missing("data_fetcher/main.py")
+        }
+        return try run(URL(fileURLWithPath: "/bin/zsh"),
+                       arguments: ["-ic", "source \"$1\" && shift && exec python \"$@\"",
+                                   "data-fetcher", activate.path, script.path] + arguments)
+    }
+
     nonisolated static func appExecutable(_ relativePath: String, name: String) throws -> URL {
         let bundle = root.appending(path: relativePath)
         guard FileManager.default.fileExists(atPath: bundle.path) else { throw RunError.missing(relativePath) }
@@ -113,8 +127,9 @@ private final class Workflow {
         message = "Querying games…"
         defer { busy = false }
         do {
-            let executable = try Runner.executable("data_fetcher/dist/main")
-            let output = try await Task.detached { try Runner.run(executable, arguments: ["games", "--page", String(number)]) }.value
+            let output = try await Task.detached {
+                try Runner.runDataFetcher(arguments: ["games", "--page", String(number)])
+            }.value
             games = Game.parse(output)
             message = games.isEmpty ? output.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         } catch { message = error.localizedDescription }
@@ -128,9 +143,10 @@ private final class Workflow {
         defer { busy = false }
         do {
             try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
-            let executable = try Runner.executable("data_fetcher/dist/main")
             let csv = csvURL
-            _ = try await Task.detached { try Runner.run(executable, arguments: ["attempts", game.id, "--output", csv.path]) }.value
+            _ = try await Task.detached {
+                try Runner.runDataFetcher(arguments: ["attempts", game.id, "--output", csv.path])
+            }.value
             guard FileManager.default.fileExists(atPath: csv.path) else { throw Runner.RunError.missingOutput(csv.path) }
             scene = .video
             message = "Choose the source video."
