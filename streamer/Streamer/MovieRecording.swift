@@ -25,31 +25,24 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     let url: URL
     private let directory: URL
     private let output = AVCaptureMovieFileOutput()
-    @ObservationIgnored private let monitor: VideoFreezeMonitor
+    
     var phase: Phase = .starting
     var message = ""
     var savedURL: URL?
 
     init(resource: CaptureResource, audioDevice: AVCaptureDevice) throws {
-        guard let monitor = VideoFreezeMonitor(metalDevice: MTLCreateSystemDefaultDevice()) else {
-            throw CaptureFailure.freezeMonitorUnavailable
-        }
+
         self.resource = resource
         self.audioDevice = audioDevice
-        self.monitor = monitor
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         url = directory.appendingPathComponent("Recording.mov")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         super.init()
-        monitor.setOnFreeze { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.finish(reason: "The video stream was frozen for more than 10 seconds.")
-            }
-        }
+
     }
 
     func start() {
-        resource.record(to: url, audioDevice: audioDevice, output: output, monitor: monitor, delegate: self)
+        resource.record(to: url, audioDevice: audioDevice, output: output, delegate: self)
     }
 
     func finish(reason: String = "") {
@@ -60,15 +53,15 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         }
         guard phase == .recording else { return }
         phase = .finishing
-        monitor.stop()
+        
         resource.stopRecording(output)
     }
 
     func failed(_ message: String) {
         self.message = message
         phase = .failed
-        monitor.stop()
-        resource.removeRecordingOutput(output, monitor: monitor)
+        
+        
     }
 
     nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo outputFileURL: URL,
@@ -77,7 +70,6 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
             if self.phase == .finishing { self.resource.stopRecording(self.output) }
             else if self.phase == .starting {
                 self.phase = .recording
-                self.monitor.start()
             }
         }
     }
@@ -93,8 +85,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 .compactMap { $0 }.joined(separator: "\n")
         } ?? ""
         Task { @MainActor in
-            self.monitor.stop()
-            self.resource.removeRecordingOutput(self.output, monitor: self.monitor)
+            
             if !message.isEmpty { self.message = message }
             self.phase = successful ? .ready : .failed
             if successful { self.save() }
