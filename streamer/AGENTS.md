@@ -21,7 +21,9 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 - The detail view offers an audio-source picker and a recording-frame-rate
   picker populated from the active video format's supported ranges. Fixed-rate
   modes use AVFoundation's exact frame durations, including rates displayed as
-  30 fps whose actual duration differs slightly from 1/30 second.
+  30 fps whose actual duration differs slightly from 1/30 second. The picker
+  still lists higher supported rates, but recording above a displayed 30 fps
+  is blocked with a warning before requesting microphone access.
 - Record opens a separate view with live preview and a temporary .mov path.
   MovieRecording owns the temporary directory and AVCaptureMovieFileOutput delegate;
   capture output changes and start/stop use CaptureResource's serial queue.

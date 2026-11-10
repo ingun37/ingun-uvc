@@ -96,6 +96,10 @@ struct ContentView: View {
                     }
                 }
                 .disabled(model.preparingRecording)
+                if model.selectedFrameRateExceedsRecordingLimit {
+                    Label("Please choose 30 fps or lower before recording.", systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
                 if model.audioDevices.isEmpty {
                     Text("No audio sources found. Connect an audio device and reopen this video source.").foregroundStyle(.orange)
                 } else {

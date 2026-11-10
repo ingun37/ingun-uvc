@@ -186,6 +186,10 @@ final class CaptureModel {
     var audioDevices: [AVCaptureDevice] = []
     var selectedAudioID = ""
     var selectedFrameRate = 0.0
+    var selectedFrameRateExceedsRecordingLimit: Bool {
+        // Match the picker's two-decimal display: some 30 fps modes report 30.00003.
+        (selectedFrameRate * 100).rounded() > 3_000
+    }
     var preparingRecording = false
 
     private func refreshAudio(for videoDevice: AVCaptureDevice) {
@@ -259,6 +263,11 @@ final class CaptureModel {
 
     func record(_ device: AVCaptureDevice, resource: CaptureResource) async {
         guard !preparingRecording else { return }
+        guard case let .detail(_, currentResource) = screen, currentResource === resource else { return }
+        guard !selectedFrameRateExceedsRecordingLimit else {
+            streamMessage = "Please choose 30 fps or lower before recording."
+            return
+        }
         preparingRecording = true
         defer { preparingRecording = false }
         let authorized: Bool

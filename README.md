@@ -24,6 +24,8 @@ details. The preview width is adjustable. Before recording, choose an audio
 source and a frame rate supported by the active video format. **Record** creates
 a temporary `.mov`; **Done** finishes it and saves a timestamped file to Movies.
 The recording view also has an optional countdown timer.
+Recording is limited to 30 fps or lower; choosing a higher rate shows a warning
+and blocks **Record**.
 
 The preview uses `AVCaptureVideoDataOutput` to receive BGRA frames. Core Video
 maps each pixel buffer to a Metal texture, which is drawn into a `CAMetalLayer`
