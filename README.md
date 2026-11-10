@@ -5,10 +5,15 @@ This repository contains several tools for basketball video workflows:
 - `streamer/`: macOS capture-card inspector.
 - `GametimeMapper/`: macOS app and CLI that map a video's time to the basketball game clock.
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
-- `ClipEditor/`: macOS app for missed-shot video compilations.
+- `ClipEditor/`: macOS app for missed-shot compilations, including one video per player. See [its README](ClipEditor/README.md).
 - `TestDataGenerator/`: macOS CLI that generates per-attempt clips and metadata.
 - `thumbnail-web/`: React template and screenshot renderer for video thumbnails.
 - `UnifiedApp/`: macOS app that runs the complete games → attempts → mapper → editor → thumbnail workflow. See [its README](UnifiedApp/README.md).
+
+When UnifiedApp runs the workflow, it writes `<video name>-<game id>.csv` and
+`<video name>-map.json` beside the source video. ClipEditor saves the full
+compilation plus `<compilation video name> - <player name>.mp4` for each player
+with included missed attempts.
 
 ## Streamer
 

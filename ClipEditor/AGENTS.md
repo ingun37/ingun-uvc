@@ -16,6 +16,8 @@ ClipEditor is a SwiftUI app that turns missed NBA field goals into a video compi
 - Interpolate between each entry's explicit game and video endpoints. Equal game endpoints represent a stopped clock. Clamp the moment to its video range. Start each clip 5 seconds before it and end 2 seconds after it, clamped to the video duration. Merge overlapping initial clips.
 - In the edit scene, each clip shows the CSV game time for every included attempt, plus playback, an include toggle, and adjustable start and end. Export only included clips.
 - Concatenate video ranges without a visual transition. Where source audio exists, extend it across each cut and use volume ramps for a short audio transition. Stage export before replacing an existing destination.
+- Export the all-player compilation to the chosen destination and one video per player with included clips, in the same directory. Name each player file `<compilation video name> - <player name>.mp4` (without the compilation's `.mp4` extension in the prefix); disambiguate duplicate names. A merged clip belongs to every player with an attempt in it and stays intact in each player's video.
+- Preserve shot captions in the all-player compilation. In each player video, show that player's name at the top center and only that player's FGM/FGA attempt count at the bottom center when its shot caption appears. Omit the player's name and jersey number from that count caption. The per-player export keeps the source video's aspect ratio; caption placement is intended for vertical viewing.
 
 ## Build and test
 

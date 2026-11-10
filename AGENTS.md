@@ -12,7 +12,8 @@ This repository contains multiple projects:
   [GametimeMapper/AGENTS.md](GametimeMapper/AGENTS.md).
 - `data_fetcher/`: Python CLI program that fetches field goal attempts of a NBA game.
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
-- `ClipEditor/`: native macOS SwiftUI app for missed-shot video compilations.
+- `ClipEditor/`: native macOS SwiftUI app for missed-shot compilations and
+  per-player videos with separate caption placement.
   Before working on this project, read and follow [ClipEditor/AGENTS.md](ClipEditor/AGENTS.md).
 - `TestDataGenerator/`: native macOS Swift CLI for per-attempt clips and metadata.
   Before working on this project, read and follow
@@ -20,6 +21,8 @@ This repository contains multiple projects:
 - `thumbnail-web/`: HTML template and renderer for creating video thumbnails.
   Before working on this project, read and follow
   [thumbnail-web/AGENTS.md](thumbnail-web/AGENTS.md).
-- `UnifiedApp/`: macOS SwiftUI orchestrator for the full workflow. Before working on this project, read and follow [UnifiedApp/AGENTS.md](UnifiedApp/AGENTS.md).
+- `UnifiedApp/`: macOS SwiftUI orchestrator for the full workflow; it saves
+  the attempts CSV and game time map beside the source video. Before working
+  on this project, read and follow [UnifiedApp/AGENTS.md](UnifiedApp/AGENTS.md).
 Project-specific instructions apply only to their respective project directories.
 For changes that cross project boundaries, follow each affected project's guide.
