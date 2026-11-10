@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-11-09 (Asia/Seoul).
+Updated 2026-11-11 (Asia/Seoul).
 
 ## Scope and current state
 
@@ -18,15 +18,21 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 - Camera permission instructions, capture errors/interruption messages, and
   selected-device disconnection handling.
 - Back returns to discovery and releases capture resources.
+- The detail view offers an audio-source picker and a recording-frame-rate
+  picker populated from the active video format's supported ranges. Fixed-rate
+  modes use AVFoundation's exact frame durations, including rates displayed as
+  30 fps whose actual duration differs slightly from 1/30 second.
 - Record opens a separate view with live preview and a temporary .mov path.
   MovieRecording owns the temporary directory and AVCaptureMovieFileOutput delegate;
   capture output changes and start/stop use CaptureResource's serial queue.
-  Done waits for finalization, then offers NSSavePanel with Movies and a timestamp
-  filename. Cancel/save failure retains the movie for retry; success returns to preview.
-  Recording includes the selected audio input. Preview offers an audio-source picker,
-  preferring combined/linked capture-device audio; recording requests microphone
-  permission and rejects missing audio connections. Live recording/save still needs
-  hardware validation.
+  The device configuration lock is held through the session commit while setting
+  the selected frame duration. Recording fails before starting if the session
+  does not retain that duration. The optional timer can finish a recording.
+  Done waits for finalization; MovieRecording saves a timestamped .mov in Movies.
+  Save failure retains the temporary movie for retry; success returns to preview.
+  Recording includes the selected audio input, preferring combined/linked
+  capture-device audio; recording requests microphone permission and rejects
+  missing audio connections.
 - Idle system and display sleep prevention during preview. This does not
   override explicit Sleep commands or laptop lid closure.
 - IOKit USB vendor/product/location and interface class/subclass lookup when
@@ -39,8 +45,8 @@ and avoid nullable stored properties where practical. Prefer immutability over m
   - `CaptureModel` is observable state and actions. `Screen` covers device
     discovery, opening, detail, and recording.
   - `CaptureResource` owns AVCaptureSession, device input, video data output,
-    and Metal preview renderer. Start/stop run on a serial dispatch queue;
-    deinit schedules stop and input removal.
+    and Metal preview renderer. Start/stop and recording configuration run on a
+    serial dispatch queue; deinit schedules stop and input removal.
   - `PreviewActivity` owns a ProcessInfo activity token with
     idleDisplaySleepDisabled and idleSystemSleepDisabled; deinit ends it.
   - `CaptureFailure` provides a readable unsupported-input error.
@@ -65,9 +71,15 @@ and avoid nullable stored properties where practical. Prefer immutability over m
 
 ## Validation and known limits
 
-The Metal preview implementation passed a Debug build and `git diff --check`.
-The user confirmed the live preview works with their capture setup. Recording
-and saving still need hardware validation with this preview pipeline.
+The user confirmed the live preview works with their capture setup. One capture
+card produced a slow, laggy .mov reported as 120 fps even when 30 fps was chosen;
+another card produced smooth output near 29 fps. A subsequent attempt failed
+with "The capture session did not retain the selected frame rate." The latest
+change holds the device lock through session commit, but the user has not yet
+reported a hardware retest. Do not assume the selected frame rate matches the
+saved movie's timestamps or that the bitrate difference explains slow playback.
+Inspect a new sample's timestamps and actual frame cadence if the issue persists.
+The latest change passed a Debug build and `git diff --check`.
 
 Build from the repository root:
 

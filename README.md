@@ -2,7 +2,8 @@
 
 This repository contains several tools for basketball video workflows:
 
-- `streamer/`: macOS capture-card inspector.
+- `streamer/`: macOS capture-card inspector and recorder with audio-source and
+  recording-frame-rate selection.
 - `GametimeMapper/`: macOS app and CLI that map a video's time to the basketball game clock.
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
 - `ClipEditor/`: macOS app for missed-shot compilations, including one video per player. See [its README](ClipEditor/README.md).
@@ -19,14 +20,20 @@ with included missed attempts.
 
 Open `streamer/Streamer.xcodeproj` and run the `Streamer` scheme. Choose a capture
 card or camera to inspect its live video, source format, and available USB
-details. The preview width is adjustable, and an audio source can be selected
-before recording. **Record** creates a temporary `.mov`; **Done** finishes it
-and opens a save dialog.
+details. The preview width is adjustable. Before recording, choose an audio
+source and a frame rate supported by the active video format. **Record** creates
+a temporary `.mov`; **Done** finishes it and saves a timestamped file to Movies.
+The recording view also has an optional countdown timer.
 
 The preview uses `AVCaptureVideoDataOutput` to receive BGRA frames. Core Video
 maps each pixel buffer to a Metal texture, which is drawn into a `CAMetalLayer`
 with aspect-fit scaling. The same capture session and preview remain active
 when recording starts.
+
+Frame-rate selection configures the capture device and checks that the session
+retains the requested duration before recording. Actual output frame rate and
+playback smoothness still need validation with each capture card; a device may
+advertise a mode that does not produce the expected recording timestamps.
 
 Build from the repository root:
 
