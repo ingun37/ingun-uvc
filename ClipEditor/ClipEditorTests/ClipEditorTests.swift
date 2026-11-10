@@ -99,6 +99,18 @@ struct ClipEditorTests {
         #expect(plan.clips[0].gameTimes == ["1ST 11:33.00", "1ST 11:30.00"])
         #expect(plan.unmatched.count == 1)
     }
+    @Test func mergedClipRetainsEveryPlayer() throws {
+        let attempts = [
+            MissedAttempt(period: "1ST", gameSecond: 100, description: "A miss", player: "A|Alice"),
+            MissedAttempt(period: "1ST", gameSecond: 97, description: "B miss", player: "B|Bob")
+        ]
+        let ranges = [ClockRange(period: "1ST", game_start_seconds: 100, game_end_seconds: 90,
+                                 video_start_seconds: 10, video_end_seconds: 20)]
+        let plan = try ClipPlanner.plan(attempts: attempts, ranges: ranges, videoDuration: 30)
+        #expect(plan.clips.count == 1)
+        #expect(Set(plan.clips[0].players) == Set(["A|Alice", "B|Bob"]))
+    }
+
     @Test func exportsVideoAndAudioWithClipTransitions() async throws {
         let fixture = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")

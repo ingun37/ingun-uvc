@@ -196,17 +196,35 @@ private final class Workflow {
             path: "unified-app-\(UUID().uuidString)",
             directoryHint: .isDirectory
         )
-    private var csvURL: URL { tempDirectory.appending(path: "attempts.csv") }
-    private var jsonURL: URL { tempDirectory.appending(path: "mapping.json") }
+    private var stagedCSVURL: URL { tempDirectory.appending(path: "attempts.csv") }
+    private var csvURL: URL? {
+        guard let videoURL, let selectedGame else { return nil }
+        return videoURL.deletingLastPathComponent().appendingPathComponent(
+            "\(videoURL.deletingPathExtension().lastPathComponent)-\(selectedGame.id).csv"
+        )
+    }
+    private var jsonURL: URL? {
+        guard let videoURL else { return nil }
+        return videoURL.deletingLastPathComponent().appendingPathComponent(
+            "\(videoURL.deletingPathExtension().lastPathComponent)-map.json"
+        )
+    }
 
     func chooseVideo() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.movie, .video, .mpeg4Movie]
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        videoURL = url
-        scene = .mapper
-        Task { await runMapper() }
+        guard let selectedGame else { return }
+        let csv = url.deletingLastPathComponent().appendingPathComponent(
+            "\(url.deletingPathExtension().lastPathComponent)-\(selectedGame.id).csv"
+        )
+        do {
+            try Data(contentsOf: stagedCSVURL).write(to: csv, options: .atomic)
+            videoURL = url
+            scene = .mapper
+            Task { await runMapper() }
+        } catch { message = error.localizedDescription }
     }
 
     func query() async {
@@ -231,6 +249,7 @@ private final class Workflow {
     }
 
     func select(_ game: Game) async {
+        videoURL = nil
         selectedGame = game
         scene = .attempts
         busy = true
@@ -241,7 +260,7 @@ private final class Workflow {
                 at: tempDirectory,
                 withIntermediateDirectories: true
             )
-            let csv = csvURL
+            let csv = stagedCSVURL
             _ = try await Task.detached {
                 try Runner.runDataFetcher(arguments: [
                     "attempts", game.id, "--output", csv.path,
@@ -256,7 +275,7 @@ private final class Workflow {
     }
 
     func runMapper() async {
-        guard let videoURL else { return }
+        guard let videoURL, let json = jsonURL else { return }
         busy = true
         defer { busy = false }
         do {
@@ -264,7 +283,6 @@ private final class Workflow {
                 "GametimeMapper/build/GametimeMapperUI.app",
                 name: "GametimeMapperUI"
             )
-            let json = jsonURL
             _ = try await Task.detached {
                 try Runner.run(
                     executable,
@@ -283,7 +301,7 @@ private final class Workflow {
     }
 
     func runEditor(videoPath: String) async {
-        guard let selectedGame else { return }
+        guard let selectedGame, let json = jsonURL, let csv = csvURL else { return }
         busy = true
         defer { busy = false }
         do {
@@ -297,8 +315,8 @@ private final class Workflow {
                     selectedGame.compilationFilename
                 )
             let arguments = [
-                "--video", videoPath, "--json", jsonURL.path,
-                "--csv", csvURL.path, "--output", output.path,
+                "--video", videoPath, "--json", json.path,
+                "--csv", csv.path, "--output", output.path,
             ]
             _ = try await Task.detached {
                 try Runner.run(executable, arguments: arguments)

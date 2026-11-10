@@ -12,13 +12,15 @@ struct MissedAttempt: Sendable {
     let period: String
     let gameSecond: Double
     let description: String
+    let player: String?
     let caption: String?
     let location: CGPoint?
 
-    init(period: String, gameSecond: Double, description: String, caption: String? = nil, location: CGPoint? = nil) {
+    init(period: String, gameSecond: Double, description: String, player: String? = nil, caption: String? = nil, location: CGPoint? = nil) {
         self.period = period
         self.gameSecond = gameSecond
         self.description = description
+        self.player = player
         self.caption = caption
         self.location = location
     }
@@ -28,6 +30,7 @@ struct ShotCaption: Sendable {
     let sourceTime: Double
     let text: String
     let location: CGPoint
+    let player: String?
 }
 
 struct Clip: Identifiable, Sendable {
@@ -37,15 +40,17 @@ struct Clip: Identifiable, Sendable {
     var descriptions: [String]
     var gameTimes: [String]
     var captions: [ShotCaption]
+    var players: [String]
     var included: Bool = true
 
-    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [], captions: [ShotCaption] = []) {
+    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [], captions: [ShotCaption] = [], players: [String] = []) {
         id = UUID()
         self.start = start
         self.end = end
         self.descriptions = descriptions
         self.gameTimes = gameTimes
         self.captions = captions
+        self.players = players
     }
 }
 
@@ -133,7 +138,7 @@ enum ClipPlanner {
             let identity = jersey.isEmpty ? displayName : "#\(jersey) \(displayName)"
             let caption = total.map { identity.isEmpty ? "\($0.made)/\($0.attempted)" : "\(identity)\n\($0.made)/\($0.attempted)" }
             return MissedAttempt(period: period, gameSecond: seconds, description: row[descriptionIndex],
-                                 caption: caption, location: location)
+                                 player: displayName.isEmpty ? nil : "\(team)|\(displayName)", caption: caption, location: location)
         }
     }
 
@@ -167,10 +172,11 @@ enum ClipPlanner {
             let end = min(videoDuration, moment + 2)
             if end > start {
                 let captions: [ShotCaption] = if let text = attempt.caption, let location = attempt.location {
-                    [ShotCaption(sourceTime: moment, text: text, location: location)]
+                    [ShotCaption(sourceTime: moment, text: text, location: location, player: attempt.player)]
                 } else { [] }
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
-                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], captions: captions))
+                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], captions: captions,
+                                       players: attempt.player.map { [$0] } ?? []))
             }
         }
         let sorted = candidates.sorted { $0.start < $1.start }
@@ -181,6 +187,9 @@ enum ClipPlanner {
                 merged[last].descriptions += clip.descriptions
                 merged[last].gameTimes += clip.gameTimes
                 merged[last].captions += clip.captions
+                for player in clip.players where !merged[last].players.contains(player) {
+                    merged[last].players.append(player)
+                }
             } else {
                 merged.append(clip)
             }

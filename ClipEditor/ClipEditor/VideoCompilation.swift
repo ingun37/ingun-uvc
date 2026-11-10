@@ -4,7 +4,8 @@ import AppKit
 import QuartzCore
 
 struct VideoCompilation {
-    static func export(videoURL: URL, clips: [Clip], destination: URL) async throws {
+    static func export(videoURL: URL, clips: [Clip], destination: URL,
+                       title: String? = nil, player: String? = nil) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -32,7 +33,10 @@ struct VideoCompilation {
             let range = CMTimeRange(start: CMTime(seconds: clip.start, preferredTimescale: 600),
                                     end: CMTime(seconds: clip.end, preferredTimescale: 600))
             try outputVideo.insertTimeRange(range, of: videoTrack, at: cursor)
-            overlays += clip.captions.filter { $0.sourceTime >= clip.start && $0.sourceTime < clip.end }
+            overlays += clip.captions.filter {
+                $0.sourceTime >= clip.start && $0.sourceTime < clip.end &&
+                (player == nil || $0.player == player)
+            }
                 .map { (cursor.seconds + $0.sourceTime - clip.start, $0) }
             if let audioTrack {
                 // Audio extends across the video cut. Alternating tracks allow tails and heads to overlap.
@@ -65,7 +69,7 @@ struct VideoCompilation {
         guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw CompilationError.exportSetup
         }
-        if !overlays.isEmpty {
+        if !overlays.isEmpty || title != nil {
             let transform = try await videoTrack.load(.preferredTransform)
             let natural = try await videoTrack.load(.naturalSize)
             let rect = CGRect(origin: .zero, size: natural).applying(transform)
@@ -81,15 +85,39 @@ struct VideoCompilation {
             let parent = CALayer(); parent.frame = CGRect(origin: .zero, size: size)
             let videoLayer = CALayer(); videoLayer.frame = parent.frame
             parent.addSublayer(videoLayer)
+            if let title {
+                let font = NSFont.systemFont(ofSize: max(26, size.height * 0.05), weight: .bold)
+                let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+                let width = min(size.width - 32, ceil((title as NSString).size(withAttributes: attributes).width) + 32)
+                let height = ceil(font.ascender - font.descender + font.leading) + 24
+                let box = CALayer()
+                box.frame = CGRect(x: (size.width - width) / 2, y: size.height - height - 16,
+                                   width: width, height: height)
+                box.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
+                box.cornerRadius = 8
+                if let image = captionImage(title, size: CGSize(width: width - 32, height: height - 24), attributes: attributes) {
+                    let label = CALayer()
+                    label.frame = CGRect(x: 16, y: 12, width: width - 32, height: height - 24)
+                    label.contents = image
+                    box.addSublayer(label)
+                    parent.addSublayer(box)
+                }
+            }
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
             let basketSide = try BasketSide()
             for (time, caption) in overlays {
-                let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime, preferredTimescale: 600), actualTime: nil)
-                let basketRight = try frame.map { try basketSide.isRight($0) } ?? true
-                let point = BasketSide.project(caption.location, right: basketRight)
+                let point: CGPoint
+                if player == nil {
+                    let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime, preferredTimescale: 600), actualTime: nil)
+                    let basketRight = try frame.map { try basketSide.isRight($0) } ?? true
+                    point = BasketSide.project(caption.location, right: basketRight)
+                } else {
+                    point = CGPoint(x: 0.5, y: 0.9)
+                }
+                let captionText = player == nil ? caption.text : String(caption.text.split(separator: "\n").last ?? "")
                 let font = NSFont.systemFont(ofSize: max(24, size.height * 0.045), weight: .semibold)
                 let paragraph = NSMutableParagraphStyle()
                 paragraph.alignment = .center
@@ -97,10 +125,10 @@ struct VideoCompilation {
                     .font: font, .foregroundColor: NSColor.white, .paragraphStyle: paragraph
                 ]
                 let padding: CGFloat = 16
-                let naturalWidth = caption.text.components(separatedBy: "\n")
+                let naturalWidth = captionText.components(separatedBy: "\n")
                     .map { ($0 as NSString).size(withAttributes: attributes).width }.max() ?? 0
                 let width = min(ceil(naturalWidth) + padding * 2, size.width - 16)
-                let textBounds = (caption.text as NSString).boundingRect(
+                let textBounds = (captionText as NSString).boundingRect(
                     with: CGSize(width: width - padding * 2, height: .greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes)
                 let height = min(ceil(textBounds.height) + padding * 2, size.height - 16)
@@ -108,10 +136,11 @@ struct VideoCompilation {
                 box.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
                 box.cornerRadius = 8
                 box.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
-                                   y: min(max((1 - point.y) * size.height, 0), size.height - height),
+                                   y: player == nil ? min(max((1 - point.y) * size.height, 0), size.height - height)
+                                       : max(16, size.height * 0.1 - height / 2),
                                    width: width, height: height)
                 let labelSize = CGSize(width: width - padding * 2, height: ceil(textBounds.height))
-                guard let renderedText = captionImage(caption.text, size: labelSize, attributes: attributes) else { continue }
+                guard let renderedText = captionImage(captionText, size: labelSize, attributes: attributes) else { continue }
                 let label = CALayer()
                 label.frame = CGRect(x: padding, y: (height - labelSize.height) / 2,
                                      width: labelSize.width, height: labelSize.height)

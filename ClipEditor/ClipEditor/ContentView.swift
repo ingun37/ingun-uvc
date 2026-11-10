@@ -44,11 +44,19 @@ private final class EditorModel {
     var message = ""
     var isBusy = false
     var exportedURL: URL?
+    var playerExportURLs: [URL] = []
     private var files: [InputKind: FileAccess] = [:]
 
     var videoURL: URL? { files[.video]?.url }
     var canContinue: Bool { InputKind.allCases.allSatisfy { files[$0] != nil } && !isBusy }
     var selectedClips: [Clip] { clips.filter(\.included) }
+    var playerGroups: [(key: String, name: String, clips: [Clip])] {
+        let keys = Array(Set(selectedClips.flatMap(\.players))).sorted()
+        return keys.map { key in
+            (key, String(key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).last ?? ""),
+             selectedClips.filter { $0.players.contains(key) })
+        }
+    }
 
     func name(for kind: InputKind) -> String { files[kind]?.url.lastPathComponent ?? "Choose file…" }
 
@@ -60,6 +68,7 @@ private final class EditorModel {
         clips = []
         unmatched = []
         exportedURL = nil
+        playerExportURLs = []
         message = ""
         return true
     }
@@ -113,13 +122,35 @@ private final class EditorModel {
             destination = selectedURL
         }
         let access = FileAccess(destination)
+        let groups = playerGroups
         isBusy = true
         message = "Exporting compilation…"
         defer { isBusy = false; _ = access }
         do {
             try await VideoCompilation.export(videoURL: video, clips: selectedClips, destination: destination)
+            var playerURLs: [URL] = []
+            var usedNames: Set<String> = [destination.lastPathComponent.lowercased()]
+            let compilationName = destination.deletingPathExtension().lastPathComponent
+            for group in groups {
+                let safeName = group.name.replacingOccurrences(of: #"[^\p{L}\p{N}._ -]"#,
+                    with: "_", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+                let base = "\(compilationName) - \(safeName.isEmpty ? "Unknown player" : safeName)"
+                var name = base
+                var suffix = 2
+                while usedNames.contains("\(name).mp4".lowercased()) {
+                    name = "\(base) \(suffix)"
+                    suffix += 1
+                }
+                usedNames.insert("\(name).mp4".lowercased())
+                let url = destination.deletingLastPathComponent().appendingPathComponent("\(name).mp4")
+                message = "Exporting \(group.name)…"
+                try await VideoCompilation.export(videoURL: video, clips: group.clips, destination: url,
+                                                  title: group.name, player: group.key)
+                playerURLs.append(url)
+            }
             exportedURL = destination
-            message = "Compilation saved to \(destination.path)."
+            playerExportURLs = playerURLs
+            message = "Saved compilation and \(playerURLs.count) player videos to \(destination.deletingLastPathComponent().path)."
         } catch {
             message = error.localizedDescription
         }
@@ -273,6 +304,10 @@ struct ContentView: View {
                     Text(url.path).lineLimit(1).truncationMode(.middle)
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
                 }
+            }
+            if !model.playerExportURLs.isEmpty {
+                Text("Player videos: \(model.playerExportURLs.map(\.lastPathComponent).joined(separator: ", "))")
+                    .textSelection(.enabled)
             }
             Spacer()
             HStack {
