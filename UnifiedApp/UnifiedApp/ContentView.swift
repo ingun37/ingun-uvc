@@ -7,7 +7,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 private struct Game: Identifiable {
-    // Edit these values to change the names used in compilation filenames.
+    // Edit these values to change the names used in output filenames.
     private static let teamLongNames: [String: String] = [
         "ATL": "Hawks",
         "BOS": "Celtics",
@@ -47,11 +47,21 @@ private struct Game: Identifiable {
     let home: String
     let away: String
 
-    var compilationFilename: String {
+    var displayDate: String {
+        let inputDate = ISO8601DateFormatter().date(from: date + "T00:00:00Z")
+        return inputDate.map {
+            $0.formatted(.dateTime.month(.abbreviated).day().year().locale(Locale(identifier: "en_US_POSIX")))
+        } ?? date
+    }
+
+    var outputName: String {
         let homeName = Self.teamLongNames[home] ?? home
         let awayName = Self.teamLongNames[away] ?? away
-        return "\(homeName) VS \(awayName) | Bricklights | \(date).mp4"
+        return "\(homeName) VS \(awayName) | Bricklights | \(displayDate)"
     }
+
+    var compilationFilename: String { outputName + ".mp4" }
+    var thumbnailFilename: String { outputName + ".jpg" }
 
     static func parse(_ output: String) -> [Game] {
         output.split(whereSeparator: \.isNewline).compactMap { line in
@@ -334,25 +344,12 @@ private final class Workflow {
             )
             try data.write(to: background)
             let output = videoURL.deletingLastPathComponent()
-                .appendingPathComponent(
-                    videoURL.deletingPathExtension().lastPathComponent
-                        + "-thumbnail.jpg"
-                )
+                .appendingPathComponent(selectedGame.thumbnailFilename)
             let script = Runner.root.appending(
                 path: "thumbnail-web/render-thumbnail.mjs"
             )
             let shell = URL(fileURLWithPath: "/bin/zsh")
-            let inputDate = ISO8601DateFormatter().date(
-                from: selectedGame.date + "T00:00:00Z"
-            )
-            let displayDate =
-                inputDate.map { date in
-                    date.formatted(
-                        .dateTime.month(.abbreviated).day().year().locale(
-                            Locale(identifier: "en_US_POSIX")
-                        )
-                    )
-                } ?? selectedGame.date
+            let displayDate = selectedGame.displayDate
             _ = try await Task.detached {
                 try Runner.run(
                     shell,
