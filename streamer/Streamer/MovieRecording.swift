@@ -22,6 +22,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     let resource: CaptureResource
     let audioDevice: AVCaptureDevice
+    let frameRate: Double
     let url: URL
     private let directory: URL
     private let output = AVCaptureMovieFileOutput()
@@ -30,10 +31,11 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     var message = ""
     var savedURL: URL?
 
-    init(resource: CaptureResource, audioDevice: AVCaptureDevice) throws {
+    init(resource: CaptureResource, audioDevice: AVCaptureDevice, frameRate: Double) throws {
 
         self.resource = resource
         self.audioDevice = audioDevice
+        self.frameRate = frameRate
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         url = directory.appendingPathComponent("Recording.mov")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -42,7 +44,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     }
 
     func start() {
-        resource.record(to: url, audioDevice: audioDevice, output: output, delegate: self)
+        resource.record(to: url, audioDevice: audioDevice, frameRate: frameRate, output: output, delegate: self)
     }
 
     func finish(reason: String = "") {

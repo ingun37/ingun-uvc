@@ -27,7 +27,7 @@ struct ContentView: View {
                     Button("Record", systemImage: "record.circle") {
                         Task { await model.record(device, resource: resource) }
                     }
-                    .disabled(model.preparingRecording || model.audioDevices.isEmpty)
+                    .disabled(model.preparingRecording || model.audioDevices.isEmpty || model.supportedFrameRates.isEmpty)
                 }
             case .record:
                 Text("Record").font(.title2.bold())
@@ -90,6 +90,12 @@ struct ContentView: View {
         switch model.screen {
         case .detail:
             VStack(alignment: .leading, spacing: 20) {
+                Picker("Recording frame rate", selection: $model.selectedFrameRate) {
+                    ForEach(model.supportedFrameRates, id: \.self) { rate in
+                        Text(String(format: "%.2f fps", rate)).tag(rate)
+                    }
+                }
+                .disabled(model.preparingRecording)
                 if model.audioDevices.isEmpty {
                     Text("No audio sources found. Connect an audio device and reopen this video source.").foregroundStyle(.orange)
                 } else {

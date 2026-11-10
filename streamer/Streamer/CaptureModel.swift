@@ -48,9 +48,14 @@ final class CaptureResource: @unchecked Sendable {
         previewActivity = PreviewActivity()
     }
 
-    func record(to url: URL, audioDevice: AVCaptureDevice, output: AVCaptureMovieFileOutput, delegate: MovieRecording) {
+    func record(to url: URL, audioDevice: AVCaptureDevice, frameRate: Double, output: AVCaptureMovieFileOutput, delegate: MovieRecording) {
         let session = session
         queue.async {
+            guard let videoDevice = (session.inputs.compactMap { $0 as? AVCaptureDeviceInput }
+                .first { $0.device.hasMediaType(.video) })?.device else {
+                Task { @MainActor in delegate.failed("The video source is no longer available.") }
+                return
+            }
             session.beginConfiguration()
             // Reuse audio ports on a combined video/audio input when available.
             if !session.inputs.flatMap({ $0.ports }).contains(where: { $0.mediaType == .audio }) {
@@ -72,7 +77,54 @@ final class CaptureResource: @unchecked Sendable {
             let supported = session.canAddOutput(output)
             if supported { session.addOutput(output) }
 
+            guard supported else {
+                session.commitConfiguration()
+                Task { @MainActor in delegate.failed("Movie recording is not supported by this capture session.") }
+                return
+            }
+
+            let requestedDuration: CMTime
+            var deviceLocked = false
+            do {
+                try videoDevice.lockForConfiguration()
+                deviceLocked = true
+                let ranges = videoDevice.activeFormat.videoSupportedFrameRateRanges
+                guard let range = ranges.first(where: {
+                    frameRate >= $0.minFrameRate - 0.001 && frameRate <= $0.maxFrameRate + 0.001
+                }) else {
+                    throw CaptureFailure.unsupportedFrameRate
+                }
+                let duration: CMTime
+                if abs(frameRate - range.minFrameRate) < 0.01 {
+                    duration = range.maxFrameDuration
+                } else if abs(frameRate - range.maxFrameRate) < 0.01 {
+                    duration = range.minFrameDuration
+                } else {
+                    duration = CMTime(value: 1_000_000, timescale: CMTimeScale((frameRate * 1_000_000).rounded()))
+                }
+                videoDevice.activeVideoMinFrameDuration = duration
+                videoDevice.activeVideoMaxFrameDuration = duration
+                requestedDuration = duration
+            } catch {
+                session.removeOutput(output)
+                session.commitConfiguration()
+                if deviceLocked { videoDevice.unlockForConfiguration() }
+                let message = error.localizedDescription
+                Task { @MainActor in delegate.failed("Could not set the frame rate: \(message)") }
+                return
+            }
+
             session.commitConfiguration()
+            videoDevice.unlockForConfiguration()
+
+            guard CMTimeCompare(videoDevice.activeVideoMinFrameDuration, requestedDuration) == 0,
+                  CMTimeCompare(videoDevice.activeVideoMaxFrameDuration, requestedDuration) == 0 else {
+                session.beginConfiguration()
+                session.removeOutput(output)
+                session.commitConfiguration()
+                Task { @MainActor in delegate.failed("The capture session did not retain the selected frame rate.") }
+                return
+            }
 
             output.startRecording(to: url, recordingDelegate: delegate)
         }
@@ -100,11 +152,13 @@ final class CaptureResource: @unchecked Sendable {
 
 enum CaptureFailure: LocalizedError {
     case unsupported
+    case unsupportedFrameRate
     case metalUnavailable
     
     var errorDescription: String? {
         switch self {
         case .unsupported: "This device or its video output cannot be added to a capture session."
+        case .unsupportedFrameRate: "The selected frame rate is no longer supported by this video format."
         case .metalUnavailable: "Metal is unavailable, so the video preview cannot be displayed."
     
         }
@@ -131,6 +185,7 @@ final class CaptureModel {
     var devices: [AVCaptureDevice] = []
     var audioDevices: [AVCaptureDevice] = []
     var selectedAudioID = ""
+    var selectedFrameRate = 0.0
     var preparingRecording = false
 
     private func refreshAudio(for videoDevice: AVCaptureDevice) {
@@ -144,6 +199,20 @@ final class CaptureModel {
         selectedAudioID = (videoDevice.hasMediaType(.audio) ? videoDevice : linked)?.uniqueID
             ?? audioDevices.first(where: { $0.localizedName == videoDevice.localizedName })?.uniqueID
             ?? AVCaptureDevice.default(for: .audio)?.uniqueID ?? audioDevices.first?.uniqueID ?? ""
+    }
+    var supportedFrameRates: [Double] {
+        guard case let .detail(device, _) = screen else { return [] }
+        let ranges = device.activeFormat.videoSupportedFrameRateRanges
+        let commonRates: [Double] = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60, 100, 120, 144, 240]
+        let boundaries = ranges.flatMap { [$0.minFrameRate, $0.maxFrameRate] }
+        let candidates = boundaries + commonRates.filter { rate in
+            !boundaries.contains(where: { abs($0 - rate) < 0.01 })
+        }
+        return candidates.filter { rate in
+            ranges.contains { rate >= $0.minFrameRate - 0.001 && rate <= $0.maxFrameRate + 0.001 }
+        }.sorted().reduce(into: [Double]()) { result, rate in
+            if result.last.map({ abs($0 - rate) > 0.01 }) ?? true { result.append(rate) }
+        }
     }
     var screen: Screen = .devices
     var message = ""
@@ -178,6 +247,9 @@ final class CaptureModel {
             let resource = try CaptureResource(device: device)
             refreshAudio(for: device)
             screen = .detail(device, resource)
+            let currentDuration = device.activeVideoMinFrameDuration.seconds
+            let currentRate = currentDuration > 0 ? 1 / currentDuration : 0
+            selectedFrameRate = supportedFrameRates.min(by: { abs($0 - currentRate) < abs($1 - currentRate) }) ?? 0
             resource.start()
         } catch {
             screen = .devices
@@ -204,9 +276,13 @@ final class CaptureModel {
             streamMessage = "No audio source is selected. Reopen the video source after connecting an audio device."
             return
         }
+        guard supportedFrameRates.contains(where: { abs($0 - selectedFrameRate) < 0.01 }) else {
+            streamMessage = "Select a supported frame rate before recording."
+            return
+        }
         streamMessage = ""
         do {
-            let recording = try MovieRecording(resource: resource, audioDevice: audioDevice)
+            let recording = try MovieRecording(resource: resource, audioDevice: audioDevice, frameRate: selectedFrameRate)
             screen = .record(device, recording)
             recording.start()
         } catch {
