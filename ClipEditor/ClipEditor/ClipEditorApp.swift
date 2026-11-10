@@ -31,11 +31,17 @@ struct ClipEditorApp: App {
     private let mappingURL = pathArgument(["--json", "-j"])
     private let attemptsURL = pathArgument(["--csv", "-c"])
     private let outputURL = pathArgument(["--output", "-o"])
+    private let gameDate: String? = {
+        let arguments = CommandLine.arguments.dropFirst()
+        guard let index = arguments.firstIndex(of: "--date"),
+              arguments.index(after: index) < arguments.endIndex else { return nil }
+        return String(arguments[arguments.index(after: index)])
+    }()
 
     var body: some Scene {
         WindowGroup {
             ContentView(videoURL: videoURL, mappingURL: mappingURL,
-                        attemptsURL: attemptsURL, outputURL: outputURL)
+                        attemptsURL: attemptsURL, outputURL: outputURL, gameDate: gameDate)
         }
     }
 }

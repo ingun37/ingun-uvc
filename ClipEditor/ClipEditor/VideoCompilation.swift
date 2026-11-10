@@ -5,7 +5,7 @@ import QuartzCore
 
 struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL,
-                       title: String? = nil, player: String? = nil) async throws {
+                       title: String? = nil, player: String? = nil, square: Bool = false) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -73,13 +73,23 @@ struct VideoCompilation {
             let transform = try await videoTrack.load(.preferredTransform)
             let natural = try await videoTrack.load(.naturalSize)
             let rect = CGRect(origin: .zero, size: natural).applying(transform)
-            let size = CGSize(width: abs(rect.width), height: abs(rect.height))
+            let sourceSize = CGSize(width: abs(rect.width), height: abs(rect.height))
+            let side = min(sourceSize.width, sourceSize.height)
+            let size = square ? CGSize(width: side, height: side) : sourceSize
             let videoComposition = AVMutableVideoComposition()
             videoComposition.renderSize = size
             videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
             let instruction = AVMutableVideoCompositionInstruction()
             instruction.timeRange = CMTimeRange(start: .zero, duration: cursor)
             let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: outputVideo)
+            if square {
+                outputVideo.preferredTransform = .identity
+                let centered = transform.concatenating(CGAffineTransform(
+                    translationX: -rect.minX + (side - sourceSize.width) / 2,
+                    y: -rect.minY + (side - sourceSize.height) / 2
+                ))
+                layerInstruction.setTransform(centered, at: .zero)
+            }
             instruction.layerInstructions = [layerInstruction]
             videoComposition.instructions = [instruction]
             let parent = CALayer(); parent.frame = CGRect(origin: .zero, size: size)

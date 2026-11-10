@@ -131,4 +131,18 @@ struct ClipEditorTests {
         let replacement = AVURLAsset(url: output)
         #expect(try await !replacement.loadTracks(withMediaType: .video).isEmpty)
     }
+
+    @Test func exportsSquarePlayerVideo() async throws {
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-square-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        try await VideoCompilation.export(videoURL: fixture,
+            clips: [Clip(start: 0.5, end: 2, descriptions: ["miss"])],
+            destination: output, title: "Player", player: "A|Player", square: true)
+        let track = try #require(await AVURLAsset(url: output).loadTracks(withMediaType: .video).first)
+        let size = try await track.load(.naturalSize)
+        #expect(abs(size.width - size.height) < 1)
+    }
 }

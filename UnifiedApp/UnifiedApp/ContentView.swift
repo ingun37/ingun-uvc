@@ -317,6 +317,7 @@ private final class Workflow {
             let arguments = [
                 "--video", videoPath, "--json", json.path,
                 "--csv", csv.path, "--output", output.path,
+                "--date", selectedGame.displayDate,
             ]
             _ = try await Task.detached {
                 try Runner.run(executable, arguments: arguments)

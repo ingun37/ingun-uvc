@@ -5,6 +5,41 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum TeamNames {
+    static let teamLongNames: [String: String] = [
+        "ATL": "Hawks",
+        "BOS": "Celtics",
+        "BKN": "Nets",
+        "CHA": "Hornets",
+        "CHI": "Bulls",
+        "CLE": "Cavs",
+        "DAL": "Mavs",
+        "DEN": "Nuggets",
+        "DET": "Pistons",
+        "GSW": "Warriors",
+        "HOU": "Rockets",
+        "IND": "Pacers",
+        "LAC": "Clippers",
+        "LAL": "Lakers",
+        "MEM": "Grizzlies",
+        "MIA": "Heat",
+        "MIL": "Bucks",
+        "MIN": "Wolves",
+        "NOP": "Pelicans",
+        "NYK": "Knicks",
+        "OKC": "Thunder",
+        "ORL": "Magic",
+        "PHI": "76ers",
+        "PHX": "Suns",
+        "POR": "Blazers",
+        "SAC": "Kings",
+        "SAS": "Spurs",
+        "TOR": "Raptors",
+        "UTA": "Jazz",
+        "WAS": "Wizards",
+    ]
+}
+
 private enum InputKind: String, CaseIterable, Hashable {
     case video = "Video"
     case mapping = "Game time mapping JSON"
@@ -41,6 +76,8 @@ private final class EditorModel {
     var clips: [Clip] = []
     var unmatched: [String] = []
     var videoDuration = 0.0
+    var teams: [String] = []
+    var gameDate: String?
     var message = ""
     var isBusy = false
     var exportedURL: URL?
@@ -97,6 +134,7 @@ private final class EditorModel {
             let duration = try await asset.load(.duration).seconds
             let ranges = try JSONDecoder().decode([ClockRange].self, from: Data(contentsOf: mapping))
             let csv = try String(contentsOf: attempts, encoding: .utf8)
+            teams = try ClipPlanner.teams(from: csv)
             let shots = try ClipPlanner.attempts(from: csv)
             let plan = try ClipPlanner.plan(attempts: shots, ranges: ranges, videoDuration: duration)
             videoDuration = duration
@@ -131,10 +169,17 @@ private final class EditorModel {
             var playerURLs: [URL] = []
             var usedNames: Set<String> = [destination.lastPathComponent.lowercased()]
             let compilationName = destination.deletingPathExtension().lastPathComponent
+            let dateText = gameDate ?? compilationName.components(separatedBy: " | ").last.flatMap {
+                $0 == compilationName ? nil : $0
+            } ?? "Unknown date"
             for group in groups {
                 let safeName = group.name.replacingOccurrences(of: #"[^\p{L}\p{N}._ -]"#,
                     with: "_", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
-                let base = "\(compilationName) - \(safeName.isEmpty ? "Unknown player" : safeName)"
+                let team = String(group.key.split(separator: "|", maxSplits: 1,
+                    omittingEmptySubsequences: false).first ?? "")
+                let opponent = teams.first { $0 != team } ?? "Unknown team"
+                let opponentName = TeamNames.teamLongNames[opponent] ?? opponent
+                let base = "\(safeName.isEmpty ? "Unknown player" : safeName)'s every bricks VS \(opponentName) | \(dateText)"
                 var name = base
                 var suffix = 2
                 while usedNames.contains("\(name).mp4".lowercased()) {
@@ -145,7 +190,7 @@ private final class EditorModel {
                 let url = destination.deletingLastPathComponent().appendingPathComponent("\(name).mp4")
                 message = "Exporting \(group.name)…"
                 try await VideoCompilation.export(videoURL: video, clips: group.clips, destination: url,
-                                                  title: group.name, player: group.key)
+                                                  title: group.name, player: group.key, square: true)
                 playerURLs.append(url)
             }
             exportedURL = destination
@@ -162,17 +207,19 @@ struct ContentView: View {
     let mappingURL: URL?
     let attemptsURL: URL?
     let outputURL: URL?
+    let gameDate: String?
     private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
     private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
 
     init(videoURL: URL? = nil, mappingURL: URL? = nil,
-         attemptsURL: URL? = nil, outputURL: URL? = nil) {
+         attemptsURL: URL? = nil, outputURL: URL? = nil, gameDate: String? = nil) {
         self.videoURL = videoURL
         self.mappingURL = mappingURL
         self.attemptsURL = attemptsURL
         self.outputURL = outputURL
+        self.gameDate = gameDate
     }
 
     var body: some View {
@@ -203,6 +250,7 @@ struct ContentView: View {
         .onAppear {
             guard !didLoadLaunchInputs else { return }
             didLoadLaunchInputs = true
+            model.gameDate = gameDate
             var invalidPaths: [String] = []
             for (kind, url) in [(InputKind.video, videoURL), (.mapping, mappingURL),
                                 (.attempts, attemptsURL)] {

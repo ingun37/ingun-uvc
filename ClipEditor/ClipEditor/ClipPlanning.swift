@@ -90,6 +90,15 @@ enum ClipPlanner {
         }
     }
 
+    static func teams(from text: String) throws -> [String] {
+        let rows = try csvRows(text)
+        guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
+              let teamIndex = header.firstIndex(of: "team") else { return [] }
+        return Array(Set(rows.dropFirst().compactMap { row in
+            row.indices.contains(teamIndex) ? row[teamIndex].trimmingCharacters(in: .whitespacesAndNewlines) : nil
+        }.filter { !$0.isEmpty })).sorted()
+    }
+
     static func attempts(from text: String) throws -> [MissedAttempt] {
         let rows = try csvRows(text)
         guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),

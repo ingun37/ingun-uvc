@@ -2,7 +2,7 @@
 
 This macOS SwiftUI app orchestrates `data_fetcher/main.py` through interactive zsh with `data_fetcher/.venv` activated, `GametimeMapper/build/GametimeMapperUI.app`, `ClipEditor/build/ClipEditor.app`, and `thumbnail-web/render-thumbnail.mjs`. Read the affected projects' AGENTS.md files before changing an integration.
 
-Keep the game ID as a 10-digit string. Parse `games` output as game ID, date, home team, and away team. Fetch attempts to a staging CSV before the video is chosen, preserving retry behavior. After the user chooses the video, write `<video name>-<game id>.csv` beside it. Pass the same video path to both child apps. Pass `<video name>-map.json`, also beside the video, as the output path to GametimeMapperUI and wait for it to exit and produce the file. Pass the video, JSON, CSV, and compilation output paths to ClipEditor and wait for it to exit. ClipEditor also saves player videos beside the compilation.
+Keep the game ID as a 10-digit string. Parse `games` output as game ID, date, home team, and away team. Fetch attempts to a staging CSV before the video is chosen, preserving retry behavior. After the user chooses the video, write `<video name>-<game id>.csv` beside it. Pass the same video path to both child apps. Pass `<video name>-map.json`, also beside the video, as the output path to GametimeMapperUI and wait for it to exit and produce the file. Pass the video, JSON, CSV, compilation output paths, and formatted game date (`--date`) to ClipEditor and wait for it to exit. ClipEditor also saves square player videos beside the compilation.
 
 Show the running UnifiedApp bundle version in the top-right corner. ClipEditor
 runs without App Sandbox so the paths passed on the command line remain
