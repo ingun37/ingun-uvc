@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import Combine
 import Foundation
 import Observation
@@ -7,19 +7,65 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 private struct Game: Identifiable {
+    // Edit these values to change the names used in compilation filenames.
+    private static let teamLongNames: [String: String] = [
+        "ATL": "Hawks",
+        "BOS": "Celtics",
+        "BKN": "Nets",
+        "CHA": "Hornets",
+        "CHI": "Bulls",
+        "CLE": "Cavs",
+        "DAL": "Mavs",
+        "DEN": "Nuggets",
+        "DET": "Pistons",
+        "GSW": "Warriors",
+        "HOU": "Rockets",
+        "IND": "Pacers",
+        "LAC": "Clippers",
+        "LAL": "Lakers",
+        "MEM": "Grizzlies",
+        "MIA": "Heat",
+        "MIL": "Bucks",
+        "MIN": "Wolves",
+        "NOP": "Pelicans",
+        "NYK": "Knicks",
+        "OKC": "Thunder",
+        "ORL": "Magic",
+        "PHI": "76ers",
+        "PHX": "Suns",
+        "POR": "Blazers",
+        "SAC": "Kings",
+        "SAS": "Spurs",
+        "TOR": "Raptors",
+        "UTA": "Jazz",
+        "WAS": "Wizards",
+    ]
+
     let id: String
     let date: String
     let teams: String
     let home: String
     let away: String
 
+    var compilationFilename: String {
+        let homeName = Self.teamLongNames[home] ?? home
+        let awayName = Self.teamLongNames[away] ?? away
+        return "\(homeName) VS \(awayName) | Bricklights | \(date).mp4"
+    }
+
     static func parse(_ output: String) -> [Game] {
         output.split(whereSeparator: \.isNewline).compactMap { line in
             let parts = line.split(whereSeparator: \.isWhitespace)
             guard parts.count >= 4, parts[0].count == 10,
-                  parts[0].allSatisfy(\.isNumber) else { return nil }
-            return Game(id: String(parts[0]), date: String(parts[1]),
-                        teams: "\(parts[2]) vs \(parts[3])", home: String(parts[2]), away: String(parts[3]))
+                parts[0].allSatisfy(\.isNumber)
+            else { return nil }
+            return Game(
+                id: String(parts[0]),
+                date: String(parts[1]),
+                teams: "\(parts[2]) vs \(parts[3])",
+                home: String(parts[2]),
+                away: String(parts[3])
+            )
         }
     }
 }
@@ -27,7 +73,11 @@ private struct Game: Identifiable {
 private enum Runner {
     nonisolated static let root: URL = {
         let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        if FileManager.default.fileExists(atPath: cwd.appending(path: "data_fetcher").path) { return cwd }
+        if FileManager.default.fileExists(
+            atPath: cwd.appending(path: "data_fetcher").path
+        ) {
+            return cwd
+        }
         return URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
     }()
@@ -40,9 +90,17 @@ private enum Runner {
         return url
     }
 
-    nonisolated static func run(_ executable: URL, arguments: [String], environment: [String: String] = [:]) throws -> String {
-        let output = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-        let error = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    nonisolated static func run(
+        _ executable: URL,
+        arguments: [String],
+        environment: [String: String] = [:]
+    ) throws -> String {
+        let output = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString
+        )
+        let error = FileManager.default.temporaryDirectory.appending(
+            path: UUID().uuidString
+        )
         FileManager.default.createFile(atPath: output.path, contents: nil)
         FileManager.default.createFile(atPath: error.path, contents: nil)
         defer {
@@ -52,19 +110,26 @@ private enum Runner {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
-        process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+        process.environment = ProcessInfo.processInfo.environment.merging(
+            environment
+        ) { _, new in new }
         process.standardOutput = try FileHandle(forWritingTo: output)
         process.standardError = try FileHandle(forWritingTo: error)
         try process.run()
         process.waitUntilExit()
         let stderr = (try? String(contentsOf: error, encoding: .utf8)) ?? ""
         guard process.terminationStatus == 0 else {
-            throw RunError.failed(stderr.isEmpty ? "Process exited with status \(process.terminationStatus)." : stderr)
+            throw RunError.failed(
+                stderr.isEmpty
+                    ? "Process exited with status \(process.terminationStatus)."
+                    : stderr
+            )
         }
         return (try? String(contentsOf: output, encoding: .utf8)) ?? ""
     }
 
-    nonisolated static func runDataFetcher(arguments: [String]) throws -> String {
+    nonisolated static func runDataFetcher(arguments: [String]) throws -> String
+    {
         let activate = root.appending(path: "data_fetcher/.venv/bin/activate")
         let script = root.appending(path: "data_fetcher/main.py")
         guard FileManager.default.fileExists(atPath: activate.path) else {
@@ -73,14 +138,22 @@ private enum Runner {
         guard FileManager.default.fileExists(atPath: script.path) else {
             throw RunError.missing("data_fetcher/main.py")
         }
-        return try run(URL(fileURLWithPath: "/bin/zsh"),
-                       arguments: ["-ic", "source \"$1\" && shift && exec python \"$@\"",
-                                   "data-fetcher", activate.path, script.path] + arguments)
+        return try run(
+            URL(fileURLWithPath: "/bin/zsh"),
+            arguments: [
+                "-ic", "source \"$1\" && shift && exec python \"$@\"",
+                "data-fetcher", activate.path, script.path,
+            ] + arguments
+        )
     }
 
-    nonisolated static func appExecutable(_ relativePath: String, name: String) throws -> URL {
+    nonisolated static func appExecutable(_ relativePath: String, name: String)
+        throws -> URL
+    {
         let bundle = root.appending(path: relativePath)
-        guard FileManager.default.fileExists(atPath: bundle.path) else { throw RunError.missing(relativePath) }
+        guard FileManager.default.fileExists(atPath: bundle.path) else {
+            throw RunError.missing(relativePath)
+        }
         return try executable(relativePath + "/Contents/MacOS/" + name)
     }
 
@@ -89,8 +162,10 @@ private enum Runner {
         var errorDescription: String? {
             switch self {
             case .missing(let path): "Required executable is missing: \(path)"
-            case .failed(let message): message.trimmingCharacters(in: .whitespacesAndNewlines)
-            case .missingOutput(let path): "The app closed without creating \(path)."
+            case .failed(let message):
+                message.trimmingCharacters(in: .whitespacesAndNewlines)
+            case .missingOutput(let path):
+                "The app closed without creating \(path)."
             }
         }
     }
@@ -107,7 +182,10 @@ private final class Workflow {
     var selectedGame: Game?
     var videoURL: URL?
     private let tempDirectory = FileManager.default.temporaryDirectory
-        .appending(path: "unified-app-\(UUID().uuidString)", directoryHint: .isDirectory)
+        .appending(
+            path: "unified-app-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
     private var csvURL: URL { tempDirectory.appending(path: "attempts.csv") }
     private var jsonURL: URL { tempDirectory.appending(path: "mapping.json") }
 
@@ -122,16 +200,23 @@ private final class Workflow {
     }
 
     func query() async {
-        guard let number = Int(page), number > 0 else { message = "Enter a positive page number."; return }
+        guard let number = Int(page), number > 0 else {
+            message = "Enter a positive page number."
+            return
+        }
         busy = true
         message = "Querying games…"
         defer { busy = false }
         do {
             let output = try await Task.detached {
-                try Runner.runDataFetcher(arguments: ["games", "--page", String(number)])
+                try Runner.runDataFetcher(arguments: [
+                    "games", "--page", String(number),
+                ])
             }.value
             games = Game.parse(output)
-            message = games.isEmpty ? output.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+            message =
+                games.isEmpty
+                ? output.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         } catch { message = error.localizedDescription }
     }
 
@@ -142,12 +227,19 @@ private final class Workflow {
         message = "Fetching attempts for \(game.id)…"
         defer { busy = false }
         do {
-            try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: tempDirectory,
+                withIntermediateDirectories: true
+            )
             let csv = csvURL
             _ = try await Task.detached {
-                try Runner.runDataFetcher(arguments: ["attempts", game.id, "--output", csv.path])
+                try Runner.runDataFetcher(arguments: [
+                    "attempts", game.id, "--output", csv.path,
+                ])
             }.value
-            guard FileManager.default.fileExists(atPath: csv.path) else { throw Runner.RunError.missingOutput(csv.path) }
+            guard FileManager.default.fileExists(atPath: csv.path) else {
+                throw Runner.RunError.missingOutput(csv.path)
+            }
             scene = .video
             message = "Choose the source video."
         } catch { message = error.localizedDescription }
@@ -158,12 +250,22 @@ private final class Workflow {
         busy = true
         defer { busy = false }
         do {
-            let executable = try Runner.appExecutable("GametimeMapper/build/GametimeMapperUI.app", name: "GametimeMapperUI")
+            let executable = try Runner.appExecutable(
+                "GametimeMapper/build/GametimeMapperUI.app",
+                name: "GametimeMapperUI"
+            )
             let json = jsonURL
             _ = try await Task.detached {
-                try Runner.run(executable, arguments: ["--video", videoURL.path, "--output", json.path])
+                try Runner.run(
+                    executable,
+                    arguments: [
+                        "--video", videoURL.path, "--output", json.path,
+                    ]
+                )
             }.value
-            guard FileManager.default.fileExists(atPath: json.path) else { throw Runner.RunError.missingOutput(json.path) }
+            guard FileManager.default.fileExists(atPath: json.path) else {
+                throw Runner.RunError.missingOutput(json.path)
+            }
             scene = .editor
             message = "ClipEditor is open. Finish the compilation there."
             await runEditor(videoPath: videoURL.path)
@@ -171,16 +273,26 @@ private final class Workflow {
     }
 
     func runEditor(videoPath: String) async {
+        guard let selectedGame else { return }
         busy = true
         defer { busy = false }
         do {
-            let executable = try Runner.appExecutable("ClipEditor/build/ClipEditor.app", name: "ClipEditor")
+            let executable = try Runner.appExecutable(
+                "ClipEditor/build/ClipEditor.app",
+                name: "ClipEditor"
+            )
             let video = URL(fileURLWithPath: videoPath)
-            let output = video.deletingLastPathComponent().appendingPathComponent(
-                video.deletingPathExtension().lastPathComponent + "-compilation.mp4")
-            let arguments = ["--video", videoPath, "--json", jsonURL.path,
-                             "--csv", csvURL.path, "--output", output.path]
-            _ = try await Task.detached { try Runner.run(executable, arguments: arguments) }.value
+            let output = video.deletingLastPathComponent()
+                .appendingPathComponent(
+                    selectedGame.compilationFilename
+                )
+            let arguments = [
+                "--video", videoPath, "--json", jsonURL.path,
+                "--csv", csvURL.path, "--output", output.path,
+            ]
+            _ = try await Task.detached {
+                try Runner.run(executable, arguments: arguments)
+            }.value
             scene = .thumbnail
             message = "Select a frame region for the thumbnail."
         } catch { message = error.localizedDescription }
@@ -195,30 +307,65 @@ private final class Workflow {
             let asset = AVURLAsset(url: videoURL)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            let frame = try generator.copyCGImage(at: CMTime(seconds: time, preferredTimescale: 600), actualTime: nil)
-            let width = CGFloat(frame.width), height = CGFloat(frame.height)
-            let crop = CGRect(x: selection.minX * width, y: selection.minY * height,
-                              width: selection.width * width, height: selection.height * height).integral
+            let frame = try generator.copyCGImage(
+                at: CMTime(seconds: time, preferredTimescale: 600),
+                actualTime: nil
+            )
+            let width = CGFloat(frame.width)
+            let height = CGFloat(frame.height)
+            let crop = CGRect(
+                x: selection.minX * width,
+                y: selection.minY * height,
+                width: selection.width * width,
+                height: selection.height * height
+            ).integral
             guard let image = frame.cropping(to: crop),
-                  let data = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.9]) else {
-                throw Runner.RunError.failed("Could not crop the selected frame region.")
+                let data = NSBitmapImageRep(cgImage: image).representation(
+                    using: .jpeg,
+                    properties: [.compressionFactor: 0.9]
+                )
+            else {
+                throw Runner.RunError.failed(
+                    "Could not crop the selected frame region."
+                )
             }
-            let background = tempDirectory.appending(path: "thumbnail-background.jpg")
+            let background = tempDirectory.appending(
+                path: "thumbnail-background.jpg"
+            )
             try data.write(to: background)
-            let output = videoURL.deletingLastPathComponent().appendingPathComponent(
-                videoURL.deletingPathExtension().lastPathComponent + "-thumbnail.jpg")
-            let script = Runner.root.appending(path: "thumbnail-web/render-thumbnail.mjs")
+            let output = videoURL.deletingLastPathComponent()
+                .appendingPathComponent(
+                    videoURL.deletingPathExtension().lastPathComponent
+                        + "-thumbnail.jpg"
+                )
+            let script = Runner.root.appending(
+                path: "thumbnail-web/render-thumbnail.mjs"
+            )
             let shell = URL(fileURLWithPath: "/bin/zsh")
-            let inputDate = ISO8601DateFormatter().date(from: selectedGame.date + "T00:00:00Z")
-            let displayDate = inputDate.map { date in
-                date.formatted(.dateTime.month(.abbreviated).day().year().locale(Locale(identifier: "en_US_POSIX")))
-            } ?? selectedGame.date
+            let inputDate = ISO8601DateFormatter().date(
+                from: selectedGame.date + "T00:00:00Z"
+            )
+            let displayDate =
+                inputDate.map { date in
+                    date.formatted(
+                        .dateTime.month(.abbreviated).day().year().locale(
+                            Locale(identifier: "en_US_POSIX")
+                        )
+                    )
+                } ?? selectedGame.date
             _ = try await Task.detached {
-                try Runner.run(shell, arguments: ["-ic", "exec node \"$@\"", "thumbnail-render",
-                                                  script.path, background.path, selectedGame.home,
-                                                  selectedGame.away, displayDate, output.path])
+                try Runner.run(
+                    shell,
+                    arguments: [
+                        "-ic", "exec node \"$@\"", "thumbnail-render",
+                        script.path, background.path, selectedGame.home,
+                        selectedGame.away, displayDate, output.path,
+                    ]
+                )
             }.value
-            guard FileManager.default.fileExists(atPath: output.path) else { throw Runner.RunError.missingOutput(output.path) }
+            guard FileManager.default.fileExists(atPath: output.path) else {
+                throw Runner.RunError.missingOutput(output.path)
+            }
             scene = .done
             message = "Thumbnail saved to \(output.path)."
         } catch { message = error.localizedDescription }
@@ -233,7 +380,9 @@ struct ContentView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Unified App").font(.largeTitle.bold())
                 Spacer()
-                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                if let version = Bundle.main.object(
+                    forInfoDictionaryKey: "CFBundleShortVersionString"
+                ) as? String {
                     Text("v\(version)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -244,15 +393,21 @@ struct ContentView: View {
             case .games:
                 HStack {
                     Text("Page")
-                    TextField("Page number", text: $workflow.page).frame(width: 90)
-                    Button("Query") { Task { await workflow.query() } }.disabled(workflow.busy)
+                    TextField("Page number", text: $workflow.page).frame(
+                        width: 90
+                    )
+                    Button("Query") { Task { await workflow.query() } }
+                        .disabled(workflow.busy)
                 }
                 List(workflow.games) { game in
                     Button {
                         Task { await workflow.select(game) }
                     } label: {
                         HStack {
-                            Text(game.date).frame(width: 110, alignment: .leading)
+                            Text(game.date).frame(
+                                width: 110,
+                                alignment: .leading
+                            )
                             Text(game.teams)
                             Spacer()
                             Text(game.id).foregroundStyle(.secondary)
@@ -262,14 +417,24 @@ struct ContentView: View {
                 }
             case .attempts, .mapper, .editor:
                 if workflow.busy {
-                    ProgressView(workflow.scene == .attempts ? "Fetching attempts…" :
-                                 workflow.scene == .mapper ? "Waiting for GametimeMapperUI…" :
-                                 "Waiting for ClipEditor…")
-                } else if workflow.scene == .attempts, let game = workflow.selectedGame {
-                    Button("Retry fetching attempts") { Task { await workflow.select(game) } }
+                    ProgressView(
+                        workflow.scene == .attempts
+                            ? "Fetching attempts…"
+                            : workflow.scene == .mapper
+                                ? "Waiting for GametimeMapperUI…"
+                                : "Waiting for ClipEditor…"
+                    )
+                } else if workflow.scene == .attempts,
+                    let game = workflow.selectedGame
+                {
+                    Button("Retry fetching attempts") {
+                        Task { await workflow.select(game) }
+                    }
                     Button("Back to games") { workflow.scene = .games }
                 } else if workflow.scene == .mapper {
-                    Button("Retry GametimeMapperUI") { Task { await workflow.runMapper() } }
+                    Button("Retry GametimeMapperUI") {
+                        Task { await workflow.runMapper() }
+                    }
                 }
                 Spacer()
             case .video:
@@ -277,8 +442,16 @@ struct ContentView: View {
                 Spacer()
             case .thumbnail:
                 if let videoURL = workflow.videoURL {
-                    ThumbnailSelectionView(videoURL: videoURL, busy: workflow.busy) { selection, time in
-                        Task { await workflow.generateThumbnail(selection: selection, time: time) }
+                    ThumbnailSelectionView(
+                        videoURL: videoURL,
+                        busy: workflow.busy
+                    ) { selection, time in
+                        Task {
+                            await workflow.generateThumbnail(
+                                selection: selection,
+                                time: time
+                            )
+                        }
                     }
                 }
             case .done:
@@ -307,24 +480,36 @@ private struct ThumbnailSelectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Thumbnail Generation").font(.title2.bold())
-            Text("Play or scrub to a frame, then drag one rectangle over the video. Drag again to replace it.")
+            Text(
+                "Play or scrub to a frame, then drag one rectangle over the video. Drag again to replace it."
+            )
             ThumbnailRegionView(player: player, selection: $selection)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
                 Button(playing ? "Pause" : "Play") {
                     if playing { player.pause() } else { player.play() }
                 }
-                Slider(value: Binding(
-                    get: { currentTime },
-                    set: { time in
-                        currentTime = time
-                        player.seek(to: CMTime(seconds: time, preferredTimescale: 600),
-                                    toleranceBefore: .zero, toleranceAfter: .zero)
-                    }
-                ), in: 0...max(duration, 0.01)) { editing in
+                Slider(
+                    value: Binding(
+                        get: { currentTime },
+                        set: { time in
+                            currentTime = time
+                            player.seek(
+                                to: CMTime(
+                                    seconds: time,
+                                    preferredTimescale: 600
+                                ),
+                                toleranceBefore: .zero,
+                                toleranceAfter: .zero
+                            )
+                        }
+                    ),
+                    in: 0...max(duration, 0.01)
+                ) { editing in
                     if editing { player.pause() }
                 }
-                Text(String(format: "%.1f / %.1f s", currentTime, duration)).monospacedDigit()
+                Text(String(format: "%.1f / %.1f s", currentTime, duration))
+                    .monospacedDigit()
             }
             Button(busy ? "Generating…" : "Generate Thumbnail") {
                 if let selection { generate(selection, currentTime) }
@@ -336,11 +521,16 @@ private struct ThumbnailSelectionView: View {
             duration = (try? await asset.load(.duration).seconds) ?? 1
             player.replaceCurrentItem(with: AVPlayerItem(asset: asset))
         }
-        .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { _ in
+        .onReceive(
+            Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+        ) { _ in
             playing = player.rate != 0
             if playing { currentTime = player.currentTime().seconds }
         }
-        .onDisappear { player.pause(); player.replaceCurrentItem(with: nil) }
+        .onDisappear {
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+        }
     }
 }
 
@@ -381,7 +571,8 @@ private final class ThumbnailRegionNSView: NSView {
         playerLayer.videoGravity = .resizeAspect
         layer?.addSublayer(playerLayer)
         outline.strokeColor = NSColor.systemYellow.cgColor
-        outline.fillColor = NSColor.systemYellow.withAlphaComponent(0.15).cgColor
+        outline.fillColor =
+            NSColor.systemYellow.withAlphaComponent(0.15).cgColor
         outline.lineWidth = 2
         layer?.addSublayer(outline)
     }
@@ -393,17 +584,28 @@ private final class ThumbnailRegionNSView: NSView {
         drawOutline()
     }
     private func drawOutline() {
-        guard let selection else { outline.path = nil; return }
+        guard let selection else {
+            outline.path = nil
+            return
+        }
         let video = playerLayer.videoRect
-        outline.path = CGPath(rect: CGRect(x: video.minX + selection.minX * video.width,
-                                           y: video.minY + selection.minY * video.height,
-                                           width: selection.width * video.width,
-                                           height: selection.height * video.height), transform: nil)
+        outline.path = CGPath(
+            rect: CGRect(
+                x: video.minX + selection.minX * video.width,
+                y: video.minY + selection.minY * video.height,
+                width: selection.width * video.width,
+                height: selection.height * video.height
+            ),
+            transform: nil
+        )
     }
     private func point(_ event: NSEvent) -> CGPoint {
-        let p = convert(event.locationInWindow, from: nil), video = playerLayer.videoRect
-        return CGPoint(x: min(max(p.x, video.minX), video.maxX),
-                       y: min(max(p.y, video.minY), video.maxY))
+        let p = convert(event.locationInWindow, from: nil)
+        let video = playerLayer.videoRect
+        return CGPoint(
+            x: min(max(p.x, video.minX), video.maxX),
+            y: min(max(p.y, video.minY), video.maxY)
+        )
     }
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
@@ -412,17 +614,32 @@ private final class ThumbnailRegionNSView: NSView {
         selection = nil
         onChange?(nil)
     }
-    override func mouseDragged(with event: NSEvent) { update(event, finished: false) }
-    override func mouseUp(with event: NSEvent) { update(event, finished: true); start = nil }
+    override func mouseDragged(with event: NSEvent) {
+        update(event, finished: false)
+    }
+    override func mouseUp(with event: NSEvent) {
+        update(event, finished: true)
+        start = nil
+    }
     private func update(_ event: NSEvent, finished: Bool) {
         guard let start else { return }
-        let end = point(event), video = playerLayer.videoRect
-        let rect = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
-                          width: abs(start.x - end.x), height: abs(start.y - end.y))
-        selection = finished && (rect.width < 4 || rect.height < 4) ? nil :
-            CGRect(x: (rect.minX - video.minX) / video.width,
-                   y: (rect.minY - video.minY) / video.height,
-                   width: rect.width / video.width, height: rect.height / video.height)
+        let end = point(event)
+        let video = playerLayer.videoRect
+        let rect = CGRect(
+            x: min(start.x, end.x),
+            y: min(start.y, end.y),
+            width: abs(start.x - end.x),
+            height: abs(start.y - end.y)
+        )
+        selection =
+            finished && (rect.width < 4 || rect.height < 4)
+            ? nil
+            : CGRect(
+                x: (rect.minX - video.minX) / video.width,
+                y: (rect.minY - video.minY) / video.height,
+                width: rect.width / video.width,
+                height: rect.height / video.height
+            )
         onChange?(selection)
     }
 }
