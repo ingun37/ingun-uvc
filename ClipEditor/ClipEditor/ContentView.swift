@@ -179,7 +179,7 @@ private final class EditorModel {
                     omittingEmptySubsequences: false).first ?? "")
                 let opponent = teams.first { $0 != team } ?? "Unknown team"
                 let opponentName = TeamNames.teamLongNames[opponent] ?? opponent
-                let base = "\(safeName.isEmpty ? "Unknown player" : safeName)'s every bricks VS \(opponentName) | \(dateText)"
+                let base = "\(safeName.isEmpty ? "Unknown player" : safeName) | every brick VS \(opponentName) | \(dateText)"
                 var name = base
                 var suffix = 2
                 while usedNames.contains("\(name).mp4".lowercased()) {
