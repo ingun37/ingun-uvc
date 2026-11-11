@@ -7,6 +7,19 @@ import Testing
 private final class FixtureBundleAnchor {}
 
 struct TheMapperTests {
+    @Test func doubleDigitUnderMinuteClock() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .doubleDigit)
+        #expect(GameTimeReader.parse(["2ND", "16.1"], format: format) ==
+                .init(period: "2ND", gameSecond: 16.1))
+        #expect(GameTimeReader.parse(["2ND", "06.1"], format: format) ==
+                .init(period: "2ND", gameSecond: 6.1))
+        #expect(GameTimeReader.parse(["2ND", "6.1"], format: format) == nil)
+        #expect(GameTimeReader.parse(["2ND", ":06.1"], format: format) == nil)
+        #expect(GameTimeReader.parse(["2ND", "1:16"], format: format) ==
+                .init(period: "2ND", gameSecond: 76))
+    }
+
     // Placeholder answers. Edit these values when you label the images.
     // Add one row whenever you add a PNG fixture.
     private static let presetA: [(fileTime: String, period: String, seconds: Double)] = [
