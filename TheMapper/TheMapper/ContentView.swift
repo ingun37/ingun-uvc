@@ -9,6 +9,10 @@ struct ContentView: View {
     let outputURL: URL?
     let launchVideoURL: URL?
 
+    private var bundleVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
+
     private enum Step { case choose, select, format, process }
     private struct ChartPoint: Identifiable {
         let id: Int
@@ -89,6 +93,7 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 760, minHeight: 570)
+        .navigationTitle("The Mapper v\(bundleVersion)")
         .onAppear {
             guard !didStart else { return }
             didStart = true
