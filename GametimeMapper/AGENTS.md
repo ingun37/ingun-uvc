@@ -1,6 +1,6 @@
-# GametimeMapper
+# GametimeMapper (legacy)
 
-This project has a macOS Swift CLI (`GametimeMapper`) and SwiftUI app
+This legacy project has a macOS Swift CLI (`GametimeMapper`) and SwiftUI app
 (`GametimeMapperUI`) that share `GametimeMapper/GameTimeMapper.swift`. Target the
 current macOS SDK. Use AVFoundation for video decoding, Vision for OCR, and Swift
 Charts for the app's graph. Follow RAII, avoid nullable stored properties where
@@ -43,7 +43,7 @@ practical, and prefer immutable values.
   the prior clock change and all OCR texts, with a button to remove that raw
   sample. The UI calls `merge(...)` only when the user clicks **Next** after
   review. The save dialog defaults to the video directory and `<video name>.json`.
-- `GametimeMapperUIApp.swift` accepts optional `--video/-v PATH` and `--output/-o PATH`. A video path skips the initial picker; an output path saves JSON directly after review and skips the save-location stage. UnifiedApp passes both paths. The app no longer writes a video-path handoff file.
+- `GametimeMapperUIApp.swift` accepts optional `--video/-v PATH` and `--output/-o PATH`. A video path skips the initial picker; an output path saves JSON directly after review and skips the save-location stage. UnifiedApp now launches TheMapper instead. The app no longer writes a video-path handoff file.
 - `GametimeMapperUI/VideoRegionView.swift` handles the one-at-a-time rectangle
   and converts displayed video coordinates to Vision's region of interest,
   including video rotation.

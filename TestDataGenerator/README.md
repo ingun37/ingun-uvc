@@ -34,7 +34,7 @@ The default clip starts 3 seconds before the shot and ends 3 seconds after it. `
 
 ## Input and output
 
-The mapping JSON comes from `GametimeMapper/`. The attempts CSV comes from `data_fetcher/` and must contain `period` and `clock` columns. The clock uses an ISO 8601 duration such as `PT11M33.00S`.
+The mapping JSON comes from `TheMapper/`. The attempts CSV comes from `data_fetcher/` and must contain `period` and `clock` columns. The clock uses an ISO 8601 duration such as `PT11M33.00S`.
 
 Each located attempt produces `attempt-0001.mp4` and `attempt-0001.json`, with the number based on its CSV row order. The JSON contains the original CSV values under `attempt`, plus:
 

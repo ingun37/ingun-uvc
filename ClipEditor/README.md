@@ -1,7 +1,7 @@
 # ClipEditor
 
 ClipEditor combines missed NBA field goals into a video. Select a source video,
-the game time mapping JSON from GametimeMapper, and the attempts CSV from
+the game time mapping JSON from TheMapper, and the attempts CSV from
 data_fetcher. Review the mapped clips, adjust their start and end times, and
 choose which clips to include before exporting.
 

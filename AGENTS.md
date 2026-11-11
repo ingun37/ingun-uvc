@@ -7,11 +7,11 @@ This repository contains multiple projects:
   Capture-card frame-rate behavior requires hardware validation. Before working
   on this project, read and follow
   [streamer/AGENTS.md](streamer/AGENTS.md).
-- `GametimeMapper/`: native macOS SwiftUI app and Swift CLI for mapping video time
-  to the basketball game clock. The app supports scoreboard selection and manual
-  filtering of OCR samples before merging.
-  Before working on this project, read and follow
-  [GametimeMapper/AGENTS.md](GametimeMapper/AGENTS.md).
+- `TheMapper/`: native macOS SwiftUI app that maps video time to the basketball
+  game clock with divide-and-conquer OCR. Before working on this project, read
+  and follow [TheMapper/AGENTS.md](TheMapper/AGENTS.md).
+- `GametimeMapper/`: legacy mapper app and CLI, retained for reference. Before
+  working on it, read [GametimeMapper/AGENTS.md](GametimeMapper/AGENTS.md).
 - `data_fetcher/`: Python CLI program that fetches field goal attempts of a NBA game.
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
 - `ClipEditor/`: native macOS SwiftUI app for missed-shot compilations and
