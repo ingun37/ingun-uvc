@@ -23,7 +23,7 @@ struct ContentView: View {
 
     private enum ProcessEvent: Sendable {
         case sample(GameTimeMapper.Sample)
-        case finished(GameTimeMapper.RawReadings)
+        case finished(GameTimeMapper.RawReadings, Double)
         case failed(String)
     }
 
@@ -536,10 +536,11 @@ struct ContentView: View {
         let events = AsyncStream<ProcessEvent> { continuation in
             Task.detached(priority: .userInitiated) {
                 do {
+                    let started = CFAbsoluteTimeGetCurrent()
                     let result = try await GameTimeMapper.sample(
                         videoURL: videoURL, regionOfInterest: visionRegion, format: format,
                         onSample: { continuation.yield(.sample($0)) })
-                    continuation.yield(.finished(result))
+                    continuation.yield(.finished(result, CFAbsoluteTimeGetCurrent() - started))
                 } catch {
                     continuation.yield(.failed(error.localizedDescription))
                 }
@@ -550,10 +551,11 @@ struct ContentView: View {
             for await event in events {
                 switch event {
                 case .sample(let sample):
-                    logLines.append(sample.logLine)
-                case .finished(let result):
+                    if !sample.ocrTexts.isEmpty { logLines.append(sample.logLine) }
+                case .finished(let result, let elapsed):
                     rawReadings = result
                     chartSamples = chartSamplesFor(result.samples)
+                    logLines.append(String(format: "Finished: %.2f s elapsed", elapsed))
                     processing = false
                 case .failed(let message):
                     errorMessage = message

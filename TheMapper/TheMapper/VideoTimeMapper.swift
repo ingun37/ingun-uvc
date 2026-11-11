@@ -23,6 +23,7 @@ nonisolated enum VideoTimeMapper {
                     margin: Double = 0.6,
                     recognize: Recognizer? = nil,
                     log: (String) -> Void = { _ in }) async throws -> [Interval] {
+        let started = CFAbsoluteTimeGetCurrent()
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else {
             throw MappingError.noVideo
@@ -63,7 +64,9 @@ nonisolated enum VideoTimeMapper {
             cache[time] = result
             let clock = result.map { "\($0.period) \($0.gameSecond)s" } ?? "no clock detected"
             let ocr = texts.map { " | OCR \($0)" } ?? ""
-            log(String(format: "%.2fs → %@%@", time, clock, ocr))
+            if texts?.isEmpty != true {
+                log(String(format: "%.2fs → %@%@", time, clock, ocr))
+            }
             return result
         }
 
@@ -87,8 +90,16 @@ nonisolated enum VideoTimeMapper {
             return try divide(start, middle) + divide(middle, end)
         }
 
-        let intervals = merge(try divide(0, lastTime), margin: margin)
-        log("Finished: \(intervals.count) intervals")
+        let found = try divide(0, lastTime)
+        let intervals = merge(found, margin: margin)
+        let continuous = found.filter { $0.kind == .continuous }
+            .reduce(0.0) { $0 + $1.videoEnd - $1.videoStart }
+        let paused = found.filter { $0.kind == .paused }
+            .reduce(0.0) { $0 + $1.videoEnd - $1.videoStart }
+        log(String(format: "Finished: %.2f s elapsed | %d intervals | continuous %.2f s, paused %.2f s, covered %.2f / %.2f s | %d OCR frames (%.0f at 0.5 s sampling)",
+                   CFAbsoluteTimeGetCurrent() - started, intervals.count,
+                   continuous, paused, continuous + paused, duration,
+                   cache.count, ceil(duration / 0.5)))
         return intervals
     }
 
