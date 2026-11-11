@@ -233,6 +233,19 @@ struct GametimeMapperTests {
         #expect(GameTimeMapper.parse(["2ND", ":09.8"], format: custom) == nil)
     }
 
+    @Test func doubleDigitUnderMinuteClock() {
+        let format = GameTimeMapper.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .doubleDigit)
+        #expect(GameTimeMapper.parse(["2ND", "16.1"], format: format) ==
+                .init(period: "2ND", gameSecond: 16.1))
+        #expect(GameTimeMapper.parse(["2ND", "06.1"], format: format) ==
+                .init(period: "2ND", gameSecond: 6.1))
+        #expect(GameTimeMapper.parse(["2ND", "0.1"], format: format) == nil)
+        #expect(GameTimeMapper.parse(["2ND", ":06.1"], format: format) == nil)
+        #expect(GameTimeMapper.parse(["2ND", "1:16"], format: format) ==
+                .init(period: "2ND", gameSecond: 76))
+    }
+
     @Test func parsesCyrillicLookalikesInShortPeriodLabels() {
         let short = GameTimeMapper.ScoreboardFormat.Preset.a.format
         let long = GameTimeMapper.ScoreboardFormat.Preset.b.format

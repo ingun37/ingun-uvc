@@ -332,6 +332,7 @@ struct ContentView: View {
                     Picker("Clock under a minute", selection: $scoreboardFormat.underMinuteStyle) {
                         Text(":ss.s (e.g. :06.1)").tag(GameTimeMapper.UnderMinuteStyle.colon)
                         Text("ss.s or s.s (e.g. 16.1, 6.1)").tag(GameTimeMapper.UnderMinuteStyle.natural)
+                        Text("ss.s (e.g. 16.1, 06.1)").tag(GameTimeMapper.UnderMinuteStyle.doubleDigit)
                     }
                     .frame(maxWidth: 480)
                 }

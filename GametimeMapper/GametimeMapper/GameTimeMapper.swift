@@ -31,7 +31,7 @@ nonisolated enum GameTimeMapper {
     }
 
     enum PeriodStyle: String, CaseIterable, Sendable { case short, long }
-    enum UnderMinuteStyle: String, CaseIterable, Sendable { case colon, natural }
+    enum UnderMinuteStyle: String, CaseIterable, Sendable { case colon, natural, doubleDigit }
 
     struct ScoreboardFormat: Equatable, Sendable {
         var periodStyles: [Period: PeriodStyle]
@@ -134,6 +134,8 @@ nonisolated enum GameTimeMapper {
             clockPattern = #"(?:\d{1,2}:[0-5]\d|:[0-5]\d\.\d)"#
         case .natural:
             clockPattern = #"(?:\d{1,2}:[0-5]\d|(?:[1-5]\d|[0-9])\.\d)"#
+        case .doubleDigit:
+            clockPattern = #"(?:\d{1,2}:[0-5]\d|[0-5]\d\.\d)"#
         case nil:
             clockPattern = #"(?:\d{1,2}:\d{2}(?:\.\d+)?|:?\d{1,2}\.\d+)"#
         }
