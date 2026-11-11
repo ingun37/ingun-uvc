@@ -21,7 +21,8 @@ nonisolated enum VideoTimeMapper {
     static func map(videoURL: URL, format: GameTimeReader.ScoreboardFormat,
                     regionOfInterest: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1),
                     margin: Double = 0.6,
-                    recognize: Recognizer? = nil) async throws -> [Interval] {
+                    recognize: Recognizer? = nil,
+                    log: (String) -> Void = { _ in }) async throws -> [Interval] {
         let asset = AVURLAsset(url: videoURL)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else {
             throw MappingError.noVideo
@@ -36,8 +37,6 @@ nonisolated enum VideoTimeMapper {
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
         let context = CIContext()
-        let read = recognize ?? { try GameTimeReader.read($0, format: format,
-                                                        regionOfInterest: regionOfInterest) }
         var cache: [Double: GameTimeReader.Reading?] = [:]
 
         func reading(at time: Double) throws -> GameTimeReader.Reading? {
@@ -50,8 +49,21 @@ nonisolated enum VideoTimeMapper {
                 kCVPixelFormatType_32BGRA, nil, &buffer)
             guard status == kCVReturnSuccess, let buffer else { throw MappingError.pixelBuffer }
             context.render(CIImage(cgImage: image), to: buffer)
-            let result = try read(buffer)
+            let result: GameTimeReader.Reading?
+            let texts: [String]?
+            if let recognize {
+                result = try recognize(buffer)
+                texts = nil
+            } else {
+                let observation = try GameTimeReader.readWithTexts(buffer, format: format,
+                    regionOfInterest: regionOfInterest)
+                result = observation.reading
+                texts = observation.texts
+            }
             cache[time] = result
+            let clock = result.map { "\($0.period) \($0.gameSecond)s" } ?? "no clock detected"
+            let ocr = texts.map { " | OCR \($0)" } ?? ""
+            log(String(format: "%.2fs → %@%@", time, clock, ocr))
             return result
         }
 
@@ -75,7 +87,9 @@ nonisolated enum VideoTimeMapper {
             return try divide(start, middle) + divide(middle, end)
         }
 
-        return merge(try divide(0, lastTime), margin: margin)
+        let intervals = merge(try divide(0, lastTime), margin: margin)
+        log("Finished: \(intervals.count) intervals")
+        return intervals
     }
 
     static func merge(_ intervals: [Interval], margin: Double = 0.6) -> [Interval] {

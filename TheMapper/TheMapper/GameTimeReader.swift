@@ -136,8 +136,14 @@ nonisolated enum GameTimeReader {
 
     static func read(_ buffer: CVPixelBuffer, format: ScoreboardFormat,
                      regionOfInterest: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)) throws -> Reading? {
+        try readWithTexts(buffer, format: format, regionOfInterest: regionOfInterest).reading
+    }
+
+    static func readWithTexts(_ buffer: CVPixelBuffer, format: ScoreboardFormat,
+                              regionOfInterest: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1))
+        throws -> (reading: Reading?, texts: [String]) {
         let texts = try visionTexts(buffer, regionOfInterest: regionOfInterest)
-        return parse(texts, format: format)
+        return (parse(texts, format: format), texts)
     }
 
     private static func visionTexts(_ buffer: CVPixelBuffer, regionOfInterest: CGRect) throws -> [String] {
