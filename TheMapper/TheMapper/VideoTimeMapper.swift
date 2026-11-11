@@ -59,13 +59,13 @@ nonisolated enum VideoTimeMapper {
             let first = try reading(at: start)
             let last = try reading(at: end)
             if let first, let last, first.period == last.period {
-                if abs((first.gameSecond - last.gameSecond) - (end - start)) <= margin {
-                    return [Interval(kind: .continuous, period: first.period,
+                if first.gameSecond == last.gameSecond {
+                    return [Interval(kind: .paused, period: first.period,
                         videoStart: start, videoEnd: end,
                         gameStart: first.gameSecond, gameEnd: last.gameSecond)]
                 }
-                if first.gameSecond == last.gameSecond {
-                    return [Interval(kind: .paused, period: first.period,
+                if abs((first.gameSecond - last.gameSecond) - (end - start)) <= margin {
+                    return [Interval(kind: .continuous, period: first.period,
                         videoStart: start, videoEnd: end,
                         gameStart: first.gameSecond, gameEnd: last.gameSecond)]
                 }
@@ -89,7 +89,7 @@ nonisolated enum VideoTimeMapper {
                 let sameClock = previous.kind == .paused && previous.gameEnd == interval.gameStart
                 let continuousClock = previous.kind == .continuous &&
                     abs(previous.gameEnd - interval.gameStart) <= margin
-                if adjacent && samePeriod && sameKind && (sameClock || continuousClock) {
+                if samePeriod && sameKind && (sameClock || (adjacent && continuousClock)) {
                     merged[index] = Interval(kind: previous.kind, period: previous.period,
                         videoStart: previous.videoStart, videoEnd: interval.videoEnd,
                         gameStart: previous.gameStart, gameEnd: interval.gameEnd)

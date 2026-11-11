@@ -27,7 +27,7 @@ struct TheMapperTests {
             #expect(intervals.contains { $0.kind == .paused })
             #expect(intervals.contains { $0.kind == .continuous })
             
-            #expect(intervals.count == 5)
+            #expect(intervals.count == 6)
             
             #expect(floor(intervals[0].gameStart) == 42)
             #expect(floor(intervals[0].gameEnd) == 20)
@@ -48,11 +48,19 @@ struct TheMapperTests {
             #expect(intervals[4].gameStart.isApproximatelyEqual(to: 1.4, absoluteTolerance: 0.001))
             #expect(intervals[4].gameEnd == 0)
             #expect(intervals[4].kind == .continuous)
+            #expect(intervals[5].gameStart == 0)
+            #expect(intervals[5].gameEnd == 0)
+            #expect(intervals[5].kind == .paused)
         } else {
-            #expect(intervals.contains { $0.kind == .paused && abs($0.gameStart - 623) <= 1 })
-            #expect(zip(intervals, intervals.dropFirst()).contains {
-                $0.videoEnd < $1.videoStart
-            })
+            #expect(intervals.count == 2)
+            if intervals.count == 2 {
+                #expect(intervals[0].kind == .continuous)
+                #expect(intervals[0].gameStart == 627)
+                #expect(intervals[0].gameEnd == 623)
+                #expect(intervals[1].kind == .paused)
+                #expect(intervals[1].gameStart == 623)
+                #expect(intervals[1].gameEnd == 623)
+            }
         }
     }
 
