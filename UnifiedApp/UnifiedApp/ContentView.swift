@@ -280,8 +280,8 @@ private final class Workflow {
         defer { busy = false }
         do {
             let executable = try Runner.appExecutable(
-                "GametimeMapper/build/GametimeMapperUI.app",
-                name: "GametimeMapperUI"
+                "TheMapper/build/TheMapper.app",
+                name: "TheMapper"
             )
             _ = try await Task.detached {
                 try Runner.run(
@@ -437,7 +437,7 @@ struct ContentView: View {
                         workflow.scene == .attempts
                             ? "Fetching attempts…"
                             : workflow.scene == .mapper
-                                ? "Waiting for GametimeMapperUI…"
+                                ? "Waiting for TheMapper…"
                                 : "Waiting for ClipEditor…"
                     )
                 } else if workflow.scene == .attempts,
@@ -448,7 +448,7 @@ struct ContentView: View {
                     }
                     Button("Back to games") { workflow.scene = .games }
                 } else if workflow.scene == .mapper {
-                    Button("Retry GametimeMapperUI") {
+                    Button("Retry TheMapper") {
                         Task { await workflow.runMapper() }
                     }
                 }
