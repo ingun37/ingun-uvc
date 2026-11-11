@@ -123,7 +123,37 @@ nonisolated enum VideoTimeMapper {
             }
             merged.append(interval)
         }
-        return merged
+        var bridged: [Interval] = []
+        var index = 0
+        while index < merged.count {
+            if index + 2 < merged.count {
+                let first = merged[index]
+                let middle = merged[index + 1]
+                let last = merged[index + 2]
+                let shortPause = middle.videoEnd - middle.videoStart < 0.5
+                let clockMatchesVideo = abs((first.gameEnd - last.gameStart) -
+                    (last.videoStart - first.videoEnd)) <= margin
+                let fullRangeMatches = abs((first.gameStart - last.gameEnd) -
+                    (last.videoEnd - first.videoStart)) <= margin
+                if first.kind == .continuous, middle.kind == .paused,
+                   last.kind == .continuous, shortPause,
+                   first.period == middle.period, middle.period == last.period,
+                   abs(first.videoEnd - middle.videoStart) < 0.000001,
+                   middle.videoEnd <= last.videoStart,
+                   first.gameEnd == middle.gameStart,
+                   middle.gameEnd >= last.gameStart,
+                   clockMatchesVideo, fullRangeMatches {
+                    bridged.append(Interval(kind: .continuous, period: first.period,
+                        videoStart: first.videoStart, videoEnd: last.videoEnd,
+                        gameStart: first.gameStart, gameEnd: last.gameEnd))
+                    index += 3
+                    continue
+                }
+            }
+            bridged.append(merged[index])
+            index += 1
+        }
+        return bridged
     }
 
     private enum MappingError: Error { case noVideo, invalidDuration, pixelBuffer }

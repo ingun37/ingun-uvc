@@ -9,6 +9,33 @@ import Numerics
 private final class FixtureBundleAnchor {}
 
 struct TheMapperTests {
+    @Test func bridgesShortFalsePauseWhenClockStayedContinuous() {
+        let entries: [VideoTimeMapper.Interval] = [
+            .init(kind: .continuous, period: "3RD", videoStart: 3030.5885961913264,
+                  videoEnd: 3077.80739868156, gameStart: 597, gameEnd: 550),
+            .init(kind: .paused, period: "3RD", videoStart: 3077.80739868156,
+                  videoEnd: 3078.1651168822436, gameStart: 550, gameEnd: 550),
+            .init(kind: .continuous, period: "3RD", videoStart: 3079.9537078856615,
+                  videoEnd: 3086.392635497966, gameStart: 548, gameEnd: 541),
+        ]
+        #expect(VideoTimeMapper.merge(entries) == [
+            .init(kind: .continuous, period: "3RD", videoStart: 3030.5885961913264,
+                  videoEnd: 3086.392635497966, gameStart: 597, gameEnd: 541)
+        ])
+    }
+
+    @Test func preservesLongRealPause() {
+        let entries: [VideoTimeMapper.Interval] = [
+            .init(kind: .continuous, period: "2ND", videoStart: 0, videoEnd: 5,
+                  gameStart: 45, gameEnd: 40),
+            .init(kind: .paused, period: "2ND", videoStart: 5, videoEnd: 8,
+                  gameStart: 40, gameEnd: 40),
+            .init(kind: .continuous, period: "2ND", videoStart: 8, videoEnd: 13,
+                  gameStart: 40, gameEnd: 35),
+        ]
+        #expect(VideoTimeMapper.merge(entries) == entries)
+    }
+
     @Test(arguments: ["continuous", "paused", "disappeared"])
     func mapsScoreboardVideo(name: String) async throws {
         let bundle = Bundle(for: FixtureBundleAnchor.self)
