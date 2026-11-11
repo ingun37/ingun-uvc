@@ -177,7 +177,7 @@ enum ClipPlanner {
                 continue
             }
             let moment = min(max(match.videoTime(for: attempt.gameSecond), 0), videoDuration)
-            let start = max(0, moment - 5)
+            let start = max(0, moment - 4)
             let end = min(videoDuration, moment + 2)
             if end > start {
                 let captions: [ShotCaption] = if let text = attempt.caption, let location = attempt.location {
