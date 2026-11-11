@@ -2,11 +2,60 @@ import CoreImage
 import CoreVideo
 import ImageIO
 import Testing
+import Numerics
+
 @testable import TheMapper
 
 private final class FixtureBundleAnchor {}
 
 struct TheMapperTests {
+    @Test(arguments: ["continuous", "paused", "disappeared"])
+    func mapsScoreboardVideo(name: String) async throws {
+        let bundle = Bundle(for: FixtureBundleAnchor.self)
+        let url = try #require(bundle.url(forResource: name, withExtension: "mp4"))
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+            underMinuteStyle: name == "paused" ? .colon : .doubleDigit)
+        let intervals = try await VideoTimeMapper.map(videoURL: url, format: format)
+        #expect(!intervals.isEmpty)
+        #expect(intervals.allSatisfy { $0.videoStart < $0.videoEnd })
+        if name == "continuous" {
+            #expect(intervals.count == 1)
+            #expect(intervals.first?.kind == .continuous)
+            #expect(abs((intervals.first?.gameStart ?? 0) - 141) <= 1)
+            #expect(abs((intervals.first?.gameEnd ?? 0) - 117) <= 1)
+        } else if name == "paused" {
+            #expect(intervals.contains { $0.kind == .paused })
+            #expect(intervals.contains { $0.kind == .continuous })
+            
+            #expect(intervals.count == 5)
+            
+            #expect(floor(intervals[0].gameStart) == 42)
+            #expect(floor(intervals[0].gameEnd) == 20)
+            #expect(intervals[0].kind == .continuous)
+            
+            #expect(floor(intervals[1].gameStart) == 20)
+            #expect(floor(intervals[1].gameEnd) == 20)
+            #expect(intervals[1].kind == .paused)
+            
+            #expect(floor(intervals[2].gameStart) == 20)
+            #expect(intervals[2].gameEnd.isApproximatelyEqual(to: 1.4, absoluteTolerance: 0.001))
+            #expect(intervals[2].kind == .continuous)
+            
+            #expect(intervals[3].gameStart.isApproximatelyEqual(to: 1.4, absoluteTolerance: 0.001))
+            #expect(intervals[3].gameEnd.isApproximatelyEqual(to: 1.4, absoluteTolerance: 0.001))
+            #expect(intervals[3].kind == .paused)
+            
+            #expect(intervals[4].gameStart.isApproximatelyEqual(to: 1.4, absoluteTolerance: 0.001))
+            #expect(intervals[4].gameEnd == 0)
+            #expect(intervals[4].kind == .continuous)
+        } else {
+            #expect(intervals.contains { $0.kind == .paused && abs($0.gameStart - 623) <= 1 })
+            #expect(zip(intervals, intervals.dropFirst()).contains {
+                $0.videoEnd < $1.videoStart
+            })
+        }
+    }
+
     @Test func doubleDigitUnderMinuteClock() {
         let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
                                                       underMinuteStyle: .doubleDigit)
@@ -14,8 +63,11 @@ struct TheMapperTests {
                 .init(period: "2ND", gameSecond: 16.1))
         #expect(GameTimeReader.parse(["2ND", "06.1"], format: format) ==
                 .init(period: "2ND", gameSecond: 6.1))
+        #expect(GameTimeReader.parse(["2ND", "06.0"], format: format) ==
+                .init(period: "2ND", gameSecond: 6))
         #expect(GameTimeReader.parse(["2ND", "6.1"], format: format) == nil)
         #expect(GameTimeReader.parse(["2ND", ":06.1"], format: format) == nil)
+        #expect(GameTimeReader.parse(["2ND", "06"], format: format) == nil)
         #expect(GameTimeReader.parse(["2ND", "1:16"], format: format) ==
                 .init(period: "2ND", gameSecond: 76))
     }

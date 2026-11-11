@@ -10,10 +10,20 @@
       "Base",
     ],
   },
+  "packages": [
+    {
+      "kind": "remote",
+      "repository": "https://github.com/apple/swift-numerics.git",
+      "version": {
+        "up-to-next-major-version": "1.1.1",
+      },
+    },
+  ],
   "files": [
     { "kind": "folder", "path": "TheMapper", "target-membership": [ "TheMapper" ] },
     { "kind": "folder", "path": "TheMapperTests", "target-membership": [ "TheMapperTests" ] },
     { "kind": "folder", "path": "TheMapperUITests", "target-membership": [ "TheMapperUITests" ] },
+    { "kind": "group", "name": "Frameworks" },
     {
       "kind": "group",
       "name": "Products",
@@ -74,6 +84,13 @@
         "compile-sources",
         "frameworks",
         "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "swift-numerics",
+          "product-name": "Numerics",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
       "build-settings": {
         "BUNDLE_LOADER": "$(TEST_HOST)",
