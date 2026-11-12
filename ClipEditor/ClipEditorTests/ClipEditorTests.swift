@@ -5,6 +5,18 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func invalidMappingIdentifiesEntryAndValues() throws {
+        let ranges = [ClockRange(period: "1ST", game_start_seconds: 100, game_end_seconds: 90,
+                                 video_start_seconds: 12, video_end_seconds: 10)]
+        do {
+            _ = try ClipPlanner.plan(attempts: [], ranges: ranges, videoDuration: 20)
+            Issue.record("Expected an invalid mapping error")
+        } catch let error as ClipPlanningError {
+            #expect(error.localizedDescription.contains("entry 1 (period 1ST)"))
+            #expect(error.localizedDescription.contains("start 12.0, end 10.0"))
+        }
+    }
+
     @Test func darkerHalfDeterminesBasketSide() throws {
         let detector = try BasketSide()
         func image(left: CGFloat, right: CGFloat) throws -> CGImage {
