@@ -120,6 +120,13 @@ struct TheMapperTests {
                 .init(period: "2ND", gameSecond: 76))
     }
 
+    @Test func firstQuarterOCRReadsIst() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        #expect(GameTimeReader.parse(["Ist 11:01", "22"], format: format) ==
+                .init(period: "1ST", gameSecond: 661))
+    }
+
     // Placeholder answers. Edit these values when you label the images.
     // Add one row whenever you add a PNG fixture.
     private static let presetA: [(fileTime: String, period: String, seconds: Double)] = [
