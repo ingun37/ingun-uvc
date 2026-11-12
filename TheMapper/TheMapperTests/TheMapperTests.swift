@@ -36,7 +36,7 @@ struct TheMapperTests {
         #expect(VideoTimeMapper.merge(entries) == entries)
     }
 
-    @Test(arguments: ["continuous", "paused", "disappeared"])
+    @Test(arguments: ["continuous", "paused", "disappeared", "continuous-interrupted"])
     func mapsScoreboardVideo(name: String) async throws {
         let bundle = Bundle(for: FixtureBundleAnchor.self)
         let url = try #require(bundle.url(forResource: name, withExtension: "mp4"))
@@ -45,12 +45,14 @@ struct TheMapperTests {
         let intervals = try await VideoTimeMapper.map(videoURL: url, format: format)
         #expect(!intervals.isEmpty)
         #expect(intervals.allSatisfy { $0.videoStart < $0.videoEnd })
-        if name == "continuous" {
+        
+        switch name {
+        case "continuous":
             #expect(intervals.count == 1)
             #expect(intervals.first?.kind == .continuous)
             #expect(abs((intervals.first?.gameStart ?? 0) - 141) <= 1)
             #expect(abs((intervals.first?.gameEnd ?? 0) - 117) <= 1)
-        } else if name == "paused" {
+        case "paused":
             #expect(intervals.contains { $0.kind == .paused })
             #expect(intervals.contains { $0.kind == .continuous })
             
@@ -78,7 +80,7 @@ struct TheMapperTests {
             #expect(intervals[5].gameStart == 0)
             #expect(intervals[5].gameEnd == 0)
             #expect(intervals[5].kind == .paused)
-        } else {
+        case "disappeared":
             #expect(intervals.count == 2)
             if intervals.count == 2 {
                 #expect(intervals[0].kind == .continuous)
@@ -88,7 +90,18 @@ struct TheMapperTests {
                 #expect(intervals[1].gameStart == 623)
                 #expect(intervals[1].gameEnd == 623)
             }
+        case "continuous-interrupted":
+            #expect(intervals.count == 1)
+            if intervals.count == 1 {
+                #expect(intervals[0].gameStart == 216)
+                #expect(intervals[0].gameEnd.isApproximatelyEqual(to: 209, relativeTolerance: 1))
+            }
+        default:
+            Issue.record("Unreachable")
+            
         }
+        
+
     }
 
     @Test func doubleDigitUnderMinuteClock() {
