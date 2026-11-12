@@ -9,7 +9,7 @@ private final class PreviewActivity {
 
     init() {
         token = ProcessInfo.processInfo.beginActivity(
-            options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled],
+            options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled, .latencyCritical],
             reason: "Displaying a live video capture preview"
         )
     }
