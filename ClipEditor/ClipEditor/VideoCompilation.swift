@@ -128,13 +128,19 @@ struct VideoCompilation {
                     point = CGPoint(x: 0.5, y: 0.9)
                 }
                 let captionText = player == nil ? caption.text : String(caption.text.split(separator: "\n").last ?? "")
-                let font = NSFont.systemFont(ofSize: max(24, size.height * 0.045), weight: .semibold)
+                // Adjust these values to resize the per-player FGM/FGA caption.
+                let playerCaptionFontSize = max(36, size.height * 0.065)
+                let playerCaptionPadding: CGFloat = 24
+                let font = NSFont.systemFont(
+                    ofSize: player == nil ? max(24, size.height * 0.045) : playerCaptionFontSize,
+                    weight: .semibold)
                 let paragraph = NSMutableParagraphStyle()
                 paragraph.alignment = .center
                 let attributes: [NSAttributedString.Key: Any] = [
-                    .font: font, .foregroundColor: NSColor.white, .paragraphStyle: paragraph
+                    .font: font, .foregroundColor: player == nil ? NSColor.white : NSColor.black,
+                    .paragraphStyle: paragraph
                 ]
-                let padding: CGFloat = 16
+                let padding: CGFloat = player == nil ? 16 : playerCaptionPadding
                 let naturalWidth = captionText.components(separatedBy: "\n")
                     .map { ($0 as NSString).size(withAttributes: attributes).width }.max() ?? 0
                 let width = min(ceil(naturalWidth) + padding * 2, size.width - 16)
@@ -143,7 +149,8 @@ struct VideoCompilation {
                     options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes)
                 let height = min(ceil(textBounds.height) + padding * 2, size.height - 16)
                 let box = CALayer()
-                box.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
+                box.backgroundColor = player == nil
+                    ? NSColor.black.withAlphaComponent(0.75).cgColor : NSColor.white.cgColor
                 box.cornerRadius = 8
                 box.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
                                    y: player == nil ? min(max((1 - point.y) * size.height, 0), size.height - height)
