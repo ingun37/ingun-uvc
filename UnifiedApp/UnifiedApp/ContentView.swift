@@ -336,6 +336,8 @@ private final class Workflow {
             let asset = AVURLAsset(url: videoURL)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
             let frame = try generator.copyCGImage(
                 at: CMTime(seconds: time, preferredTimescale: 600),
                 actualTime: nil
@@ -492,6 +494,7 @@ private struct ThumbnailSelectionView: View {
     @State private var currentTime = 0.0
     @State private var duration = 1.0
     @State private var playing = false
+    @State private var seeking = false
     @State private var zoom = 1.0
     @State private var windowStart = 0.0
 
@@ -505,7 +508,23 @@ private struct ThumbnailSelectionView: View {
     private func moveWindow(_ direction: Double) {
         windowStart = min(max(windowStart + direction * windowLength * 0.8, 0), max(duration - windowLength, 0))
         currentTime = min(max(currentTime, windowStart), windowEnd)
-        player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        seek(to: currentTime)
+    }
+
+    private func seek(to time: Double) {
+        seeking = true
+        player.seek(
+            to: CMTime(seconds: time, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        ) { finished in
+            if finished {
+                DispatchQueue.main.async {
+                    currentTime = player.currentTime().seconds
+                    seeking = false
+                }
+            }
+        }
     }
 
     var body: some View {
@@ -518,21 +537,17 @@ private struct ThumbnailSelectionView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
                 Button(playing ? "Pause" : "Play") {
-                    if playing { player.pause() } else { player.play() }
+                    if playing {
+                        player.pause()
+                        currentTime = player.currentTime().seconds
+                    } else { player.play() }
                 }
                 Slider(
                     value: Binding(
                         get: { currentTime },
                         set: { time in
                             currentTime = time
-                            player.seek(
-                                to: CMTime(
-                                    seconds: time,
-                                    preferredTimescale: 600
-                                ),
-                                toleranceBefore: .zero,
-                                toleranceAfter: .zero
-                            )
+                            seek(to: time)
                         }
                     ),
                     in: windowStart...max(windowEnd, windowStart + 0.01)
@@ -556,9 +571,9 @@ private struct ThumbnailSelectionView: View {
                     .frame(width: 150, alignment: .trailing)
             }
             Button(busy ? "Generating…" : "Generate Thumbnail") {
-                if let selection { generate(selection, currentTime) }
+                if let selection { generate(selection, player.currentTime().seconds) }
             }
-            .disabled(selection == nil || busy)
+            .disabled(selection == nil || busy || seeking)
         }
         .task {
             let asset = AVURLAsset(url: videoURL)
