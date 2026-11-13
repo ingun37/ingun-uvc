@@ -17,7 +17,9 @@ nonisolated enum GameTimeReader {
             case .second: "2ND"
             case .third: "3RD"
             case .fourth: "4TH"
-            case .firstOvertime, .secondOvertime, .thirdOvertime: "OT"
+            case .firstOvertime: "OT"
+            case .secondOvertime: "2OT"
+            case .thirdOvertime: "3OT"
             }
         }
         var longLabel: String {
@@ -83,7 +85,7 @@ nonisolated enum GameTimeReader {
                 (selection.periodStyles[period] == .long ? period.longLabel : period.shortLabel,
                  period.shortLabel)
             }
-        } ?? ["1ST", "2ND", "3RD", "4TH", "OT"].map { ($0, $0) }
+        } ?? Period.allCases.map { ($0.shortLabel, $0.shortLabel) }
         // OCR sometimes inserts a space between the quarter number and suffix.
         for label in ["1ST", "2ND", "3RD", "4TH"] where labels.contains(where: { $0.label == label }) {
             labels.append((String(label.prefix(1)) + " " + String(label.dropFirst()), label))
@@ -97,6 +99,13 @@ nonisolated enum GameTimeReader {
         }
         if labels.contains(where: { $0.label == "OT" }) {
             labels += [("ОT", "OT"), ("ОТ", "OT")]
+        }
+        // Vision can read the letter O as zero in numbered overtime labels.
+        if labels.contains(where: { $0.label == "2OT" }) {
+            labels.append(("20T", "2OT"))
+        }
+        if labels.contains(where: { $0.label == "3OT" }) {
+            labels.append(("30T", "3OT"))
         }
         guard let period = candidates.lazy.compactMap({ text -> String? in
             for (label, canonical) in labels {

@@ -127,6 +127,24 @@ struct TheMapperTests {
                 .init(period: "1ST", gameSecond: 661))
     }
 
+    @Test func overtimeShortLabels() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        for (label, period) in [("OT", "OT"), ("2OT", "2OT"), ("3OT", "3OT")] {
+            let expected = GameTimeReader.Reading(period: period, gameSecond: 76)
+            #expect(GameTimeReader.parse([label, "1:16"], format: format) == expected)
+            #expect(GameTimeReader.parse([label, "1:16"]) == expected)
+        }
+        #expect(GameTimeReader.parse(["1:50", "20T 24"], format: format) ==
+                .init(period: "2OT", gameSecond: 110))
+        #expect(GameTimeReader.parse(["1:50", "30T 24"], format: format) ==
+                .init(period: "3OT", gameSecond: 110))
+        #expect(GameTimeReader.parse(["1:50", "20T 24"]) ==
+                .init(period: "2OT", gameSecond: 110))
+        #expect(GameTimeReader.parse(["1:50", "30T 24"]) ==
+                .init(period: "3OT", gameSecond: 110))
+    }
+
     // Placeholder answers. Edit these values when you label the images.
     // Add one row whenever you add a PNG fixture.
     private static let presetA: [(fileTime: String, period: String, seconds: Double)] = [
