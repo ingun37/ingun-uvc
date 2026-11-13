@@ -492,6 +492,21 @@ private struct ThumbnailSelectionView: View {
     @State private var currentTime = 0.0
     @State private var duration = 1.0
     @State private var playing = false
+    @State private var zoom = 1.0
+    @State private var windowStart = 0.0
+
+    private var windowLength: Double { max(duration / zoom, 0.01) }
+    private var windowEnd: Double { min(windowStart + windowLength, duration) }
+
+    private func centerWindow(on time: Double) {
+        windowStart = min(max(time - windowLength / 2, 0), max(duration - windowLength, 0))
+    }
+
+    private func moveWindow(_ direction: Double) {
+        windowStart = min(max(windowStart + direction * windowLength * 0.8, 0), max(duration - windowLength, 0))
+        currentTime = min(max(currentTime, windowStart), windowEnd)
+        player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -520,12 +535,25 @@ private struct ThumbnailSelectionView: View {
                             )
                         }
                     ),
-                    in: 0...max(duration, 0.01)
+                    in: windowStart...max(windowEnd, windowStart + 0.01)
                 ) { editing in
                     if editing { player.pause() }
                 }
                 Text(String(format: "%.1f / %.1f s", currentTime, duration))
                     .monospacedDigit()
+            }
+            HStack {
+                Button("Earlier") { moveWindow(-1) }
+                    .disabled(zoom == 1 || windowStart == 0)
+                Slider(value: $zoom, in: 1...128)
+                    .onChange(of: zoom) { centerWindow(on: currentTime) }
+                Text(String(format: "%.0f× zoom", zoom))
+                    .frame(width: 90, alignment: .trailing)
+                Button("Later") { moveWindow(1) }
+                    .disabled(zoom == 1 || windowEnd >= duration)
+                Text(String(format: "%.1f–%.1f s", windowStart, windowEnd))
+                    .monospacedDigit()
+                    .frame(width: 150, alignment: .trailing)
             }
             Button(busy ? "Generating…" : "Generate Thumbnail") {
                 if let selection { generate(selection, currentTime) }
@@ -541,7 +569,10 @@ private struct ThumbnailSelectionView: View {
             Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
         ) { _ in
             playing = player.rate != 0
-            if playing { currentTime = player.currentTime().seconds }
+            if playing {
+                currentTime = player.currentTime().seconds
+                if currentTime > windowEnd { centerWindow(on: currentTime) }
+            }
         }
         .onDisappear {
             player.pause()
