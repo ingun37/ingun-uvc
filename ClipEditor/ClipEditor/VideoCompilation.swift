@@ -5,7 +5,8 @@ import QuartzCore
 
 struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL,
-                       title: String? = nil, player: String? = nil, square: Bool = false) async throws {
+                       title: String? = nil, subtitle: String? = nil,
+                       player: String? = nil, square: Bool = false) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -96,22 +97,36 @@ struct VideoCompilation {
             let videoLayer = CALayer(); videoLayer.frame = parent.frame
             parent.addSublayer(videoLayer)
             if let title {
+                // Adjust these two values to resize the per-player name and subtitle.
                 let font = NSFont.systemFont(ofSize: max(26, size.height * 0.05), weight: .bold)
+                let subtitleFont = NSFont.systemFont(ofSize: max(18, size.height * 0.028), weight: .semibold)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-                let width = min(size.width - 32, ceil((title as NSString).size(withAttributes: attributes).width) + 32)
-                let height = ceil(font.ascender - font.descender + font.leading) + 24
+                let subtitleAttributes: [NSAttributedString.Key: Any] = [.font: subtitleFont, .foregroundColor: NSColor.white]
+                let subtitleWidth = subtitle.map { ($0 as NSString).size(withAttributes: subtitleAttributes).width } ?? 0
+                let width = min(size.width - 32, ceil(max((title as NSString).size(withAttributes: attributes).width,
+                                                           subtitleWidth)) + 32)
+                let titleHeight = ceil(font.ascender - font.descender + font.leading)
+                let subtitleHeight = subtitle == nil ? 0 : ceil(subtitleFont.ascender - subtitleFont.descender + subtitleFont.leading)
+                let height = titleHeight + subtitleHeight + (subtitle == nil ? 0 : 6) + 24
                 let box = CALayer()
                 box.frame = CGRect(x: (size.width - width) / 2, y: size.height - height - 16,
                                    width: width, height: height)
                 box.backgroundColor = NSColor.black.withAlphaComponent(0.75).cgColor
                 box.cornerRadius = 8
-                if let image = captionImage(title, size: CGSize(width: width - 32, height: height - 24), attributes: attributes) {
+                if let image = captionImage(title, size: CGSize(width: width - 32, height: titleHeight), attributes: attributes) {
                     let label = CALayer()
-                    label.frame = CGRect(x: 16, y: 12, width: width - 32, height: height - 24)
+                    label.frame = CGRect(x: 16, y: height - 12 - titleHeight, width: width - 32, height: titleHeight)
                     label.contents = image
                     box.addSublayer(label)
-                    parent.addSublayer(box)
                 }
+                if let subtitle, let image = captionImage(subtitle,
+                    size: CGSize(width: width - 32, height: subtitleHeight), attributes: subtitleAttributes) {
+                    let label = CALayer()
+                    label.frame = CGRect(x: 16, y: 12, width: width - 32, height: subtitleHeight)
+                    label.contents = image
+                    box.addSublayer(label)
+                }
+                parent.addSublayer(box)
             }
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true

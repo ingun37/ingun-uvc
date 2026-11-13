@@ -172,6 +172,8 @@ private final class EditorModel {
             let dateText = gameDate ?? compilationName.components(separatedBy: " | ").last.flatMap {
                 $0 == compilationName ? nil : $0
             } ?? "Unknown date"
+            let shortDate = dateText.components(separatedBy: ",").first?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? dateText
             for group in groups {
                 let safeName = group.name.replacingOccurrences(of: #"[^\p{L}\p{N}._ -]"#,
                     with: "_", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -190,7 +192,9 @@ private final class EditorModel {
                 let url = destination.deletingLastPathComponent().appendingPathComponent("\(name).mp4")
                 message = "Exporting \(group.name)…"
                 try await VideoCompilation.export(videoURL: video, clips: group.clips, destination: url,
-                                                  title: group.name, player: group.key, square: true)
+                                                  title: group.name,
+                                                  subtitle: "Every 🧱 VS \(opponent) | \(shortDate)",
+                                                  player: group.key, square: true)
                 playerURLs.append(url)
             }
             exportedURL = destination
