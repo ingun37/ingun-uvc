@@ -10,4 +10,4 @@ accessible; do not use the old `video-path.txt` handoff.
 
 The thumbnail scene appears after ClipEditor closes. It allows one normalized video rectangle and uses the current frame, game date, and home and away codes. Render through thumbnail-web and save `<video name>-thumbnail.jpg` beside the source video. The renderer runs via interactive zsh to load NVM from `~/.zshrc`.
 
-The app runs companion executables from repository-relative paths. Handle absent executables and missing output files with visible errors. Preserve retry behavior for failed fetches. Build the Release scheme after changes.
+The app runs companion executables from repository-relative paths. Handle absent executables and missing output files with visible errors. Preserve retry behavior for failed fetches. Build the Release scheme after changes. For Xcode builds, request escalated execution on the first attempt: Swift's macro helper fails under the workspace sandbox with `sandbox-exec: sandbox_apply: Operation not permitted`. Use a DerivedData path under `/private/tmp` so the build does not write to the default location in `~/Library`.

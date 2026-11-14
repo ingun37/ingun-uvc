@@ -127,15 +127,15 @@ private enum Runner {
         process.standardError = try FileHandle(forWritingTo: error)
         try process.run()
         process.waitUntilExit()
+        let stdout = (try? String(contentsOf: output, encoding: .utf8)) ?? ""
         let stderr = (try? String(contentsOf: error, encoding: .utf8)) ?? ""
         guard process.terminationStatus == 0 else {
-            throw RunError.failed(
-                stderr.isEmpty
-                    ? "Process exited with status \(process.terminationStatus)."
-                    : stderr
-            )
+            var details = ["Process exited with status \(process.terminationStatus)."]
+            if !stdout.isEmpty { details.append("Output:\n\(stdout)") }
+            if !stderr.isEmpty { details.append("Error output:\n\(stderr)") }
+            throw RunError.failed(details.joined(separator: "\n\n"))
         }
-        return (try? String(contentsOf: output, encoding: .utf8)) ?? ""
+        return stdout
     }
 
     nonisolated static func runDataFetcher(arguments: [String]) throws -> String
