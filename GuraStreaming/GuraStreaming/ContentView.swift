@@ -1,24 +1,185 @@
-//
-//  ContentView.swift
-//  GuraStreaming
-//
-//  Created by Ingun Jon on 11/14/26.
-//
-
+import AVFoundation
+import AppKit
+import Combine
 import SwiftUI
 
 struct ContentView: View {
+    @State private var model = CaptureModel()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        VStack(alignment: .leading, spacing: 20) {
+            switch model.screen {
+            case .devices:
+                deviceList
+            case let .detail(device, _):
+                HStack {
+                    Button("Back", systemImage: "chevron.left") {
+                        model.back()
+                        Task { await model.refresh() }
+                    }
+                    Text(device.localizedName).font(.title2.bold())
+                    Spacer()
+                }
+                DeviceDetail(device: device)
+                if !model.streamMessage.isEmpty {
+                    Label(model.streamMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                }
+            }
         }
-        .padding()
+        .padding(24)
+        .frame(minWidth: 720, minHeight: 580)
+        .task { await model.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) {
+            model.disconnected($0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.runtimeErrorNotification)) {
+            model.sessionFailed($0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.wasInterruptedNotification)) { notification in
+            if case let .detail(_, resource) = model.screen,
+               let session = notification.object as? AVCaptureSession, session === resource.session {
+                model.streamMessage = "Capture was interrupted. It will resume when the device becomes available."
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.interruptionEndedNotification)) { notification in
+            if case let .detail(_, resource) = model.screen,
+               let session = notification.object as? AVCaptureSession, session === resource.session {
+                model.streamMessage = ""
+            }
+        }
+    }
+
+    private var deviceList: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Video sources").font(.largeTitle.bold())
+                    Text("Choose a capture card or camera to inspect its live video.")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
+            }
+            if model.permissionDenied {
+                ContentUnavailableView {
+                    Label("Camera access required", systemImage: "camera.badge.ellipsis")
+                } description: {
+                    Text("Allow camera access in System Settings → Privacy & Security → Camera, then refresh.")
+                } actions: {
+                    Button("Open System Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            } else if model.devices.isEmpty {
+                ContentUnavailableView("No video sources found", systemImage: "video.slash",
+                                       description: Text("Connect a USB capture card or camera, then click Refresh."))
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(model.devices, id: \.uniqueID) { device in
+                            Button { model.open(device) } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "video").font(.title2).frame(width: 36)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(device.localizedName).font(.headline)
+                                        Text(device.deviceType.rawValue).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                                }
+                                .padding(16).contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                }
+            }
+            if !model.message.isEmpty {
+                Label(model.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            }
+        }
     }
 }
 
-#Preview {
-    ContentView()
+private struct DeviceDetail: View {
+    let device: AVCaptureDevice
+
+    private var rows: [DetailRow] {
+        let format = device.activeFormat
+        let description = format.formatDescription
+        let dimensions = CMVideoFormatDescriptionGetDimensions(description)
+        let rates = format.videoSupportedFrameRateRanges.map {
+            String(format: "%.2f–%.2f fps", $0.minFrameRate, $0.maxFrameRate)
+        }.joined(separator: ", ")
+        return [
+            DetailRow(label: "Device type", value: device.deviceType.rawValue),
+            DetailRow(label: "Unique ID", value: device.uniqueID),
+            DetailRow(label: "Model ID", value: device.modelID),
+            DetailRow(label: "Manufacturer", value: device.manufacturer),
+            DetailRow(label: "Transport", value: fourCC(UInt32(bitPattern: device.transportType))),
+            DetailRow(label: "Media type", value: fourCC(CMFormatDescriptionGetMediaType(description))),
+            DetailRow(label: "Pixel format / codec", value: fourCC(CMFormatDescriptionGetMediaSubType(description))),
+            DetailRow(label: "Active resolution", value: "\(dimensions.width) × \(dimensions.height)"),
+            DetailRow(label: "Supported frame rates", value: rates),
+            DetailRow(label: "Available formats", value: "\(device.formats.count)")
+        ]
+    }
+
+    private var colorRows: [DetailRow] {
+        let description = device.activeFormat.formatDescription
+        func reported(_ key: CFString) -> String {
+            guard let value = CMFormatDescriptionGetExtension(description, extensionKey: key) else {
+                return "Not reported"
+            }
+            return String(describing: value)
+        }
+        return [
+            DetailRow(label: "Color primaries", value: reported(kCMFormatDescriptionExtension_ColorPrimaries)),
+            DetailRow(label: "Transfer function", value: reported(kCMFormatDescriptionExtension_TransferFunction)),
+            DetailRow(label: "YCbCr matrix", value: reported(kCMFormatDescriptionExtension_YCbCrMatrix))
+        ]
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                GroupBox("Video source") { details(rows) }
+                GroupBox("Color profile") { details(colorRows) }
+                GroupBox("USB descriptors") {
+                    let usb = USBDetails.rows(for: device)
+                    if usb.isEmpty {
+                        Text("USB descriptors are unavailable for this source. The device may use a non-USB transport, or macOS may not expose its registry information.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    } else { details(usb) }
+                }
+            }
+        }
+    }
+
+    private func details(_ rows: [DetailRow]) -> some View {
+        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
+            ForEach(rows) { row in
+                GridRow {
+                    Text(row.label).foregroundStyle(.secondary)
+                    Text(row.value.isEmpty ? "Not reported" : row.value)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }.padding(8)
+    }
+
+    private func fourCC(_ value: FourCharCode) -> String {
+        let bytes = [24, 16, 8, 0].map { UInt8((value >> $0) & 0xff) }
+        if bytes.allSatisfy({ (32...126).contains($0) }) {
+            return String(bytes: bytes, encoding: .ascii) ?? "Unknown"
+        }
+        return String(format: "0x%08X", value)
+    }
 }
