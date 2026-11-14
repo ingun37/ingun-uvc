@@ -6,8 +6,19 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		92C4739D30A8528B0083BAD2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = Streamer;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Streamer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Streamer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		92C4739930A8528B0083BAD2 /* StreamerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StreamerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,20 @@
 			path = Streamer;
 			sourceTree = "<group>";
 		};
+		92C4739A30A8528B0083BAD2 /* StreamerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = StreamerTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		92C4739630A8528B0083BAD2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -31,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* Streamer */,
+				92C4739A30A8528B0083BAD2 /* StreamerTests */,
 				000000000000000000000020 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -39,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000120 /* Streamer.app */,
+				92C4739930A8528B0083BAD2 /* StreamerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -64,6 +87,27 @@
 			productReference = 000000000000000000000120 /* Streamer.app */;
 			productType = "com.apple.product-type.application";
 		};
+		92C4739830A8528B0083BAD2 /* StreamerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 92C473A130A8528B0083BAD2 /* Build configuration list for PBXNativeTarget "StreamerTests" */;
+			buildPhases = (
+				92C4739530A8528B0083BAD2 /* Sources */,
+				92C4739630A8528B0083BAD2 /* Frameworks */,
+				92C4739730A8528B0083BAD2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				92C4739E30A8528B0083BAD2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				92C4739A30A8528B0083BAD2 /* StreamerTests */,
+			);
+			name = StreamerTests;
+			productName = StreamerTests;
+			productReference = 92C4739930A8528B0083BAD2 /* StreamerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -71,11 +115,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					92C4739830A8528B0083BAD2 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -94,12 +142,18 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* Streamer */,
+				92C4739830A8528B0083BAD2 /* StreamerTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		92C4739730A8528B0083BAD2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -112,7 +166,20 @@
 			files = (
 			);
 		};
+		92C4739530A8528B0083BAD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		92C4739E30A8528B0083BAD2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* Streamer */;
+			targetProxy = 92C4739D30A8528B0083BAD2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Streamer" */ = {
@@ -333,6 +400,46 @@
 			};
 			name = Release;
 		};
+		92C4739F30A8528B0083BAD2 /* Debug configuration for PBXNativeTarget "StreamerTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.StreamerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Streamer.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Streamer";
+			};
+			name = Debug;
+		};
+		92C473A030A8528B0083BAD2 /* Release configuration for PBXNativeTarget "StreamerTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.StreamerTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Streamer.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Streamer";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -349,6 +456,14 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "Streamer" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "Streamer" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		92C473A130A8528B0083BAD2 /* Build configuration list for PBXNativeTarget "StreamerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				92C4739F30A8528B0083BAD2 /* Debug configuration for PBXNativeTarget "StreamerTests" */,
+				92C473A030A8528B0083BAD2 /* Release configuration for PBXNativeTarget "StreamerTests" */,
 			);
 			defaultConfigurationName = Release;
 		};

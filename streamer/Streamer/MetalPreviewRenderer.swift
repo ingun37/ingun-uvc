@@ -14,6 +14,9 @@ nonisolated final class MetalPreviewRenderer: NSObject, AVCaptureVideoDataOutput
     private let commandQueue: MTLCommandQueue
     private let pipeline: MTLRenderPipelineState
     private var textureCache: CVMetalTextureCache
+    private let freezeLock = NSLock()
+    private var freezeDetector: FrozenVideoDetector?
+    private var freezeProgress: (@Sendable (TimeInterval?) -> Void)?
 
     init(device: MTLDevice) throws {
         guard let commandQueue = device.makeCommandQueue() else { throw CaptureFailure.metalUnavailable }
@@ -69,6 +72,15 @@ nonisolated final class MetalPreviewRenderer: NSObject, AVCaptureVideoDataOutput
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        freezeLock.lock()
+        let detector = freezeDetector
+        let progress = freezeProgress
+        freezeLock.unlock()
+        if let detector {
+            detector.inspect(pixelBuffer, at: ProcessInfo.processInfo.systemUptime) { duration in
+                progress?(duration)
+            }
+        }
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         var cvTexture: CVMetalTexture?
@@ -104,5 +116,21 @@ nonisolated final class MetalPreviewRenderer: NSObject, AVCaptureVideoDataOutput
         commandBuffer.addCompletedHandler { _ in _ = pendingTexture.texture }
         commandBuffer.present(drawable)
         commandBuffer.commit()
+    }
+
+    func startFreezeDetection(_ progress: @escaping @Sendable (TimeInterval?) -> Void) throws {
+        let detector = try FrozenVideoDetector(device: commandQueue.device)
+        freezeLock.lock()
+        freezeDetector = detector
+        freezeProgress = progress
+        freezeLock.unlock()
+    }
+
+    func stopFreezeDetection() {
+        freezeLock.lock()
+        freezeDetector?.cancel()
+        freezeDetector = nil
+        freezeProgress = nil
+        freezeLock.unlock()
     }
 }

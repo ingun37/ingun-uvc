@@ -179,6 +179,7 @@ private struct RecordView: View {
     @State private var timerSeconds = 0
     @State private var timerDeadline: TimeInterval?
     @State private var timeRemaining: Int?
+    @State private var freezeRemaining: Int?
 
     private var timerDuration: Int { timerHours * 3600 + timerMinutes * 60 + timerSeconds }
 
@@ -201,6 +202,23 @@ private struct RecordView: View {
             }
             Text(recording.phase.label).font(.headline)
             Text("Audio: \(recording.audioDevice.localizedName)").foregroundStyle(.secondary)
+            GroupBox("Frozen video") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Stepper(value: Binding(
+                        get: { recording.freezeTimeout },
+                        set: { recording.freezeTimeout = $0 }
+                    ), in: 1...3600) {
+                        Text("Stop after \(recording.freezeTimeout) seconds without video motion")
+                    }
+                    .disabled(recording.phase != .recording)
+                    if let freezeRemaining, recording.phase == .recording {
+                        Label("Video may be frozen — stopping in \(freezeRemaining) seconds", systemImage: "snowflake")
+                            .foregroundStyle(.orange)
+                            .monospacedDigit()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             GroupBox("Recording timer") {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -238,6 +256,15 @@ private struct RecordView: View {
         }
         .onDisappear { recording.finish() }
         .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { _ in
+            if recording.phase == .recording, let deadline = recording.freezeDeadline {
+                let remaining = max(0, Int(ceil(deadline - ProcessInfo.processInfo.systemUptime)))
+                freezeRemaining = remaining
+                if remaining == 0 {
+                    recording.finish(reason: "Recording stopped because the video was frozen for \(recording.freezeTimeout) seconds.")
+                }
+            } else {
+                freezeRemaining = nil
+            }
             guard let timerDeadline else { return }
             guard recording.phase == .recording else {
                 self.timerDeadline = nil

@@ -30,6 +30,8 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     var phase: Phase = .starting
     var message = ""
     var savedURL: URL?
+    var freezeTimeout = 48
+    var freezeDeadline: TimeInterval?
 
     init(resource: CaptureResource, audioDevice: AVCaptureDevice, frameRate: Double) throws {
 
@@ -49,6 +51,8 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func finish(reason: String = "") {
         if !reason.isEmpty { message = reason }
+        resource.preview.stopFreezeDetection()
+        freezeDeadline = nil
         if phase == .starting {
             phase = .finishing
             return
@@ -60,6 +64,8 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     }
 
     func failed(_ message: String) {
+        resource.preview.stopFreezeDetection()
+        freezeDeadline = nil
         self.message = message
         phase = .failed
         
@@ -68,10 +74,17 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo outputFileURL: URL,
                                from connections: [AVCaptureConnection]) {
-        Task { @MainActor in
+        Task { @MainActor [self] in
             if self.phase == .finishing { self.resource.stopRecording(self.output) }
             else if self.phase == .starting {
                 self.phase = .recording
+                do {
+                    try self.resource.preview.startFreezeDetection { [weak self] duration in
+                        Task { @MainActor [weak self] in self?.updateFreeze(duration) }
+                    }
+                } catch {
+                    self.finish(reason: "Could not monitor frozen video: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -87,10 +100,24 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 .compactMap { $0 }.joined(separator: "\n")
         } ?? ""
         Task { @MainActor in
+            self.resource.preview.stopFreezeDetection()
+            self.freezeDeadline = nil
             
             if !message.isEmpty { self.message = message }
             self.phase = successful ? .ready : .failed
             if successful { self.save() }
+        }
+    }
+
+    private func updateFreeze(_ duration: TimeInterval?) {
+        guard phase == .recording else { return }
+        guard let duration else {
+            freezeDeadline = nil
+            return
+        }
+        freezeDeadline = ProcessInfo.processInfo.systemUptime + Double(freezeTimeout) - duration
+        if duration >= Double(freezeTimeout) {
+            finish(reason: "Recording stopped because the video was frozen for \(freezeTimeout) seconds.")
         }
     }
 
