@@ -11,11 +11,37 @@ struct ContentView: View {
             switch model.screen {
             case .devices:
                 deviceList
+            case let .frequency(device):
+                VStack(alignment: .leading, spacing: 20) {
+                    Button("Back to video sources", systemImage: "chevron.left") { model.back() }
+                    Text(device.localizedName).font(.largeTitle.bold())
+                    Text("Choose a capture frame rate before opening this source.")
+                        .foregroundStyle(.secondary)
+                    if model.supportedFrameRates.isEmpty {
+                        ContentUnavailableView("No frame rates reported", systemImage: "video.slash",
+                                               description: Text("This source does not report a supported frame rate for its active format."))
+                    } else {
+                        Picker("Video frequency", selection: $model.selectedFrameRate) {
+                            ForEach(model.supportedFrameRates, id: \.self) { rate in
+                                Text(String(format: "%.2f fps", rate)).tag(rate)
+                            }
+                        }
+                        .frame(maxWidth: 360)
+                        Button("Open video source", systemImage: "arrow.right") {
+                            Task { await model.open(device) }
+                        }
+                        .disabled(model.preparingCapture)
+                    }
+                    if !model.message.isEmpty {
+                        Label(model.message, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    }
+                    Spacer()
+                }
             case let .detail(device, resource):
                 HStack {
                     Button("Back", systemImage: "chevron.left") {
                         model.back()
-                        Task { await model.refresh() }
                     }
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
@@ -97,7 +123,7 @@ struct ContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(model.devices, id: \.uniqueID) { device in
-                            Button { Task { await model.open(device) } } label: {
+                            Button { model.select(device) } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "video").font(.title2).frame(width: 36)
                                     VStack(alignment: .leading, spacing: 4) {
