@@ -2,8 +2,9 @@
 
 This repository contains several tools for basketball video workflows:
 
-- `streamer/`: macOS capture-card inspector and recorder with audio-source and
-  recording-frame-rate selection.
+- `GuraStreaming/`: active macOS capture-card inspector and MOV recorder with
+  frame-rate selection, a Metal preview, and an audio-level meter.
+- `streamer/`: legacy capture app, retained for reference.
 - `TheMapper/`: active macOS app that maps video time to the basketball game clock.
 - `GametimeMapper/`: legacy mapper app and CLI, retained for reference.
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
@@ -17,34 +18,33 @@ When UnifiedApp runs the workflow, it writes `<video name>-<game id>.csv` and
 compilation plus a square `<player name>'s every bricks VS <opposing team long name> | <date>.mp4` for each player
 with included missed attempts.
 
-## Streamer
+## GuraStreaming
 
-Open `streamer/Streamer.xcodeproj` and run the `Streamer` scheme. Choose a capture
-card or camera to inspect its live video, source format, and available USB
-details. The preview width is adjustable. Before recording, choose an audio
-source and a frame rate supported by the active video format. **Record** creates
-a temporary `.mov`; **Done** finishes it and saves a timestamped file to Movies.
-The recording view also has an optional countdown timer.
-Recording is limited to 30 fps or lower; choosing a higher rate shows a warning
-and blocks **Record**.
+Open `GuraStreaming/GuraStreaming.xcodeproj` and run the `GuraStreaming` scheme.
+Choose a capture card or camera, then select a supported video frame rate. The
+picker defaults to 29.97 fps when available, then 30 fps. The detail view shows
+source and USB specifications, available color-profile information, a live
+Metal preview, and an audio-level meter when the source has accessible audio.
 
-The preview uses `AVCaptureVideoDataOutput` to receive BGRA frames. Core Video
-maps each pixel buffer to a Metal texture, which is drawn into a `CAMetalLayer`
-with aspect-fit scaling. The same capture session and preview remain active
-when recording starts.
+**Record** adds a movie output to the active capture session. **Stop** finalizes
+the recording and saves a timestamped `.mov` directly in `~/Movies`; the app
+shows the saved path when finalization succeeds. The preview retains only the
+newest waiting video frame, so it can drop frames when rendering falls behind.
 
-Frame-rate selection configures the capture device and checks that the session
-retains the requested duration before recording. Actual output frame rate and
-playback smoothness still need validation with each capture card; a device may
-advertise a mode that does not produce the expected recording timestamps.
+Frame-rate configuration is checked when the session starts and when recording
+begins. Actual delivered and saved frame cadence still needs hardware
+validation for each capture card.
 
 Build from the repository root:
 
 ```sh
-xcodebuild -project streamer/Streamer.xcodeproj -scheme Streamer \
-  -configuration Debug -derivedDataPath /tmp/ingun-uvc-streamer-build \
+xcodebuild -project GuraStreaming/GuraStreaming.xcodeproj -scheme GuraStreaming \
+  -configuration Debug -derivedDataPath /tmp/gurastreaming-build \
   CODE_SIGNING_ALLOWED=NO build
 ```
+
+`streamer/` remains available as the previous implementation. Its historical
+behavior and build instructions are in [streamer/AGENTS.md](streamer/AGENTS.md).
 
 ## TheMapper
 

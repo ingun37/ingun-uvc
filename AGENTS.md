@@ -2,11 +2,12 @@
 
 This repository contains multiple projects:
 
-- `streamer/`: native macOS SwiftUI capture-card inspector and recorder with a
-  Metal live preview, audio-source selection, and recording-frame-rate selection.
-  Capture-card frame-rate behavior requires hardware validation. Before working
-  on this project, read and follow
-  [streamer/AGENTS.md](streamer/AGENTS.md).
+- `GuraStreaming/`: active native macOS SwiftUI capture-card inspector and
+  recorder with frame-rate selection, a Metal preview, audio levels, and MOV
+  recording. Capture-card behavior requires hardware validation. Before
+  working on it, read and follow [GuraStreaming/AGENTS.md](GuraStreaming/AGENTS.md).
+- `streamer/`: legacy capture app, retained for reference after GuraStreaming
+  replaced it. Before changing it, read [streamer/AGENTS.md](streamer/AGENTS.md).
 - `TheMapper/`: native macOS SwiftUI app that maps video time to the basketball
   game clock with divide-and-conquer OCR. Before working on this project, read
   and follow [TheMapper/AGENTS.md](TheMapper/AGENTS.md).

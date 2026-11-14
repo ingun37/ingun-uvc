@@ -1,6 +1,12 @@
 # Project handoff
 
-Updated 2026-11-11 (Asia/Seoul).
+Original handoff updated 2026-11-11; legacy status updated 2026-11-14
+(Asia/Seoul).
+
+`streamer/` is now a legacy reference project. `GuraStreaming/` replaces it as
+the active capture app; see [../GuraStreaming/AGENTS.md](../GuraStreaming/AGENTS.md)
+for current capture work. The details below document this older implementation
+when changes to `streamer/` itself are needed.
 
 ## Scope and current state
 
