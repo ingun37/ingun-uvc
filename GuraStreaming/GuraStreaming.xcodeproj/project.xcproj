@@ -44,9 +44,11 @@
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_PREVIEWS": "YES",
         "ENABLE_RESOURCE_ACCESS_CAMERA": "YES",
+        "ENABLE_RESOURCE_ACCESS_AUDIO_INPUT": "YES",
         "ENABLE_USER_SELECTED_FILES": "readonly",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_KEY_NSCameraUsageDescription": "GuraStreaming needs camera access to list and inspect video capture sources.",
+        "INFOPLIST_KEY_NSMicrophoneUsageDescription": "GuraStreaming reads audio levels from the selected capture source.",
         "INFOPLIST_KEY_NSHumanReadableCopyright": "",
         "LD_RUNPATH_SEARCH_PATHS": [
           "$(inherited)",

@@ -21,15 +21,20 @@ struct ContentView: View {
                     Spacer()
                 }
                 HStack(alignment: .top, spacing: 20) {
-                    CapturePreview(renderer: resource.renderer)
-                        .aspectRatio(
-                            { let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
-                                return CGFloat(size.width) / CGFloat(size.height) }(),
-                            contentMode: .fit
-                        )
-                        .frame(minWidth: 320, maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .accessibilityLabel("Live video preview")
+                    VStack(alignment: .leading, spacing: 16) {
+                        CapturePreview(renderer: resource.renderer)
+                            .aspectRatio(
+                                { let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                                    return CGFloat(size.width) / CGFloat(size.height) }(),
+                                contentMode: .fit
+                            )
+                            .frame(minWidth: 320, maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .accessibilityLabel("Live video preview")
+                        AudioVisualizer(meter: resource.audioMeter,
+                                        sourceName: resource.audioSourceName,
+                                        message: model.audioMessage)
+                    }
                     DeviceDetail(device: device)
                         .frame(width: 440)
                 }
@@ -92,7 +97,7 @@ struct ContentView: View {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(model.devices, id: \.uniqueID) { device in
-                            Button { model.open(device) } label: {
+                            Button { Task { await model.open(device) } } label: {
                                 HStack(spacing: 14) {
                                     Image(systemName: "video").font(.title2).frame(width: 36)
                                     VStack(alignment: .leading, spacing: 4) {
@@ -113,6 +118,37 @@ struct ContentView: View {
             if !model.message.isEmpty {
                 Label(model.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
+        }
+    }
+}
+
+private struct AudioVisualizer: View {
+    let meter: AudioLevelMeter
+    let sourceName: String?
+    let message: String
+
+    var body: some View {
+        GroupBox("Audio level") {
+            VStack(alignment: .leading, spacing: 8) {
+                if let sourceName {
+                    Text(sourceName).font(.caption).foregroundStyle(.secondary)
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(.quaternary)
+                            Capsule().fill(.green)
+                                .frame(width: max(2, geometry.size.width * meter.level))
+                        }
+                    }
+                    .frame(height: 14)
+                    .animation(.linear(duration: 0.05), value: meter.level)
+                    .accessibilityLabel("Audio level")
+                    .accessibilityValue("\(Int(meter.level * 100)) percent")
+                } else {
+                    Text(message).foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
         }
     }
 }

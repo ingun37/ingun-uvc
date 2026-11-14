@@ -18,16 +18,20 @@ final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDe
     }
 }
 
-/// Owns the session and its one video data output for the lifetime of the detail scene.
+/// Owns the session and its video and optional audio outputs for the detail scene.
 final class CaptureResource: @unchecked Sendable {
     let session: AVCaptureSession
     let videoOutput: AVCaptureVideoDataOutput
     let frameDelegate: VideoFrameDelegate
     let renderer: MetalPreviewRenderer
+    let audioMeter = AudioLevelMeter()
+    let audioSourceName: String?
+    private let audioDelegate: AudioLevelDelegate?
     private let sessionQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.session")
     private let frameQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.frames")
+    private let audioQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.audioFrames")
 
-    init(device: AVCaptureDevice) throws {
+    init(device: AVCaptureDevice, audioDevice: AVCaptureDevice?) throws {
         let session = AVCaptureSession()
         let input = try AVCaptureDeviceInput(device: device)
         guard let metalDevice = MTLCreateSystemDefaultDevice() else { throw CaptureFailure.metalUnavailable }
@@ -44,7 +48,42 @@ final class CaptureResource: @unchecked Sendable {
         }
         session.addInput(input)
         session.addOutput(output)
+
+        var installedAudioDelegate: AudioLevelDelegate?
+        var installedAudioName: String?
+        var installedAudioOutput: AVCaptureAudioDataOutput?
+        if let audioDevice {
+            do {
+                let usesVideoInput = audioDevice.uniqueID == device.uniqueID && device.hasMediaType(.audio)
+                let audioInput = usesVideoInput ? nil : try AVCaptureDeviceInput(device: audioDevice)
+                if let audioInput, session.canAddInput(audioInput) { session.addInput(audioInput) }
+                if audioInput == nil || session.inputs.contains(where: { $0 === audioInput }) {
+                    let audioOutput = AVCaptureAudioDataOutput()
+                    audioOutput.audioSettings = [
+                        AVFormatIDKey: kAudioFormatLinearPCM,
+                        AVLinearPCMIsFloatKey: true,
+                        AVLinearPCMBitDepthKey: 32,
+                        AVLinearPCMIsNonInterleaved: false
+                    ]
+                    if session.canAddOutput(audioOutput) {
+                        let processor = AudioLevelProcessor(meter: audioMeter)
+                        let delegate = AudioLevelDelegate(processor: processor)
+                        audioOutput.setSampleBufferDelegate(delegate, queue: audioQueue)
+                        session.addOutput(audioOutput)
+                        installedAudioDelegate = delegate
+                        installedAudioName = audioDevice.localizedName
+                        installedAudioOutput = audioOutput
+                    }
+                }
+            } catch {
+                // Video preview still works if this source's audio cannot open.
+            }
+        }
         session.commitConfiguration()
+        if installedAudioOutput?.connection(with: .audio) == nil {
+            installedAudioDelegate = nil
+            installedAudioName = nil
+        }
 
         // Prefer native bi-planar capture data. BGRA is a fallback for sources that
         // do not offer either YUV format.
@@ -59,6 +98,8 @@ final class CaptureResource: @unchecked Sendable {
         self.videoOutput = output
         self.frameDelegate = delegate
         self.renderer = renderer
+        self.audioDelegate = installedAudioDelegate
+        self.audioSourceName = installedAudioName
     }
 
     func start() {
@@ -103,6 +144,7 @@ final class CaptureModel {
     var message = ""
     var streamMessage = ""
     var permissionDenied = false
+    var audioMessage = ""
 
     func refresh() async {
         message = ""
@@ -126,12 +168,33 @@ final class CaptureModel {
         ).devices.sorted { $0.localizedName.localizedStandardCompare($1.localizedName) == .orderedAscending }
     }
 
-    func open(_ device: AVCaptureDevice) {
+    func open(_ device: AVCaptureDevice) async {
         message = ""
         streamMessage = ""
+        audioMessage = ""
+        let audioDevices = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.external, .microphone], mediaType: .audio, position: .unspecified
+        ).devices
+        let audioDevice = device.hasMediaType(.audio) ? device
+            : device.linkedDevices.first(where: { $0.hasMediaType(.audio) })
+                ?? audioDevices.first(where: { $0.localizedName == device.localizedName })
+        let authorized: Bool
+        if audioDevice != nil {
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized: authorized = true
+            case .notDetermined: authorized = await AVCaptureDevice.requestAccess(for: .audio)
+            default: authorized = false
+            }
+        } else {
+            authorized = false
+        }
         do {
-            let resource = try CaptureResource(device: device)
+            let resource = try CaptureResource(device: device, audioDevice: authorized ? audioDevice : nil)
             screen = .detail(device, resource)
+            audioMessage = resource.audioSourceName == nil
+                ? (audioDevice == nil ? "No audio source is linked to this video source."
+                   : authorized ? "This audio source could not be opened." : "Allow microphone access to show audio levels.")
+                : ""
             resource.start()
         } catch {
             message = error.localizedDescription
