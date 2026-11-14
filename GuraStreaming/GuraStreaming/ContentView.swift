@@ -43,8 +43,13 @@ struct ContentView: View {
                     Button("Back", systemImage: "chevron.left") {
                         model.back()
                     }
+                    .disabled(model.recording?.phase.isBusy == true)
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
+                    Button("Record", systemImage: "record.circle") { model.record(resource) }
+                        .disabled(model.recording?.phase.isBusy == true)
+                    Button("Stop", systemImage: "stop.circle") { model.recording?.stop() }
+                        .disabled(model.recording?.phase != .recording && model.recording?.phase != .starting)
                 }
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 16) {
@@ -67,6 +72,9 @@ struct ContentView: View {
                 if !model.streamMessage.isEmpty {
                     Label(model.streamMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
+                }
+                if let recording = model.recording {
+                    Text(recording.message).textSelection(.enabled)
                 }
             }
         }

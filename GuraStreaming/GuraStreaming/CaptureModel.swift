@@ -27,6 +27,8 @@ final class CaptureResource: @unchecked Sendable {
     let audioMeter = AudioLevelMeter()
     let audioSourceName: String?
     private let audioDelegate: AudioLevelDelegate?
+    private let device: AVCaptureDevice
+    private let frameDuration: CMTime
     private let sessionQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.session")
     private let frameQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.frames")
     private let audioQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.audioFrames")
@@ -120,6 +122,59 @@ final class CaptureResource: @unchecked Sendable {
         self.renderer = renderer
         self.audioDelegate = installedAudioDelegate
         self.audioSourceName = installedAudioName
+        self.device = device
+        self.frameDuration = frameDuration
+    }
+
+    func startRecording(_ recording: MovieRecording) {
+        let session = session
+        let device = device
+        let duration = frameDuration
+        let output = recording.output
+        sessionQueue.async {
+            do {
+                try device.lockForConfiguration()
+            } catch {
+                let message = error.localizedDescription
+                Task { @MainActor in recording.failed("Could not configure recording: \(message)") }
+                return
+            }
+            session.beginConfiguration()
+            guard session.canAddOutput(output) else {
+                session.commitConfiguration()
+                device.unlockForConfiguration()
+                Task { @MainActor in recording.failed("This capture session cannot add a movie output.") }
+                return
+            }
+            session.addOutput(output)
+            device.activeVideoMinFrameDuration = duration
+            device.activeVideoMaxFrameDuration = duration
+            session.commitConfiguration()
+            device.unlockForConfiguration()
+            guard CMTimeCompare(device.activeVideoMinFrameDuration, duration) == 0,
+                  CMTimeCompare(device.activeVideoMaxFrameDuration, duration) == 0,
+                  output.connection(with: .video) != nil else {
+                session.beginConfiguration()
+                session.removeOutput(output)
+                session.commitConfiguration()
+                Task { @MainActor in recording.failed("The movie output did not retain the selected video rate.") }
+                return
+            }
+            output.startRecording(to: recording.destinationURL, recordingDelegate: recording)
+        }
+    }
+
+    func stopRecording(_ output: AVCaptureMovieFileOutput) {
+        sessionQueue.async { if output.isRecording { output.stopRecording() } }
+    }
+
+    func removeRecordingOutput(_ output: AVCaptureMovieFileOutput) {
+        let session = session
+        sessionQueue.async {
+            session.beginConfiguration()
+            if session.outputs.contains(where: { $0 === output }) { session.removeOutput(output) }
+            session.commitConfiguration()
+        }
     }
 
     func start() {
@@ -172,6 +227,7 @@ final class CaptureModel {
     var audioMessage = ""
     var selectedFrameRate = 0.0
     var preparingCapture = false
+    var recording: MovieRecording?
 
     var supportedFrameRates: [Double] {
         guard case let .frequency(device) = screen else { return [] }
@@ -264,12 +320,27 @@ final class CaptureModel {
     }
 
     func back() {
+        if let recording, recording.phase.isBusy { return }
         switch screen {
-        case let .detail(device, _): screen = .frequency(device)
+        case let .detail(device, _):
+            recording = nil
+            screen = .frequency(device)
         case .frequency: screen = .devices
         case .devices: break
         }
         streamMessage = ""
+    }
+
+    func record(_ resource: CaptureResource) {
+        guard case let .detail(_, current) = screen, current === resource,
+              recording?.phase.isBusy != true else { return }
+        do {
+            let newRecording = try MovieRecording(resource: resource)
+            recording = newRecording
+            newRecording.start()
+        } catch {
+            streamMessage = "Could not start recording: \(error.localizedDescription)"
+        }
     }
 
     func disconnected(_ notification: Notification) {
