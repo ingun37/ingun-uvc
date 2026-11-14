@@ -11,7 +11,7 @@ struct ContentView: View {
             switch model.screen {
             case .devices:
                 deviceList
-            case let .detail(device, _):
+            case let .detail(device, resource):
                 HStack {
                     Button("Back", systemImage: "chevron.left") {
                         model.back()
@@ -20,7 +20,19 @@ struct ContentView: View {
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
                 }
-                DeviceDetail(device: device)
+                HStack(alignment: .top, spacing: 20) {
+                    CapturePreview(renderer: resource.renderer)
+                        .aspectRatio(
+                            { let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                                return CGFloat(size.width) / CGFloat(size.height) }(),
+                            contentMode: .fit
+                        )
+                        .frame(minWidth: 320, maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityLabel("Live video preview")
+                    DeviceDetail(device: device)
+                        .frame(width: 440)
+                }
                 if !model.streamMessage.isEmpty {
                     Label(model.streamMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
@@ -28,7 +40,7 @@ struct ContentView: View {
             }
         }
         .padding(24)
-        .frame(minWidth: 720, minHeight: 580)
+        .frame(minWidth: 900, minHeight: 580)
         .task { await model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) {
             model.disconnected($0)
@@ -102,6 +114,47 @@ struct ContentView: View {
                 Label(model.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
         }
+    }
+}
+
+private struct CapturePreview: NSViewRepresentable {
+    let renderer: MetalPreviewRenderer
+
+    func makeNSView(context: Context) -> PreviewView {
+        PreviewView(renderer: renderer)
+    }
+
+    func updateNSView(_ view: PreviewView, context: Context) {
+        view.renderer = renderer
+    }
+}
+
+private final class PreviewView: NSView {
+    var renderer: MetalPreviewRenderer {
+        didSet {
+            if oldValue !== renderer {
+                layer = renderer.layer
+                needsLayout = true
+            }
+        }
+    }
+
+    init(renderer: MetalPreviewRenderer) {
+        self.renderer = renderer
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer = renderer.layer
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layout() {
+        super.layout()
+        renderer.layer.contentsScale = window?.backingScaleFactor ?? 1
+        renderer.layer.drawableSize = CGSize(
+            width: bounds.width * renderer.layer.contentsScale,
+            height: bounds.height * renderer.layer.contentsScale
+        )
     }
 }
 

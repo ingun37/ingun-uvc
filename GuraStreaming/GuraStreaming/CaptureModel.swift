@@ -1,13 +1,20 @@
 import AVFoundation
+import Metal
 import Observation
 
-/// Receives video frames on CaptureResource's dedicated frame queue.
-/// Frame processing can be added here in the next scene.
+/// The capture callback only retains the newest waiting pixel buffer.
 final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    let renderer: MetalPreviewRenderer
+
+    init(renderer: MetalPreviewRenderer) {
+        self.renderer = renderer
+    }
+
     nonisolated func captureOutput(_ output: AVCaptureOutput,
                                    didOutput sampleBuffer: CMSampleBuffer,
                                    from connection: AVCaptureConnection) {
-        // The asynchronous data output is active. The detail scene does not use frames yet.
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        renderer.offer(pixelBuffer)
     }
 }
 
@@ -16,14 +23,17 @@ final class CaptureResource: @unchecked Sendable {
     let session: AVCaptureSession
     let videoOutput: AVCaptureVideoDataOutput
     let frameDelegate: VideoFrameDelegate
+    let renderer: MetalPreviewRenderer
     private let sessionQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.session")
     private let frameQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.frames")
 
     init(device: AVCaptureDevice) throws {
         let session = AVCaptureSession()
         let input = try AVCaptureDeviceInput(device: device)
+        guard let metalDevice = MTLCreateSystemDefaultDevice() else { throw CaptureFailure.metalUnavailable }
+        let renderer = try MetalPreviewRenderer(device: metalDevice)
         let output = AVCaptureVideoDataOutput()
-        let delegate = VideoFrameDelegate()
+        let delegate = VideoFrameDelegate(renderer: renderer)
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(delegate, queue: frameQueue)
 
@@ -36,9 +46,19 @@ final class CaptureResource: @unchecked Sendable {
         session.addOutput(output)
         session.commitConfiguration()
 
+        // Prefer native bi-planar capture data. BGRA is a fallback for sources that
+        // do not offer either YUV format.
+        let formats = output.availableVideoPixelFormatTypes
+        let selected = [kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                        kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+                        kCVPixelFormatType_32BGRA].first { formats.contains($0) }
+        guard let selected else { throw CaptureFailure.unsupportedPixelFormat }
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: selected]
+
         self.session = session
         self.videoOutput = output
         self.frameDelegate = delegate
+        self.renderer = renderer
     }
 
     func start() {
@@ -59,9 +79,15 @@ final class CaptureResource: @unchecked Sendable {
 
 private enum CaptureFailure: LocalizedError {
     case unsupported
+    case unsupportedPixelFormat
+    case metalUnavailable
 
     var errorDescription: String? {
-        "This device or its video output cannot be added to a capture session."
+        switch self {
+        case .unsupported: "This device or its video output cannot be added to a capture session."
+        case .unsupportedPixelFormat: "This video source has no supported preview pixel format."
+        case .metalUnavailable: "Metal is unavailable, so the video preview cannot be displayed."
+        }
     }
 }
 
