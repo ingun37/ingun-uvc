@@ -271,9 +271,11 @@ final class CaptureModel {
         screen = .frequency(device)
         let currentDuration = device.activeVideoMinFrameDuration.seconds
         let currentRate = currentDuration > 0 ? 1 / currentDuration : 0
-        selectedFrameRate = supportedFrameRates.min(by: {
-            abs($0 - currentRate) < abs($1 - currentRate)
-        }) ?? 0
+        let rates = supportedFrameRates
+        selectedFrameRate = rates.first(where: { abs($0 - 29.97) < 0.01 })
+            ?? rates.first(where: { abs($0 - 30) < 0.01 })
+            ?? rates.min(by: { abs($0 - currentRate) < abs($1 - currentRate) })
+            ?? 0
     }
 
     func open(_ device: AVCaptureDevice) async {
