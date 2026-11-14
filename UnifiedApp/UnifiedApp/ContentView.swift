@@ -103,7 +103,8 @@ private enum Runner {
     nonisolated static func run(
         _ executable: URL,
         arguments: [String],
-        environment: [String: String] = [:]
+        environment: [String: String] = [:],
+        expectedOutput: URL? = nil
     ) throws -> String {
         let output = FileManager.default.temporaryDirectory.appending(
             path: UUID().uuidString
@@ -135,10 +136,20 @@ private enum Runner {
             if !stderr.isEmpty { details.append("Error output:\n\(stderr)") }
             throw RunError.failed(details.joined(separator: "\n\n"))
         }
+        if let expectedOutput,
+            !FileManager.default.fileExists(atPath: expectedOutput.path)
+        {
+            var details = ["The app closed without creating \(expectedOutput.path)."]
+            if !stdout.isEmpty { details.append("Output:\n\(stdout)") }
+            if !stderr.isEmpty { details.append("Error output:\n\(stderr)") }
+            throw RunError.failed(details.joined(separator: "\n\n"))
+        }
         return stdout
     }
 
-    nonisolated static func runDataFetcher(arguments: [String]) throws -> String
+    nonisolated static func runDataFetcher(
+        arguments: [String], expectedOutput: URL? = nil
+    ) throws -> String
     {
         let activate = root.appending(path: "data_fetcher/.venv/bin/activate")
         let script = root.appending(path: "data_fetcher/main.py")
@@ -153,7 +164,8 @@ private enum Runner {
             arguments: [
                 "-ic", "source \"$1\" && shift && exec python \"$@\"",
                 "data-fetcher", activate.path, script.path,
-            ] + arguments
+            ] + arguments,
+            expectedOutput: expectedOutput
         )
     }
 
@@ -262,13 +274,11 @@ private final class Workflow {
             )
             let csv = stagedCSVURL
             _ = try await Task.detached {
-                try Runner.runDataFetcher(arguments: [
-                    "attempts", game.id, "--output", csv.path,
-                ])
+                try Runner.runDataFetcher(
+                    arguments: ["attempts", game.id, "--output", csv.path],
+                    expectedOutput: csv
+                )
             }.value
-            guard FileManager.default.fileExists(atPath: csv.path) else {
-                throw Runner.RunError.missingOutput(csv.path)
-            }
             scene = .video
             message = "Choose the source video."
         } catch { message = error.localizedDescription }
