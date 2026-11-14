@@ -380,6 +380,14 @@ private struct ClipRow: View {
     let videoURL: URL
     let videoDuration: Double
 
+    private var minimumLength: Double { min(1, clip.originalEnd - clip.originalStart) }
+    private var startRange: ClosedRange<Double> {
+        max(0, clip.originalStart - 12)...min(clip.originalStart + 12, clip.end - minimumLength)
+    }
+    private var endRange: ClosedRange<Double> {
+        max(clip.originalEnd - 12, clip.start + minimumLength)...min(videoDuration, clip.originalEnd + 12)
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             ClipPreview(url: videoURL, start: clip.start, end: clip.end)
@@ -399,14 +407,19 @@ private struct ClipRow: View {
                     .monospacedDigit().foregroundStyle(.secondary)
                 HStack {
                     Text("Start")
-                    Slider(value: $clip.start, in: 0...max(0, clip.end - 1))
+                    Slider(value: $clip.start, in: startRange)
                     Text(ClipPlanner.clockLabel(clip.start)).monospacedDigit()
                 }
                 HStack {
                     Text("End")
-                    Slider(value: $clip.end, in: min(videoDuration, clip.start + 1)...videoDuration)
+                    Slider(value: $clip.end, in: endRange)
                     Text(ClipPlanner.clockLabel(clip.end)).monospacedDigit()
                 }
+                Button("Reset timing") {
+                    clip.start = clip.originalStart
+                    clip.end = clip.originalEnd
+                }
+                .disabled(clip.start == clip.originalStart && clip.end == clip.originalEnd)
                 Text("Drag either edge to include more or less source video.")
                     .font(.caption).foregroundStyle(.secondary)
             }

@@ -35,6 +35,8 @@ struct ShotCaption: Sendable {
 
 struct Clip: Identifiable, Sendable {
     let id: UUID
+    let originalStart: Double
+    var originalEnd: Double
     var start: Double
     var end: Double
     var descriptions: [String]
@@ -45,6 +47,8 @@ struct Clip: Identifiable, Sendable {
 
     init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [], captions: [ShotCaption] = [], players: [String] = []) {
         id = UUID()
+        originalStart = start
+        originalEnd = end
         self.start = start
         self.end = end
         self.descriptions = descriptions
@@ -211,6 +215,7 @@ enum ClipPlanner {
         for clip in sorted {
             if let last = merged.indices.last, clip.start <= merged[last].end {
                 merged[last].end = max(merged[last].end, clip.end)
+                merged[last].originalEnd = merged[last].end
                 merged[last].descriptions += clip.descriptions
                 merged[last].gameTimes += clip.gameTimes
                 merged[last].captions += clip.captions
