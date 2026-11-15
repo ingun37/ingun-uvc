@@ -85,6 +85,8 @@ struct ContentView: View {
                 case .process:
                     Button("Back to Formats") { step = .format }.disabled(processing)
                     Spacer()
+                    Button("Export Log") { exportLog() }
+                        .disabled(processing)
                     Button("Save JSON…") { saveMapping() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(processing || intervals == nil || (outputURL != nil && savedURL != nil))
@@ -227,6 +229,7 @@ struct ContentView: View {
         selectedRegion = nil
         intervals = nil
         chartPoints = []
+        logLines = []
         errorMessage = nil
         savedURL = nil
         step = .select
@@ -300,6 +303,19 @@ struct ContentView: View {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try (encoder.encode(entries) + Data([0x0a])).write(to: destination, options: .atomic)
             savedURL = destination
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func exportLog() {
+        guard let videoURL else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "log") ?? .plainText]
+        panel.directoryURL = videoURL.deletingLastPathComponent()
+        panel.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + ".log"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        do {
+            let contents = logLines.joined(separator: "\n") + (logLines.isEmpty ? "" : "\n")
+            try contents.write(to: destination, atomically: true, encoding: .utf8)
         } catch { errorMessage = error.localizedDescription }
     }
 }

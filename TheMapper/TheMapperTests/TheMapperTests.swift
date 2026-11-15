@@ -125,6 +125,8 @@ struct TheMapperTests {
                                                       underMinuteStyle: .colon)
         #expect(GameTimeReader.parse(["Ist 11:01", "22"], format: format) ==
                 .init(period: "1ST", gameSecond: 661))
+        #expect(GameTimeReader.parse(["15T 11:01", "22"], format: format) ==
+                .init(period: "1ST", gameSecond: 661))
     }
 
     @Test func overtimeShortLabels() {
