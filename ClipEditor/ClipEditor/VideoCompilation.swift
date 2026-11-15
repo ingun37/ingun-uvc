@@ -271,6 +271,12 @@ struct VideoCompilation {
             layer.frame = frame
             layer.backgroundColor = NSColor.white.cgColor
             layer.cornerRadius = 10
+            layer.shadowColor = NSColor.black.cgColor
+            layer.shadowOpacity = 0.94
+            layer.shadowRadius = 24
+            layer.shadowOffset = CGSize(width: 0, height: -3)
+            layer.shadowPath = CGPath(roundedRect: layer.bounds, cornerWidth: 10,
+                                      cornerHeight: 10, transform: nil)
             if let image = captionImage(count, size: CGSize(width: boxWidth - horizontalPadding * 2,
                                                             height: textHeight),
                                         attributes: attributes) {
