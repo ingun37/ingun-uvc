@@ -216,7 +216,10 @@ struct ContentView: View {
     private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
-    @State private var previewSpeed = 2.0
+    @State private var previewSpeed = 4.0
+    @State private var selectedPreviewID: UUID?
+    @State private var previewPlayToggle = 0
+    @State private var previewKeyMonitor: Any?
 
     init(videoURL: URL? = nil, mappingURL: URL? = nil,
          attemptsURL: URL? = nil, outputURL: URL? = nil, gameDate: String? = nil) {
@@ -329,13 +332,50 @@ struct ContentView: View {
                     .monospacedDigit()
                     .frame(width: 42, alignment: .trailing)
             }
-            ScrollView {
-                LazyVStack(spacing: 18) {
-                    ForEach($model.clips) { $clip in
-                        if let videoURL = model.videoURL {
-                            ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration,
-                                    previewSpeed: previewSpeed)
+            Text("↑/↓ Select preview · Space Play/Pause")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 18) {
+                        ForEach($model.clips) { $clip in
+                            if let videoURL = model.videoURL {
+                                ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration,
+                                        previewSpeed: previewSpeed, isSelected: selectedPreviewID == clip.id,
+                                        playToggle: previewPlayToggle)
+                                    .id(clip.id)
+                            }
                         }
+                    }
+                }
+                .onAppear {
+                    selectedPreviewID = model.clips.first?.id
+                    previewKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                        guard event.window === NSApp.mainWindow,
+                              NSApp.modalWindow == nil,
+                              event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else {
+                            return event
+                        }
+                        switch event.keyCode {
+                        case 125, 126: // Down, up
+                            guard !model.clips.isEmpty else { return nil }
+                            let index = model.clips.firstIndex { $0.id == selectedPreviewID } ?? 0
+                            let next = min(max(index + (event.keyCode == 125 ? 1 : -1), 0), model.clips.count - 1)
+                            selectedPreviewID = model.clips[next].id
+                            withAnimation { proxy.scrollTo(selectedPreviewID, anchor: .center) }
+                            return nil
+                        case 49: // Space
+                            if selectedPreviewID != nil { previewPlayToggle += 1 }
+                            return nil
+                        default:
+                            return event
+                        }
+                    }
+                }
+                .onDisappear {
+                    if let previewKeyMonitor {
+                        NSEvent.removeMonitor(previewKeyMonitor)
+                        self.previewKeyMonitor = nil
                     }
                 }
             }
@@ -390,6 +430,8 @@ private struct ClipRow: View {
     let videoURL: URL
     let videoDuration: Double
     let previewSpeed: Double
+    let isSelected: Bool
+    let playToggle: Int
 
     private var minimumLength: Double { min(1, clip.originalEnd - clip.originalStart) }
     private var startRange: ClosedRange<Double> {
@@ -401,7 +443,8 @@ private struct ClipRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            ClipPreview(url: videoURL, start: clip.start, end: clip.end, speed: previewSpeed)
+            ClipPreview(url: videoURL, start: clip.start, end: clip.end, speed: previewSpeed,
+                        isSelected: isSelected, playToggle: playToggle)
                 .frame(width: 320, height: 180)
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Include in compilation", isOn: $clip.included)
@@ -436,7 +479,10 @@ private struct ClipRow: View {
             }
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+        .background(isSelected ? Color.accentColor.opacity(0.14) : Color.gray.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2))
     }
 }
 
@@ -445,6 +491,8 @@ private struct ClipPreview: View {
     let start: Double
     let end: Double
     let speed: Double
+    let isSelected: Bool
+    let playToggle: Int
     @State private var player = AVPlayer()
 
     var body: some View {
@@ -458,6 +506,17 @@ private struct ClipPreview: View {
                 player.defaultRate = Float(newSpeed)
                 if player.timeControlStatus != .paused {
                     player.rate = Float(newSpeed)
+                }
+            }
+            .onChange(of: isSelected) { _, selected in
+                if !selected { player.pause() }
+            }
+            .onChange(of: playToggle) { _, _ in
+                guard isSelected else { return }
+                if player.timeControlStatus == .paused {
+                    player.playImmediately(atRate: Float(speed))
+                } else {
+                    player.pause()
                 }
             }
             .onChange(of: start) { _, _ in resetRange() }
