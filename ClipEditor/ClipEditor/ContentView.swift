@@ -216,6 +216,7 @@ struct ContentView: View {
     private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
+    @State private var previewSpeed = 2.0
 
     init(videoURL: URL? = nil, mappingURL: URL? = nil,
          attemptsURL: URL? = nil, outputURL: URL? = nil, gameDate: String? = nil) {
@@ -320,11 +321,20 @@ struct ContentView: View {
                     ForEach(model.unmatched, id: \.self) { Text($0).font(.caption) }
                 }
             }
+            HStack {
+                Text("Preview speed")
+                Slider(value: $previewSpeed, in: 0.5...6)
+                    .frame(maxWidth: 240)
+                Text("\(previewSpeed, specifier: "%.1f")×")
+                    .monospacedDigit()
+                    .frame(width: 42, alignment: .trailing)
+            }
             ScrollView {
                 LazyVStack(spacing: 18) {
                     ForEach($model.clips) { $clip in
                         if let videoURL = model.videoURL {
-                            ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration)
+                            ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration,
+                                    previewSpeed: previewSpeed)
                         }
                     }
                 }
@@ -379,6 +389,7 @@ private struct ClipRow: View {
     @Binding var clip: Clip
     let videoURL: URL
     let videoDuration: Double
+    let previewSpeed: Double
 
     private var minimumLength: Double { min(1, clip.originalEnd - clip.originalStart) }
     private var startRange: ClosedRange<Double> {
@@ -390,7 +401,7 @@ private struct ClipRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            ClipPreview(url: videoURL, start: clip.start, end: clip.end)
+            ClipPreview(url: videoURL, start: clip.start, end: clip.end, speed: previewSpeed)
                 .frame(width: 320, height: 180)
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Include in compilation", isOn: $clip.included)
@@ -433,13 +444,21 @@ private struct ClipPreview: View {
     let url: URL
     let start: Double
     let end: Double
+    let speed: Double
     @State private var player = AVPlayer()
 
     var body: some View {
         NativePlayerView(player: player)
             .onAppear {
+                player.defaultRate = Float(speed)
                 player.replaceCurrentItem(with: AVPlayerItem(url: url))
                 resetRange()
+            }
+            .onChange(of: speed) { _, newSpeed in
+                player.defaultRate = Float(newSpeed)
+                if player.timeControlStatus != .paused {
+                    player.rate = Float(newSpeed)
+                }
             }
             .onChange(of: start) { _, _ in resetRange() }
             .onChange(of: end) { _, _ in resetRange() }
