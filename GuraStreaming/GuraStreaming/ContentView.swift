@@ -5,7 +5,9 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = CaptureModel()
-
+    private var bundleVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             switch model.screen {
@@ -80,6 +82,7 @@ struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 900, minHeight: 580)
+        .navigationTitle("GuraStreaming v\(bundleVersion)")
         .task { await model.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) {
             model.disconnected($0)
