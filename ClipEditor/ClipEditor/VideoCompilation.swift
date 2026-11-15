@@ -249,22 +249,34 @@ struct VideoCompilation {
         }
         changes.sort { $0.time < $1.time }
         let font = NSFont.systemFont(ofSize: max(36, size.height * 0.065), weight: .semibold)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
-        let boxWidth = min(size.width - 16, max(150, size.width * 0.28))
-        let boxHeight = max(72, size.height * 0.105)
-        let frame = CGRect(x: (size.width - boxWidth) / 2,
-                           y: max(16, size.height * 0.1 - boxHeight / 2),
-                           width: boxWidth, height: boxHeight)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: NSColor.black, .paragraphStyle: paragraph
+        ]
+        let horizontalPadding: CGFloat = 20
+        let verticalPadding: CGFloat = 12
+        let centerY = max(56, size.height * 0.1)
         for (index, change) in changes.enumerated() {
+            let count = change.count.map { "\($0.made)/\($0.attempted)" } ?? "0/0"
+            let textSize = (count as NSString).size(withAttributes: attributes)
+            let textWidth = ceil(textSize.width) + 4
+            let textHeight = ceil(font.ascender - font.descender + font.leading) + 4
+            let boxWidth = min(size.width - 16, textWidth + horizontalPadding * 2)
+            let boxHeight = textHeight + verticalPadding * 2
+            let frame = CGRect(x: (size.width - boxWidth) / 2,
+                               y: max(16, centerY - boxHeight / 2),
+                               width: boxWidth, height: boxHeight)
             let layer = CALayer()
             layer.frame = frame
             layer.backgroundColor = NSColor.white.cgColor
             layer.cornerRadius = 10
-            let count = change.count.map { "\($0.made)/\($0.attempted)" } ?? "0/0"
-            if let image = captionImage(count, size: CGSize(width: boxWidth - 28, height: boxHeight - 20),
+            if let image = captionImage(count, size: CGSize(width: boxWidth - horizontalPadding * 2,
+                                                            height: textHeight),
                                         attributes: attributes) {
                 let label = CALayer()
-                label.frame = CGRect(x: 14, y: 10, width: boxWidth - 28, height: boxHeight - 20)
+                label.frame = CGRect(x: horizontalPadding, y: verticalPadding,
+                                     width: boxWidth - horizontalPadding * 2, height: textHeight)
                 label.contents = image
                 label.contentsScale = 2
                 layer.addSublayer(label)
@@ -301,12 +313,14 @@ struct VideoCompilation {
             parent.addSublayer(layer)
             guard let event = change.count else { continue }
             let emoji = event.isMade ? "🏀" : "🧱"
-            let emojiFont = NSFont.systemFont(ofSize: max(38, size.height * 0.075))
-            guard let image = captionImage(emoji, size: CGSize(width: 100, height: 100),
+            let iconSize = min(88, max(64, size.height * 0.08))
+            let emojiFont = NSFont.systemFont(ofSize: iconSize * 0.78)
+            guard let image = captionImage(emoji, size: CGSize(width: iconSize, height: iconSize),
                                            attributes: [.font: emojiFont]) else { continue }
             let icon = CALayer()
             icon.contents = image
-            icon.frame = CGRect(x: frame.maxX - 35, y: frame.maxY - 10, width: 100, height: 100)
+            icon.frame = CGRect(x: frame.midX - iconSize / 2, y: frame.maxY + 6,
+                                width: iconSize, height: iconSize)
             icon.opacity = 0
             guard change.time < duration - 0.05 else { continue }
             let span = min(0.7, duration - change.time)
