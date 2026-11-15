@@ -75,8 +75,30 @@ struct ContentView: View {
                     Label(model.streamMessage, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 }
+                HStack {
+                    Text("Stop after frozen video")
+                    TextField("Seconds", value: $model.freezeTimeout, format: .number)
+                        .frame(width: 65)
+                    Text("seconds")
+                }
+                .onChange(of: model.freezeTimeout) { _, value in
+                    if !value.isFinite { model.freezeTimeout = 60 }
+                }
+                .disabled(model.recording?.phase.isBusy == true)
                 if let recording = model.recording {
+                    if let remaining = recording.freezeCountdown {
+                        Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")
+                            .foregroundStyle(.orange)
+                    }
                     Text(recording.message).textSelection(.enabled)
+                    if let savedURL = recording.savedURL {
+                        HStack {
+                            Button("Open directory") {
+                                NSWorkspace.shared.open(savedURL.deletingLastPathComponent())
+                            }
+                            Button("Open file") { NSWorkspace.shared.open(savedURL) }
+                        }
+                    }
                 }
             }
         }

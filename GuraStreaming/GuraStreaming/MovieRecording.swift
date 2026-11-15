@@ -20,6 +20,9 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     let destinationURL: URL
     var phase: Phase = .starting
     var message = "Starting recording…"
+    var freezeCountdown: Int?
+    var stopReason = "Stopped by clicking Stop"
+    var savedURL: URL?
 
     init(resource: CaptureResource) throws {
         self.resource = resource
@@ -39,9 +42,27 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         super.init()
     }
 
-    func start() { resource.startRecording(self) }
+    func start(freezeTimeout: TimeInterval) {
+        let detector = resource.freezeDetector
+        detector.timeout = freezeTimeout
+        detector.onCountdown = { [weak self] remaining in
+            Task { @MainActor [weak self] in self?.freezeCountdown = remaining }
+        }
+        detector.onTimeout = { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.phase == .recording else { return }
+                self.stop(reason: "Stopped because the video was frozen")
+                self.message = "Recording stopped because video was frozen. Finishing…"
+            }
+        }
+        detector.setActive(true)
+        resource.startRecording(self)
+    }
 
-    func stop() {
+    func stop(reason: String = "Stopped by clicking Stop") {
+        stopReason = reason
+        resource.freezeDetector.setActive(false)
+        freezeCountdown = nil
         switch phase {
         case .starting:
             phase = .stopping
@@ -55,8 +76,9 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     }
 
     func failed(_ reason: String) {
+        resource.freezeDetector.setActive(false)
         phase = .failed
-        message = reason
+        message = "Stopped because of an error: \(reason)"
     }
 
     nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo outputFileURL: URL,
@@ -77,13 +99,15 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         let success = failure == nil || (failure?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool == true)
         let failureText = failure?.localizedDescription ?? "Recording did not finish successfully."
         Task { @MainActor [self] in
+            resource.freezeDetector.setActive(false)
             resource.removeRecordingOutput(self.output)
             guard success else {
                 failed(failureText)
                 return
             }
             phase = .saved
-            message = "Video is saved to \(outputFileURL.path)"
+            savedURL = outputFileURL
+            message = "\(stopReason). Video is saved to \(outputFileURL.path)"
             print(message)
         }
     }

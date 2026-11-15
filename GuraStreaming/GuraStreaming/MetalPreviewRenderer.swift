@@ -17,7 +17,8 @@ nonisolated private final class FrameLifetime: @unchecked Sendable {
 /// the capture callback's queue.
 nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
     let layer: CAMetalLayer
-    private let commandQueue: MTLCommandQueue
+    let device: MTLDevice
+    let commandQueue: MTLCommandQueue
     private let textureCache: CVMetalTextureCache
     private let yuvPipeline: MTLRenderPipelineState
     private let bgraPipeline: MTLRenderPipelineState
@@ -85,6 +86,7 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
         layer.pixelFormat = .bgra8Unorm
         layer.backgroundColor = CGColor(gray: 0, alpha: 1)
 
+        self.device = device
         self.layer = layer
         self.commandQueue = commandQueue
         self.textureCache = cache
@@ -184,7 +186,7 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
         renderQueue.async { [self] in renderLatest() }
     }
 
-    private func texture(_ frame: CVPixelBuffer, format: MTLPixelFormat, plane: Int) -> CVMetalTexture? {
+    func texture(_ frame: CVPixelBuffer, format: MTLPixelFormat, plane: Int) -> CVMetalTexture? {
         let width = CVPixelBufferIsPlanar(frame) ? CVPixelBufferGetWidthOfPlane(frame, plane) : CVPixelBufferGetWidth(frame)
         let height = CVPixelBufferIsPlanar(frame) ? CVPixelBufferGetHeightOfPlane(frame, plane) : CVPixelBufferGetHeight(frame)
         var result: CVMetalTexture?

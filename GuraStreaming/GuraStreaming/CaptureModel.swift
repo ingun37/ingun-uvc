@@ -5,9 +5,11 @@ import Observation
 /// The capture callback only retains the newest waiting pixel buffer.
 final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let renderer: MetalPreviewRenderer
+    let detector: MetalFreezeDetector
 
-    init(renderer: MetalPreviewRenderer) {
+    init(renderer: MetalPreviewRenderer, detector: MetalFreezeDetector) {
         self.renderer = renderer
+        self.detector = detector
     }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput,
@@ -15,6 +17,7 @@ final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                                    from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         renderer.offer(pixelBuffer)
+        detector.offer(pixelBuffer, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
     }
 }
 
@@ -24,6 +27,7 @@ final class CaptureResource: @unchecked Sendable {
     let videoOutput: AVCaptureVideoDataOutput
     let frameDelegate: VideoFrameDelegate
     let renderer: MetalPreviewRenderer
+    let freezeDetector: MetalFreezeDetector
     let audioMeter = AudioLevelMeter()
     let audioSourceName: String?
     private let audioDelegate: AudioLevelDelegate?
@@ -50,8 +54,9 @@ final class CaptureResource: @unchecked Sendable {
         let input = try AVCaptureDeviceInput(device: device)
         guard let metalDevice = MTLCreateSystemDefaultDevice() else { throw CaptureFailure.metalUnavailable }
         let renderer = try MetalPreviewRenderer(device: metalDevice)
+        let detector = try MetalFreezeDetector(renderer: renderer)
         let output = AVCaptureVideoDataOutput()
-        let delegate = VideoFrameDelegate(renderer: renderer)
+        let delegate = VideoFrameDelegate(renderer: renderer, detector: detector)
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(delegate, queue: frameQueue)
 
@@ -120,6 +125,7 @@ final class CaptureResource: @unchecked Sendable {
         self.videoOutput = output
         self.frameDelegate = delegate
         self.renderer = renderer
+        self.freezeDetector = detector
         self.audioDelegate = installedAudioDelegate
         self.audioSourceName = installedAudioName
         self.device = device
@@ -228,6 +234,7 @@ final class CaptureModel {
     var selectedFrameRate = 0.0
     var preparingCapture = false
     var recording: MovieRecording?
+    var freezeTimeout = 60.0
 
     var supportedFrameRates: [Double] {
         guard case let .frequency(device) = screen else { return [] }
@@ -339,7 +346,7 @@ final class CaptureModel {
         do {
             let newRecording = try MovieRecording(resource: resource)
             recording = newRecording
-            newRecording.start()
+            newRecording.start(freezeTimeout: max(1, freezeTimeout))
         } catch {
             streamMessage = "Could not start recording: \(error.localizedDescription)"
         }
