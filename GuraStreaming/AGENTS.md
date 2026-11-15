@@ -1,6 +1,6 @@
 # GuraStreaming project guidance
 
-Updated 2026-11-14 (Asia/Seoul).
+Updated 2026-11-15 (Asia/Seoul).
 
 ## Scope
 
@@ -26,8 +26,12 @@ required. Prefer clear resource ownership and keep capture callbacks short.
 5. Record adds an `AVCaptureMovieFileOutput` to the existing session on its
    serial queue. Stop finalizes a timestamped `.mov` directly in `~/Movies`.
    The saved-path message appears only after the file-output delegate reports
-   successful completion. Record is disabled while starting, recording, or
-   stopping; Back is disabled during those phases.
+   successful completion. The message reports whether Stop was clicked or frozen video
+   triggered the stop; failures show their error. Saved recordings offer Open directory
+   and Open file buttons. Record is disabled while starting, recording, or
+   stopping; Back is disabled during those phases. The frozen-video timeout is
+   adjustable before recording and defaults to 60 seconds. Repeated frames start
+   a countdown; continued repetition through the timeout stops recording.
 
 ## Code map
 
@@ -41,6 +45,10 @@ required. Prefer clear resource ownership and keep capture callbacks short.
   `CVPixelBuffer` to Metal textures and draws into `CAMetalLayer`. It allows one
   GPU render and one waiting frame. The completion handler retains the buffer
   and texture wrappers until the GPU finishes.
+- `GuraStreaming/MetalFreezeDetector.swift`: Metal compute comparison of a fixed
+  256 × 144 pixel grid. It shares the preview device, command queue, and texture
+  cache, holds one latest waiting frame, and uses sample timestamps for the
+  countdown. Small codec differences are tolerated.
 - `GuraStreaming/AudioLevelMeter.swift`: audio callback retains only the latest
   waiting sample. A utility queue computes a bounded RMS level and publishes
   UI updates at most 20 times per second.
@@ -58,9 +66,11 @@ xcodebuild -project GuraStreaming/GuraStreaming.xcodeproj -scheme GuraStreaming 
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-Debug builds have passed. This is a compilation check only; capture-card frame
+The frozen-video unit test reads `GuraStreamingTests/frozen-audible-small.mp4`
+with a two-second timeout. Builds and this file-backed test have passed; capture-card frame
 cadence, preview, audio metering, movie finalization, and saved-file timestamps
-still require hardware validation. Some devices advertise frame rates that do
+still require hardware validation. Frozen-video accuracy and recording stop
+behavior on capture hardware also require validation. Some devices advertise frame rates that do
 not match delivered or recorded cadence. Inspect sample timestamps and the
 saved movie if a rate looks wrong.
 

@@ -3,7 +3,7 @@
 This repository contains several tools for basketball video workflows:
 
 - `GuraStreaming/`: active macOS capture-card inspector and MOV recorder with
-  frame-rate selection, a Metal preview, and an audio-level meter.
+  frame-rate selection, a Metal preview, an audio-level meter, and automatic stop on frozen video.
 - `streamer/`: legacy capture app, retained for reference.
 - `TheMapper/`: active macOS app that maps video time to the basketball game clock.
 - `GametimeMapper/`: legacy mapper app and CLI, retained for reference.
@@ -28,12 +28,24 @@ Metal preview, and an audio-level meter when the source has accessible audio.
 
 **Record** adds a movie output to the active capture session. **Stop** finalizes
 the recording and saves a timestamped `.mov` directly in `~/Movies`; the app
-shows the saved path when finalization succeeds. The preview retains only the
-newest waiting video frame, so it can drop frames when rendering falls behind.
+shows why recording stopped and the saved path when finalization succeeds.
+**Open directory** opens the containing Movies folder; **Open file** opens the
+saved movie. If recording fails, the app shows the error instead.
+
+The frozen-video timeout defaults to 60 seconds and can be changed in the detail
+view before recording. A countdown appears when repeated frames are detected;
+recording stops if they continue for the selected duration. A Metal compute
+shader compares a fixed 256 × 144 grid of pixels between frames, allowing
+small codec differences. The preview and detector each retain only their newest
+waiting frame, so either can skip frames when GPU work falls behind. Both share
+the Metal device, command queue, and texture cache. The movie output runs through
+the capture session separately.
 
 Frame-rate configuration is checked when the session starts and when recording
 begins. Actual delivered and saved frame cadence still needs hardware
-validation for each capture card.
+validation for each capture card. The frozen-video test uses
+`GuraStreaming/GuraStreamingTests/frozen-audible-small.mp4` with a two-second
+timeout.
 
 Build from the repository root:
 
