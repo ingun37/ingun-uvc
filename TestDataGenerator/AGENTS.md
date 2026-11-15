@@ -26,3 +26,4 @@ xcodebuild -project TestDataGenerator/TestDataGenerator.xcodeproj \
 ```
 
 Use `test-data/0022600156/0.mov`, `0.json`, and `attempts.csv` for an end-to-end run. Write generated clips outside the repository, such as `/tmp/test-data-generator-output`.
+`test-data/basket-side/` contains previously generated per-attempt MP4 and JSON pairs used to check ClipEditor's basket-side detector. The JSON `shot_time_seconds` is the offset of the shot frame within its paired MP4; it does not label the basket side.

@@ -19,6 +19,7 @@ ClipEditor is a SwiftUI app that turns missed NBA field goals into a video compi
 - Concatenate video ranges without a visual transition. Where source audio exists, extend it across each cut and use volume ramps for a short audio transition. Stage export before replacing an existing destination.
 - Export the all-player compilation to the chosen destination and one square video per player with included clips, in the same directory. Name each player file `<player name>'s every bricks VS <opposing team long name> | <date>.mp4`; disambiguate duplicate names. Use the CSV team codes and the same long-name mapping as UnifiedApp. UnifiedApp passes the date with `--date`; standalone exports can infer it from the compilation filename. A merged clip belongs to every player with an attempt in it and stays intact in each player's video.
 - Preserve shot captions and source dimensions in the all-player compilation. Center-crop each player video to 1:1. Show that player's name at the top center and only that player's FGM/FGA attempt count at the bottom center when its shot caption appears. Omit the player's name and jersey number from that count caption.
+- For each all-player shot caption, determine basket side from the frame at the shot's source time. Compare summed pixel brightness across every row in only the leftmost 16 columns and rightmost 16 columns; ignore all middle columns. The darker edge determines the side. For frames narrower than 32 pixels, use equal nonoverlapping edge regions. Ties choose left; frame extraction or detection failure defaults to right. Per-player captions use their fixed placement.
 
 ## Build and test
 
@@ -36,3 +37,4 @@ xcodebuild -project ClipEditor/ClipEditor.xcodeproj \
 ```
 
 `ClipEditorTests/` covers CSV parsing, clip planning, and export with audio. The template UI test runner may fail to bootstrap in automated environments; run the focused unit target for deterministic checks.
+Use the clips and matching JSON metadata in `test-data/basket-side/` to check basket-side detection at each `shot_time_seconds` offset. The JSON contains shot timing and metadata, not a labeled basket-side answer; verify the expected side from the video frame when using it as a regression fixture.

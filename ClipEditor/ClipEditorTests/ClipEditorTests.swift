@@ -37,6 +37,23 @@ struct ClipEditorTests {
         #expect(try !detector.isRight(image(left: 0.5, right: 0.5)))
     }
 
+    @Test func basketSideIgnoresMiddleColumns() throws {
+        let detector = try BasketSide()
+        guard let context = CGContext(data: nil, width: 64, height: 4, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw BasketSide.DetectionError.computeFailed
+        }
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 64, height: 4))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 16, height: 4))
+        context.fill(CGRect(x: 48, y: 0, width: 16, height: 4))
+        context.fill(CGRect(x: 16, y: 0, width: 16, height: 4))
+        guard let image = context.makeImage() else { throw BasketSide.DetectionError.computeFailed }
+        #expect(try !detector.isRight(image))
+    }
+
     @Test func interpolatesWithinContinuousClockRangeAndLeavesGapsUnmatched() throws {
         let attempts = [
             MissedAttempt(period: "1ST", gameSecond: 97, description: "middle"),

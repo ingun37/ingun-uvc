@@ -81,12 +81,12 @@ struct BasketSide {
                                         uint row [[thread_position_in_grid]]) {
         if (row >= frame.get_height()) return;
         float2 sums = 0.0;
-        const uint midpoint = frame.get_width() / 2;
-        for (uint x = 0; x < frame.get_width(); ++x) {
-            const float3 rgb = frame.read(uint2(x, row)).rgb;
-            const float brightness = dot(rgb, float3(0.2126, 0.7152, 0.0722));
-            if (x < midpoint) sums.x += brightness;
-            else if (x >= frame.get_width() - midpoint) sums.y += brightness;
+        const uint columns = min(16u, frame.get_width() / 2);
+        for (uint x = 0; x < columns; ++x) {
+            const float3 left = frame.read(uint2(x, row)).rgb;
+            const float3 right = frame.read(uint2(frame.get_width() - columns + x, row)).rgb;
+            sums.x += dot(left, float3(0.2126, 0.7152, 0.0722));
+            sums.y += dot(right, float3(0.2126, 0.7152, 0.0722));
         }
         rowSums[row] = sums;
     }
