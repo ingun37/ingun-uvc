@@ -7,6 +7,21 @@
 
 import SwiftUI
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var activity: NSObjectProtocol?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: [.idleDisplaySleepDisabled, .idleSystemSleepDisabled, .latencyCritical],
+            reason: "GuraStreaming is running"
+        )
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
