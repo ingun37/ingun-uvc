@@ -87,6 +87,9 @@ private final class EditorModel {
     var videoURL: URL? { files[.video]?.url }
     var canContinue: Bool { InputKind.allCases.allSatisfy { files[$0] != nil } && !isBusy }
     var selectedClips: [Clip] { clips.filter(\.included) }
+    var missingLocationCount: Int {
+        selectedClips.flatMap(\.captions).filter { $0.location == nil }.count
+    }
     var playerGroups: [(key: String, name: String, clips: [Clip])] {
         let keys = Array(Set(selectedClips.flatMap(\.players))).sorted()
         return keys.map { key in
@@ -323,6 +326,11 @@ struct ContentView: View {
                 DisclosureGroup("\(model.unmatched.count) attempts could not be mapped") {
                     ForEach(model.unmatched, id: \.self) { Text($0).font(.caption) }
                 }
+            }
+            if model.missingLocationCount > 0 {
+                Label("\(model.missingLocationCount) included attempts have no shot location. Their captions will appear at the bottom center in the compilation and player videos.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
             }
             HStack {
                 Text("Preview speed")

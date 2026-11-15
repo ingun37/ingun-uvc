@@ -29,7 +29,7 @@ struct MissedAttempt: Sendable {
 struct ShotCaption: Sendable {
     let sourceTime: Double
     let text: String
-    let location: CGPoint
+    let location: CGPoint?
     let player: String?
 }
 
@@ -202,8 +202,8 @@ enum ClipPlanner {
             let start = max(0, moment - 4)
             let end = min(videoDuration, moment + 2)
             if end > start {
-                let captions: [ShotCaption] = if let text = attempt.caption, let location = attempt.location {
-                    [ShotCaption(sourceTime: moment, text: text, location: location, player: attempt.player)]
+                let captions: [ShotCaption] = if let text = attempt.caption {
+                    [ShotCaption(sourceTime: moment, text: text, location: attempt.location, player: attempt.player)]
                 } else { [] }
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
                                        gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], captions: captions,

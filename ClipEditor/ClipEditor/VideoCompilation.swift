@@ -135,10 +135,10 @@ struct VideoCompilation {
             let basketSide = try BasketSide()
             for (time, caption) in overlays {
                 let point: CGPoint
-                if player == nil {
+                if player == nil, let location = caption.location {
                     let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime, preferredTimescale: 600), actualTime: nil)
                     let basketRight = try frame.map { try basketSide.isRight($0) } ?? true
-                    point = BasketSide.project(caption.location, right: basketRight)
+                    point = BasketSide.project(location, right: basketRight)
                 } else {
                     point = CGPoint(x: 0.5, y: 0.9)
                 }
@@ -168,7 +168,8 @@ struct VideoCompilation {
                     ? NSColor.black.withAlphaComponent(0.75).cgColor : NSColor.white.cgColor
                 box.cornerRadius = 8
                 box.frame = CGRect(x: min(max(point.x * size.width - width / 2, 0), size.width - width),
-                                   y: player == nil ? min(max((1 - point.y) * size.height, 0), size.height - height)
+                                   y: player == nil && caption.location != nil
+                                       ? min(max((1 - point.y) * size.height, 0), size.height - height)
                                        : max(16, size.height * 0.1 - height / 2),
                                    width: width, height: height)
                 let labelSize = CGSize(width: width - padding * 2, height: ceil(textBounds.height))
