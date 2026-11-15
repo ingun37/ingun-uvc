@@ -88,6 +88,17 @@ struct ClipEditorTests {
         #expect(!attempts.isEmpty)
     }
 
+    @Test func countHistoryIncludesMadeShotsBetweenMisses() throws {
+        let csv = "period,clock,team,player,player_full_name,result,description\n" +
+            "1,PT11M00S,A,One,Alice,missed,miss\n" +
+            "1,PT10M00S,A,One,Alice,made,make\n" +
+            "1,PT09M00S,A,One,Alice,missed,miss\n"
+        let events = try #require(ClipPlanner.countEvents(from: csv)["A|Alice"])
+        #expect(events.map(\.attempted) == [1, 2, 3])
+        #expect(events.map(\.made) == [0, 1, 1])
+        #expect(events.map(\.isMade) == [false, true, false])
+    }
+
     @Test func mapsClampsAndMergesOverlappingMisses() throws {
         let attempts = [
             MissedAttempt(period: "1ST", gameSecond: 693, description: "first"),
@@ -151,5 +162,29 @@ struct ClipEditorTests {
         let track = try #require(await AVURLAsset(url: output).loadTracks(withMediaType: .video).first)
         let size = try await track.load(.naturalSize)
         #expect(abs(size.width - size.height) < 1)
+    }
+
+    @Test func exportsAnimatedCountFromShortFixture() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "test-data/short-2")
+        let csv = try String(contentsOf: root.appending(path: "first-quarter-only.csv"), encoding: .utf8)
+        let ranges = try JSONDecoder().decode([ClockRange].self,
+            from: Data(contentsOf: root.appending(path: "first-quarter-only.json")))
+        let video = root.appending(path: "first-quarter-only.mov")
+        let duration = try await AVURLAsset(url: video).load(.duration).seconds
+        let plan = try ClipPlanner.plan(attempts: ClipPlanner.attempts(from: csv),
+                                        ranges: ranges, videoDuration: duration)
+        let player = "DET|Cade Cunningham"
+        let clips = plan.clips.filter { $0.players.contains(player) }
+        let events = try #require(ClipPlanner.countEvents(from: csv)[player])
+        #expect(!clips.isEmpty)
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-animated-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        try await VideoCompilation.export(videoURL: video, clips: clips, destination: output,
+                                          title: "Cade Cunningham", player: player, square: true,
+                                          countEvents: events)
+        #expect(FileManager.default.fileExists(atPath: output.path))
     }
 }

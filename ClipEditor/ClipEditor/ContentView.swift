@@ -77,6 +77,7 @@ private final class EditorModel {
     var unmatched: [String] = []
     var videoDuration = 0.0
     var teams: [String] = []
+    var countEvents: [String: [CountEvent]] = [:]
     var gameDate: String?
     var message = ""
     var isBusy = false
@@ -107,6 +108,7 @@ private final class EditorModel {
         files[kind] = FileAccess(url)
         clips = []
         unmatched = []
+        countEvents = [:]
         exportedURL = nil
         playerExportURLs = []
         message = ""
@@ -139,6 +141,7 @@ private final class EditorModel {
             let csv = try String(contentsOf: attempts, encoding: .utf8)
             teams = try ClipPlanner.teams(from: csv)
             let shots = try ClipPlanner.attempts(from: csv)
+            countEvents = try ClipPlanner.countEvents(from: csv)
             let plan = try ClipPlanner.plan(attempts: shots, ranges: ranges, videoDuration: duration)
             videoDuration = duration
             clips = plan.clips
@@ -197,7 +200,8 @@ private final class EditorModel {
                 try await VideoCompilation.export(videoURL: video, clips: group.clips, destination: url,
                                                   title: group.name,
                                                   subtitle: "Every 🧱 VS \(opponent) | \(shortDate)",
-                                                  player: group.key, square: true)
+                                                  player: group.key, square: true,
+                                                  countEvents: countEvents[group.key] ?? [])
                 playerURLs.append(url)
             }
             exportedURL = destination

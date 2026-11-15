@@ -33,6 +33,12 @@ struct ShotCaption: Sendable {
     let player: String?
 }
 
+struct CountEvent: Sendable {
+    let made: Int
+    let attempted: Int
+    let isMade: Bool
+}
+
 struct Clip: Identifiable, Sendable {
     let id: UUID
     let originalStart: Double
@@ -78,6 +84,31 @@ enum ClipPlanningError: LocalizedError {
 }
 
 enum ClipPlanner {
+    static func countEvents(from text: String) throws -> [String: [CountEvent]] {
+        let rows = try csvRows(text)
+        guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
+              let resultIndex = header.firstIndex(of: "result"),
+              let playerIndex = header.firstIndex(of: "player") else { return [:] }
+        let fullNameIndex = header.firstIndex(of: "player_full_name")
+        let teamIndex = header.firstIndex(of: "team")
+        var events: [String: [CountEvent]] = [:]
+        for row in rows.dropFirst() {
+            guard row.indices.contains(resultIndex), row.indices.contains(playerIndex) else { continue }
+            let result = row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard result == "made" || result == "missed" else { continue }
+            let player = row[playerIndex]
+            let fullName = fullNameIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let team = teamIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let name = fullName.isEmpty ? player : fullName
+            guard !name.isEmpty else { continue }
+            let key = "\(team)|\(name)"
+            let previous = events[key]?.last
+            events[key, default: []].append(CountEvent(made: (previous?.made ?? 0) + (result == "made" ? 1 : 0),
+                                                         attempted: (previous?.attempted ?? 0) + 1,
+                                                         isMade: result == "made"))
+        }
+        return events
+    }
     private struct MappedRange {
         let range: ClockRange
         var clockDuration: Double { range.game_start_seconds - range.game_end_seconds }

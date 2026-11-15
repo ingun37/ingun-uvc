@@ -6,7 +6,8 @@ import QuartzCore
 struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL,
                        title: String? = nil, subtitle: String? = nil,
-                       player: String? = nil, square: Bool = false) async throws {
+                       player: String? = nil, square: Bool = false,
+                       countEvents: [CountEvent] = []) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -128,12 +129,17 @@ struct VideoCompilation {
                 }
                 parent.addSublayer(box)
             }
+            if player != nil {
+                addCountAnimation(to: parent, size: size, duration: cursor.seconds,
+                                  clips: selected, player: player!, events: countEvents)
+            }
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
             let basketSide = try BasketSide()
             for (time, caption) in overlays {
+                if player != nil { continue }
                 let point: CGPoint
                 if player == nil, let location = caption.location {
                     let frame = try? generator.copyCGImage(at: CMTime(seconds: caption.sourceTime, preferredTimescale: 600), actualTime: nil)
@@ -210,6 +216,124 @@ struct VideoCompilation {
             _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
         } else {
             try FileManager.default.moveItem(at: staged, to: destination)
+        }
+    }
+
+    private static func addCountAnimation(to parent: CALayer, size: CGSize, duration: Double,
+                                          clips: [Clip], player: String, events: [CountEvent]) {
+        guard duration > 0 else { return }
+        struct Change { let time: Double; let count: CountEvent? }
+        var changes = [Change(time: 0, count: nil)]
+        var shownAttempts = 0
+        var cursor = 0.0
+        for clip in clips {
+            let shots = clip.captions.filter { $0.player == player &&
+                $0.sourceTime >= clip.start && $0.sourceTime < clip.end
+            }.sorted { $0.sourceTime < $1.sourceTime }
+            for shot in shots {
+                guard let countText = shot.text.components(separatedBy: "\n").last,
+                      let attempts = Int(countText.split(separator: "/").last ?? ""),
+                      attempts <= events.count else { continue }
+                let gapEnd = max(shownAttempts, attempts - 1)
+                if gapEnd > shownAttempts {
+                    let available = min(0.85, max(0.1, shot.sourceTime - clip.start - 0.15))
+                    for index in (shownAttempts + 1)...gapEnd {
+                        let fraction = Double(index - shownAttempts) / Double(gapEnd - shownAttempts + 1)
+                        changes.append(Change(time: cursor + available * fraction, count: events[index - 1]))
+                    }
+                }
+                changes.append(Change(time: cursor + shot.sourceTime - clip.start, count: events[attempts - 1]))
+                shownAttempts = attempts
+            }
+            cursor += clip.end - clip.start
+        }
+        changes.sort { $0.time < $1.time }
+        let font = NSFont.systemFont(ofSize: max(36, size.height * 0.065), weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let boxWidth = min(size.width - 16, max(150, size.width * 0.28))
+        let boxHeight = max(72, size.height * 0.105)
+        let frame = CGRect(x: (size.width - boxWidth) / 2,
+                           y: max(16, size.height * 0.1 - boxHeight / 2),
+                           width: boxWidth, height: boxHeight)
+        for (index, change) in changes.enumerated() {
+            let layer = CALayer()
+            layer.frame = frame
+            layer.backgroundColor = NSColor.white.cgColor
+            layer.cornerRadius = 10
+            let count = change.count.map { "\($0.made)/\($0.attempted)" } ?? "0/0"
+            if let image = captionImage(count, size: CGSize(width: boxWidth - 28, height: boxHeight - 20),
+                                        attributes: attributes) {
+                let label = CALayer()
+                label.frame = CGRect(x: 14, y: 10, width: boxWidth - 28, height: boxHeight - 20)
+                label.contents = image
+                label.contentsScale = 2
+                layer.addSublayer(label)
+            }
+            let end = index + 1 < changes.count ? changes[index + 1].time : duration
+            let visible = CAKeyframeAnimation(keyPath: "opacity")
+            visible.values = change.time == 0 ? [1, 0, 0] : [0, 1, 0, 0]
+            visible.keyTimes = change.time == 0
+                ? [0, NSNumber(value: min(1, end / duration)), 1]
+                : [0, NSNumber(value: min(1, change.time / duration)),
+                   NSNumber(value: min(1, end / duration)), 1]
+            visible.calculationMode = .discrete
+            visible.beginTime = AVCoreAnimationBeginTimeAtZero
+            visible.duration = duration
+            visible.isRemovedOnCompletion = false
+            visible.fillMode = .both
+            layer.opacity = 0
+            layer.add(visible, forKey: "visibility")
+            if change.time > 0 && change.time < duration - 0.05 {
+                let pop = CAKeyframeAnimation(keyPath: "transform.scale")
+                let span = min(0.42, duration - change.time)
+                pop.values = [1, 1, 0.7, 1.17, 0.94, 1, 1]
+                pop.keyTimes = [0, NSNumber(value: change.time / duration),
+                                NSNumber(value: change.time / duration),
+                                NSNumber(value: (change.time + span * 0.38) / duration),
+                                NSNumber(value: (change.time + span * 0.7) / duration),
+                                NSNumber(value: (change.time + span) / duration), 1]
+                pop.beginTime = AVCoreAnimationBeginTimeAtZero
+                pop.duration = duration
+                pop.isRemovedOnCompletion = false
+                pop.fillMode = .both
+                layer.add(pop, forKey: "pop")
+            }
+            parent.addSublayer(layer)
+            guard let event = change.count else { continue }
+            let emoji = event.isMade ? "🏀" : "🧱"
+            let emojiFont = NSFont.systemFont(ofSize: max(38, size.height * 0.075))
+            guard let image = captionImage(emoji, size: CGSize(width: 100, height: 100),
+                                           attributes: [.font: emojiFont]) else { continue }
+            let icon = CALayer()
+            icon.contents = image
+            icon.frame = CGRect(x: frame.maxX - 35, y: frame.maxY - 10, width: 100, height: 100)
+            icon.opacity = 0
+            guard change.time < duration - 0.05 else { continue }
+            let span = min(0.7, duration - change.time)
+            let bounce = CAKeyframeAnimation(keyPath: "position.y")
+            let y = icon.position.y
+            bounce.values = [y + 90, y + 90, y - 24, y + 12, y, y]
+            bounce.keyTimes = [0, NSNumber(value: change.time / duration),
+                               NSNumber(value: (change.time + span * 0.35) / duration),
+                               NSNumber(value: (change.time + span * 0.57) / duration),
+                               NSNumber(value: (change.time + span * 0.8) / duration), 1]
+            bounce.beginTime = AVCoreAnimationBeginTimeAtZero
+            bounce.duration = duration
+            bounce.isRemovedOnCompletion = false
+            bounce.fillMode = .both
+            icon.add(bounce, forKey: "bounce")
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = [0, 0, 1, 1, 0, 0]
+            fade.keyTimes = [0, NSNumber(value: change.time / duration),
+                             NSNumber(value: (change.time + span * 0.12) / duration),
+                             NSNumber(value: (change.time + span * 0.72) / duration),
+                             NSNumber(value: (change.time + span) / duration), 1]
+            fade.beginTime = AVCoreAnimationBeginTimeAtZero
+            fade.duration = duration
+            fade.isRemovedOnCompletion = false
+            fade.fillMode = .both
+            icon.add(fade, forKey: "fade")
+            parent.addSublayer(icon)
         }
     }
 
