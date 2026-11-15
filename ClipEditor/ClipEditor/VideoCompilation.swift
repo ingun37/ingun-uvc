@@ -269,7 +269,7 @@ struct VideoCompilation {
                                width: boxWidth, height: boxHeight)
             let layer = CALayer()
             layer.frame = frame
-            layer.backgroundColor = NSColor.white.cgColor
+            layer.backgroundColor = CGColor(gray: 0.96, alpha: 1.0)
             layer.cornerRadius = 10
             layer.shadowColor = NSColor.black.cgColor
             layer.shadowOpacity = 0.94
