@@ -16,7 +16,8 @@ This repository contains multiple projects:
 - `data_fetcher/`: Python CLI program that fetches field goal attempts of a NBA game.
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
 - `ClipEditor/`: native macOS SwiftUI app for missed-shot compilations and
-  per-player videos with separate caption placement.
+  per-player videos with separate caption placement, shared preview speed,
+  and keyboard navigation between clip previews.
   Before working on this project, read and follow [ClipEditor/AGENTS.md](ClipEditor/AGENTS.md).
 - `TestDataGenerator/`: native macOS Swift CLI for per-attempt clips and metadata.
   Before working on this project, read and follow
