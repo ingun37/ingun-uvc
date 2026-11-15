@@ -27,6 +27,7 @@
 		929ACB3130935A9D00674F83 /* ClipEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */ = {isa = PBXFileReference; explicitFileType = "archive.metal-library"; includeInIndex = 0; path = PimpUpTheStats.metallib; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,6 +44,11 @@
 		929ACB4B30935A9D00674F83 /* ClipEditorUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ClipEditorUITests;
+			sourceTree = "<group>";
+		};
+		92E27A6430A9BBB00088F688 /* PimpUpTheStats */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PimpUpTheStats;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -72,6 +78,7 @@
 				929ACB3330935A9D00674F83 /* ClipEditor */,
 				929ACB4130935A9D00674F83 /* ClipEditorTests */,
 				929ACB4B30935A9D00674F83 /* ClipEditorUITests */,
+				92E27A6430A9BBB00088F688 /* PimpUpTheStats */,
 				929ACB3230935A9D00674F83 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -82,6 +89,7 @@
 				929ACB3130935A9D00674F83 /* ClipEditor.app */,
 				929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */,
 				929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */,
+				92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -149,6 +157,22 @@
 			productReference = 929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		92E27A6230A9BBB00088F688 /* PimpUpTheStats */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 92E27A6930A9BBB00088F688 /* Build configuration list for PBXNativeTarget "PimpUpTheStats" */;
+			buildPhases = (
+				92E27A6130A9BBB00088F688 /* Sources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				92E27A6430A9BBB00088F688 /* PimpUpTheStats */,
+			);
+			name = PimpUpTheStats;
+			productName = PimpUpTheStats;
+			productReference = 92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */;
+			productType = "com.apple.product-type.metal-library";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -170,6 +194,9 @@
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = 929ACB3030935A9C00674F83;
 					};
+					92E27A6230A9BBB00088F688 = {
+						CreatedOnToolsVersion = 27.2;
+					};
 				};
 			};
 			buildConfigurationList = 929ACB2C30935A9C00674F83 /* Build configuration list for PBXProject "ClipEditor" */;
@@ -189,6 +216,7 @@
 				929ACB3030935A9C00674F83 /* ClipEditor */,
 				929ACB3D30935A9D00674F83 /* ClipEditorTests */,
 				929ACB4730935A9D00674F83 /* ClipEditorUITests */,
+				92E27A6230A9BBB00088F688 /* PimpUpTheStats */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +251,11 @@
 			);
 		};
 		929ACB4430935A9D00674F83 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		92E27A6130A9BBB00088F688 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
 			);
@@ -497,6 +530,24 @@
 			};
 			name = Release;
 		};
+		92E27A6730A9BBB00088F688 /* Debug configuration for PBXNativeTarget "PimpUpTheStats" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				VERSIONING_SYSTEM = "";
+			};
+			name = Debug;
+		};
+		92E27A6830A9BBB00088F688 /* Release configuration for PBXNativeTarget "PimpUpTheStats" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				VERSIONING_SYSTEM = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -529,6 +580,14 @@
 			buildConfigurations = (
 				929ACB5730935A9D00674F83 /* Debug configuration for PBXNativeTarget "ClipEditorUITests" */,
 				929ACB5830935A9D00674F83 /* Release configuration for PBXNativeTarget "ClipEditorUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		92E27A6930A9BBB00088F688 /* Build configuration list for PBXNativeTarget "PimpUpTheStats" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				92E27A6730A9BBB00088F688 /* Debug configuration for PBXNativeTarget "PimpUpTheStats" */,
+				92E27A6830A9BBB00088F688 /* Release configuration for PBXNativeTarget "PimpUpTheStats" */,
 			);
 			defaultConfigurationName = Release;
 		};
