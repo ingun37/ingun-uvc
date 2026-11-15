@@ -319,7 +319,8 @@ struct VideoCompilation {
                                            attributes: [.font: emojiFont]) else { continue }
             let icon = CALayer()
             icon.contents = image
-            icon.frame = CGRect(x: frame.midX - iconSize / 2, y: frame.maxY + 6,
+            // +10 is heuristic adjustment to align center
+            icon.frame = CGRect(x: frame.midX - iconSize / 2 + 10, y: frame.maxY + 6,
                                 width: iconSize, height: iconSize)
             icon.opacity = 0
             guard change.time < duration - 0.05 else { continue }
