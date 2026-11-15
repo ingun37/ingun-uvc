@@ -15,8 +15,8 @@ This repository contains several tools for basketball video workflows:
 
 When UnifiedApp runs the workflow, it writes `<video name>-<game id>.csv` and
 `<video name>-map.json` beside the source video. ClipEditor saves the full
-compilation plus a square `<player name>'s every bricks VS <opposing team long name> | <date>.mp4` for each player
-with included missed attempts.
+compilation plus a square `<player name> | every brick VS <opposing team long name> | <date>.mp4` for each player
+with included missed attempts. Player videos keep an animated FGM/FGA count visible throughout.
 
 ## GuraStreaming
 
