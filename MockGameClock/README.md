@@ -48,3 +48,23 @@ Use one statement per line. The first must be `start at` and the last must be `e
 Times use `PERIOD mm:ss.ff`, with two digits in each numeric part. Periods are `1ST`, `2ND`, `3RD`, `4TH`, `OT`, `2OT`, and `3OT`. Quarters start at `11:59.00`; overtime periods start at `04:59.00`. At one minute or more, the video displays `mm:ss`. Below one minute, it displays `:ss.s`. The next period begins after `:00.0`; a script may end at `3OT 00:00.00`.
 
 The clock scales uniformly to fit the requested video dimensions and is centered on a black background.
+
+## TheMapper test videos
+
+TheMapper keeps reproducible video fixtures beside their scripts in
+`TheMapper/TheMapperTests/scoreboard-videos/`. The `mock-pauses-a.txt` and
+`mock-pauses-b.txt` scripts each contain three pauses at different clock times
+and lengths. The corresponding 1280 × 720 MOV files use the CLI's 30 fps output.
+From the repository root, after building the CLI, regenerate a fixture with:
+
+```sh
+/tmp/mock-game-clock-build/Build/Products/Release/mock-game-clock \
+  --width 1280 --height 720 \
+  --code TheMapper/TheMapperTests/scoreboard-videos/mock-pauses-a.txt \
+  --output TheMapper/TheMapperTests/scoreboard-videos/mock-pauses-a.mov
+```
+
+The CLI refuses to overwrite an existing file, so remove the old MOV before
+regenerating it. TheMapper's tests use known frame indices from these scripts
+to check continuous-interval end times to within 0.1 seconds. Update those
+expected frame indices if you change a script.

@@ -6,6 +6,7 @@ This repository contains several tools for basketball video workflows:
   frame-rate selection, a Metal preview, an audio-level meter, and automatic stop on frozen video.
 - `streamer/`: legacy capture app, retained for reference.
 - `TheMapper/`: active macOS app that maps video time to the basketball game clock.
+- `MockGameClock/`: app and CLI that render scripted game-clock videos for mapper tests.
 - `GametimeMapper/`: legacy mapper app and CLI, retained for reference.
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
 - `ClipEditor/`: macOS app for missed-shot compilations, including one video per player. See [its README](ClipEditor/README.md).
@@ -68,7 +69,9 @@ Open `TheMapper/TheMapper.xcodeproj` and run the `TheMapper` scheme. The app let
 4. Process the video. The live log shows OCR text and parsed clocks. After processing, the graph shows continuous and paused intervals. The final log line reports elapsed time, interval coverage, and OCR frame count.
 5. Click **Save JSON**. The save dialog defaults to the video's folder; `--output/-o <path>` saves directly to that path when the button is clicked.
 
-TheMapper uses endpoint OCR and recursively splits intervals that are neither continuous nor paused. It produces a JSON array with `period`, `game_start_seconds`, `game_end_seconds`, `video_start_seconds`, and `video_end_seconds`. There is no manual filtering stage. TheMapper shows its bundle version in the window title bar.
+TheMapper uses endpoint OCR and recursively splits intervals that are neither continuous nor paused. After merging, it checks each continuous interval's final clock-second transition with up to four additional OCR samples over the preceding second. When the readings agree, it refines `video_end_seconds` to within 1/16 second of that transition and shifts `video_start_seconds` by the same amount. An interval stays unchanged if a reading fails or disagrees. It produces a JSON array with `period`, `game_start_seconds`, `game_end_seconds`, `video_start_seconds`, and `video_end_seconds`. There is no manual filtering stage. TheMapper shows its bundle version in the window title bar.
+
+`TheMapper/TheMapperTests/scoreboard-videos/` contains MockGameClock videos and their source `.txt` scripts. Two videos include three pauses each at different clock times and lengths. The mapping tests check seven continuous-interval end transitions against known 30 fps frame positions with a 0.1-second tolerance. See [MockGameClock's README](MockGameClock/README.md) to regenerate the videos.
 
 Build and run unit tests from the repository root:
 

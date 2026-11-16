@@ -9,8 +9,14 @@ This repository contains multiple projects:
 - `streamer/`: legacy capture app, retained for reference after GuraStreaming
   replaced it. Before changing it, read [streamer/AGENTS.md](streamer/AGENTS.md).
 - `TheMapper/`: native macOS SwiftUI app that maps video time to the basketball
-  game clock with divide-and-conquer OCR. Before working on this project, read
-  and follow [TheMapper/AGENTS.md](TheMapper/AGENTS.md).
+  game clock with divide-and-conquer OCR and refines continuous-interval ends
+  after merging. Its mapping tests use MockGameClock video fixtures. Before
+  working on this project, read and follow
+  [TheMapper/AGENTS.md](TheMapper/AGENTS.md).
+- `MockGameClock/`: macOS app and CLI that generate scripted game-clock videos.
+  Source scripts and rendered fixtures used by TheMapper live in
+  `TheMapper/TheMapperTests/scoreboard-videos/`. See
+  [MockGameClock/README.md](MockGameClock/README.md) for the script format and CLI.
 - `GametimeMapper/`: legacy mapper app and CLI, retained for reference. Before
   working on it, read [GametimeMapper/AGENTS.md](GametimeMapper/AGENTS.md).
 - `data_fetcher/`: Python CLI program that fetches field goal attempts of a NBA game.
