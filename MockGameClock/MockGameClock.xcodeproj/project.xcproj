@@ -11,12 +11,28 @@
     ],
   },
   "files": [
-    { "kind": "folder", "path": "MockGameClock", "target-membership": [ "MockGameClock" ] },
+    {
+      "kind": "folder",
+      "path": "MockGameClock",
+      "target-membership": [
+        "MockGameClock",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "mock-game-clock",
+          "inclusions": [
+            "ClockVideo.swift",
+          ],
+        },
+      ],
+    },
+    { "kind": "folder", "path": "mock-game-clock", "target-membership": [ "mock-game-clock" ] },
     {
       "kind": "group",
       "name": "Products",
       "children": [
         { "path": "<PRODUCTS>/MockGameClock.app", "id": "926B02D530AB2CD500AF46CD", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/mock-game-clock", "id": "92936DC030AB3D5600B0CF79", "type": "compiled.mach-o.executable", "index": false },
       ],
     },
   ],
@@ -55,6 +71,28 @@
         "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
         "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
         "SWIFT_EMIT_LOC_STRINGS": "YES",
+        "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
+        "SWIFT_VERSION": "5.0",
+      },
+    }, {
+      "name": "mock-game-clock",
+      "id": "92936DBF30AB3D5600B0CF79",
+      "product": "Products/mock-game-clock",
+      "product-type": "tool",
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        {
+          "kind": "copy",
+          "name": "Copy Files",
+          "relative-path": "/usr/share/man/man1/",
+          "scope": "install",
+        },
+      ],
+      "build-settings": {
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
         "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
         "SWIFT_VERSION": "5.0",
       },
