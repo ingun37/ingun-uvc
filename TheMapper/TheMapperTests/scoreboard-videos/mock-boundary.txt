@@ -1,0 +1,3 @@
+# Generated with MockGameClock/CLI at 1280x720.
+start at 2ND 02:21.00
+end at 2ND 02:17.00

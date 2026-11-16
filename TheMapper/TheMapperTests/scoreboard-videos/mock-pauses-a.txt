@@ -1,0 +1,6 @@
+# MockGameClock/CLI, 1280x720, 30 fps. Pauses deliberately vary in position and length.
+start at 2ND 02:21.00
+pause at 2ND 02:19.00 for 1.3 seconds
+pause at 2ND 02:15.00 for 2.1 seconds
+pause at 2ND 02:13.00 for 0.7 seconds
+end at 2ND 02:09.00

@@ -91,7 +91,7 @@ nonisolated enum VideoTimeMapper {
         }
 
         let found = try divide(0, lastTime)
-        let intervals = merge(found, margin: margin)
+        let intervals = refineContinuousEnds(merge(found, margin: margin), reading: reading)
         let continuous = found.filter { $0.kind == .continuous }
             .reduce(0.0) { $0 + $1.videoEnd - $1.videoStart }
         let paused = found.filter { $0.kind == .paused }
@@ -154,6 +154,44 @@ nonisolated enum VideoTimeMapper {
             index += 1
         }
         return bridged
+    }
+
+    /// Locate the first frame showing the final clock second. A countdown clock
+    /// shows gameEnd + 1 immediately before it shows gameEnd.
+    static func refineContinuousEnds(
+        _ intervals: [Interval],
+        reading: (Double) throws -> GameTimeReader.Reading?
+    ) -> [Interval] {
+        intervals.map { interval in
+            guard interval.kind == .continuous, interval.videoEnd >= 1 else { return interval }
+            do {
+                var lower = interval.videoEnd - 1
+                var upper = interval.videoEnd
+                guard let before = try reading(lower), let after = try reading(upper),
+                      before.period == interval.period, after.period == interval.period,
+                      abs(before.gameSecond - (interval.gameEnd + 1)) < 0.001,
+                      abs(after.gameSecond - interval.gameEnd) < 0.001 else { return interval }
+                for _ in 0..<4 {
+                    let middle = (lower + upper) / 2
+                    guard let sample = try reading(middle), sample.period == interval.period else {
+                        return interval
+                    }
+                    if abs(sample.gameSecond - interval.gameEnd) < 0.001 {
+                        upper = middle
+                    } else if abs(sample.gameSecond - (interval.gameEnd + 1)) < 0.001 {
+                        lower = middle
+                    } else {
+                        return interval
+                    }
+                }
+                let offset = upper - interval.videoEnd
+                return Interval(kind: interval.kind, period: interval.period,
+                    videoStart: interval.videoStart + offset, videoEnd: upper,
+                    gameStart: interval.gameStart, gameEnd: interval.gameEnd)
+            } catch {
+                return interval
+            }
+        }
     }
 
     private enum MappingError: Error { case noVideo, invalidDuration, pixelBuffer }

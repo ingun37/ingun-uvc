@@ -1,0 +1,6 @@
+# MockGameClock/CLI, 1280x720, 30 fps. Different period and pause spacing.
+start at 4TH 01:50.00
+pause at 4TH 01:48.00 for 0.6 seconds
+pause at 4TH 01:44.00 for 1.7 seconds
+pause at 4TH 01:41.00 for 1.1 seconds
+end at 4TH 01:38.00

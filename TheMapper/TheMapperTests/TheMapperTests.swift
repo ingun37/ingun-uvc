@@ -9,6 +9,74 @@ import Numerics
 private final class FixtureBundleAnchor {}
 
 struct TheMapperTests {
+    @Test func refinesContinuousBoundaryAndMovesStartBySameOffset() {
+        let interval = VideoTimeMapper.Interval(kind: .continuous, period: "2ND",
+            videoStart: 1, videoEnd: 3, gameStart: 41, gameEnd: 39)
+        var sampled: [Double] = []
+        let result = VideoTimeMapper.refineContinuousEnds([interval]) { time in
+            sampled.append(time)
+            return .init(period: "2ND", gameSecond: time < 2.3 ? 40 : 39)
+        }
+        #expect(sampled == [2, 3, 2.5, 2.25, 2.375, 2.3125])
+        #expect(result[0].videoEnd == 2.3125)
+        #expect(result[0].videoStart == 0.3125)
+        #expect(result[0].gameStart == interval.gameStart)
+        #expect(result[0].gameEnd == interval.gameEnd)
+    }
+
+    @Test func leavesUncertainIntervalsUnchangedAndContinues() {
+        let first = VideoTimeMapper.Interval(kind: .continuous, period: "2ND",
+            videoStart: 1, videoEnd: 3, gameStart: 41, gameEnd: 39)
+        let paused = VideoTimeMapper.Interval(kind: .paused, period: "2ND",
+            videoStart: 3, videoEnd: 4, gameStart: 39, gameEnd: 39)
+        let next = VideoTimeMapper.Interval(kind: .continuous, period: "2ND",
+            videoStart: 4, videoEnd: 6, gameStart: 39, gameEnd: 37)
+        let result = VideoTimeMapper.refineContinuousEnds([first, paused, next]) { time in
+            if time < 4 { throw CocoaError(.fileReadUnknown) }
+            return .init(period: "2ND", gameSecond: time < 5.4 ? 38 : 37)
+        }
+        #expect(result[0] == first)
+        #expect(result[1] == paused)
+        #expect(result[2].videoEnd == 5.4375)
+        #expect(result[2].videoStart == 3.4375)
+    }
+
+    @Test func mapsMockGameClockBoundaryVideo() async throws {
+        let bundle = Bundle(for: FixtureBundleAnchor.self)
+        let url = try #require(bundle.url(forResource: "mock-boundary", withExtension: "mov"))
+        let intervals = try await VideoTimeMapper.map(videoURL: url,
+            format: .init(periodStyle: .short, underMinuteStyle: .colon))
+        let continuous = try #require(intervals.first { $0.kind == .continuous })
+        #expect(continuous.period == "2ND")
+        #expect(continuous.gameStart == 141)
+        #expect(continuous.gameEnd == 137)
+        // MockGameClock first displays 2:17 at frame 91 (30 fps).
+        #expect(abs(continuous.videoEnd - (91.0 / 30)) < 0.1)
+    }
+
+    @Test(arguments: ["mock-pauses-a", "mock-pauses-b"])
+    func mapsMultipleMockPauses(name: String) async throws {
+        let bundle = Bundle(for: FixtureBundleAnchor.self)
+        let url = try #require(bundle.url(forResource: name, withExtension: "mov"))
+        let intervals = try await VideoTimeMapper.map(videoURL: url,
+            format: .init(periodStyle: .short, underMinuteStyle: .colon))
+        // Frame indices are the first frames displaying these clock values in
+        // MockGameClock's 30 fps output, including all inserted pause frames.
+        let expected: [(gameEnd: Double, firstFrame: Int)] = name == "mock-pauses-a"
+            ? [(139, 31), (135, 190), (133, 313), (129, 454)]
+            : [(104, 169), (101, 310), (98, 433)]
+        let continuous = intervals.filter { $0.kind == .continuous }
+        #expect(continuous.count == expected.count)
+        for (interval, boundary) in zip(continuous, expected) {
+            #expect(interval.gameEnd == boundary.gameEnd)
+            #expect(abs(interval.videoEnd - Double(boundary.firstFrame) / 30) < 0.1,
+                "\(name): \(boundary.gameEnd)s starts at frame \(boundary.firstFrame)")
+        }
+        let paused = intervals.filter { $0.kind == .paused }
+        #expect(paused.count == 3)
+        #expect(paused.allSatisfy { $0.gameStart == $0.gameEnd })
+    }
+
     @Test func bridgesShortFalsePauseWhenClockStayedContinuous() {
         let entries: [VideoTimeMapper.Interval] = [
             .init(kind: .continuous, period: "3RD", videoStart: 3030.5885961913264,
