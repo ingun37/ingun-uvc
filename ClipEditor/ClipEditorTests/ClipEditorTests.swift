@@ -97,6 +97,14 @@ struct ClipEditorTests {
         #expect(events.map(\.attempted) == [1, 2, 3])
         #expect(events.map(\.made) == [0, 1, 1])
         #expect(events.map(\.isMade) == [false, true, false])
+        #expect(events[1].gameTime == "1st 10′0″")
+    }
+
+    @Test func madeShotTimeUsesPeriodAndPrimeNotation() throws {
+        let csv = "period,clock,team,player,result,description\n" +
+            "2,PT11M02S,A,Alice,made,make\n"
+        let event = try #require(ClipPlanner.countEvents(from: csv)["A|Alice"]?.first)
+        #expect(event.gameTime == "2nd 11′2″")
     }
 
     @Test func mapsClampsAndMergesOverlappingMisses() throws {

@@ -318,16 +318,19 @@ struct VideoCompilation {
             }
             parent.addSublayer(layer)
             guard let event = change.count else { continue }
-            let emoji = event.isMade ? "🏀" : "🧱"
+            let emoji = event.isMade ? "🏀 \(event.gameTime ?? "")" : "🧱"
             let iconSize = min(88, max(64, size.height * 0.08))
             let emojiFont = NSFont.systemFont(ofSize: iconSize * 0.78)
-            guard let image = captionImage(emoji, size: CGSize(width: iconSize, height: iconSize),
-                                           attributes: [.font: emojiFont]) else { continue }
+            let timeFont = NSFont.systemFont(ofSize: iconSize * 0.38, weight: .semibold)
+            let iconAttributes: [NSAttributedString.Key: Any] = [.font: event.isMade ? timeFont : emojiFont]
+            let iconWidth = event.isMade ? min(size.width - 16, ceil((emoji as NSString).size(withAttributes: iconAttributes).width) + 12) : iconSize
+            guard let image = captionImage(emoji, size: CGSize(width: iconWidth, height: iconSize),
+                                           attributes: iconAttributes) else { continue }
             let icon = CALayer()
             icon.contents = image
             // +10 is heuristic adjustment to align center
-            icon.frame = CGRect(x: frame.midX - iconSize / 2 + 10, y: frame.maxY + 6,
-                                width: iconSize, height: iconSize)
+            icon.frame = CGRect(x: frame.midX - iconWidth / 2 + 10, y: frame.maxY + 6,
+                                width: iconWidth, height: iconSize)
             icon.opacity = 0
             guard change.time < duration - 0.05 else { continue }
             let span = min(0.7, duration - change.time)

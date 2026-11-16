@@ -37,6 +37,7 @@ struct CountEvent: Sendable {
     let made: Int
     let attempted: Int
     let isMade: Bool
+    let gameTime: String?
 }
 
 struct Clip: Identifiable, Sendable {
@@ -91,6 +92,8 @@ enum ClipPlanner {
               let playerIndex = header.firstIndex(of: "player") else { return [:] }
         let fullNameIndex = header.firstIndex(of: "player_full_name")
         let teamIndex = header.firstIndex(of: "team")
+        let periodIndex = header.firstIndex(of: "period")
+        let clockIndex = header.firstIndex(of: "clock")
         var events: [String: [CountEvent]] = [:]
         for row in rows.dropFirst() {
             guard row.indices.contains(resultIndex), row.indices.contains(playerIndex) else { continue }
@@ -103,9 +106,19 @@ enum ClipPlanner {
             guard !name.isEmpty else { continue }
             let key = "\(team)|\(name)"
             let previous = events[key]?.last
+            let period = periodIndex.flatMap { row.indices.contains($0) ? Int(row[$0].trimmingCharacters(in: .whitespacesAndNewlines)) : nil }
+            let seconds = clockIndex.flatMap { row.indices.contains($0) ? gameSeconds(row[$0].trimmingCharacters(in: .whitespacesAndNewlines)) : nil }
+            let gameTime: String?
+            if let period, period > 0, let seconds {
+                let periodLabel = period == 5 ? "OT" : period > 5 ? "\(period - 4)OT" : "\(period)\(period == 1 ? "st" : period == 2 ? "nd" : period == 3 ? "rd" : "th")"
+                let wholeSeconds = Int(seconds)
+                gameTime = "\(periodLabel) \(wholeSeconds / 60)′\(wholeSeconds % 60)″"
+            } else {
+                gameTime = nil
+            }
             events[key, default: []].append(CountEvent(made: (previous?.made ?? 0) + (result == "made" ? 1 : 0),
                                                          attempted: (previous?.attempted ?? 0) + 1,
-                                                         isMade: result == "made"))
+                                                         isMade: result == "made", gameTime: gameTime))
         }
         return events
     }
