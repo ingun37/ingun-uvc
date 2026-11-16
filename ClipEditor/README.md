@@ -18,10 +18,17 @@ player's name at the top center and keeps that player's FGM/FGA count visible
 at the bottom center, starting at `0/0`. At the beginning of each clip, the
 count quickly catches up through any made or missed attempts in the CSV gap.
 It advances again when the player misses in the clip. A bouncing 🏀 accompanies
-a make and a bouncing 🧱 accompanies a miss. The count is centered in a fitted
-white box with a black shadow, with the emoji above it. These animations are
+a make with its CSV game time beside it (for example, `🏀 2nd 11′2″`), and a
+bouncing 🧱 accompanies a miss. The count is centered in a fitted white box
+with a black shadow, with the emoji and time label above it. These animations are
 baked into the exported MP4 and do not appear in clip previews. Player videos
 are center-cropped to 1:1; the full compilation retains the source dimensions.
+
+To resize the per-player overlay, edit `addCountAnimation` in
+`ClipEditor/VideoCompilation.swift`: `font` controls the FGM/FGA text,
+`horizontalPadding` and `verticalPadding` control its box, and `iconSize`,
+`emojiFont`, and `timeFont` control the emoji and game-time label. There is no
+single scale setting for the whole overlay.
 
 Launch options `--video/-v`, `--json/-j`, and `--csv/-c` prefill the inputs.
 `--output/-o` exports directly to the given compilation path after clip review.
