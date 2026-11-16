@@ -319,7 +319,8 @@ struct VideoCompilation {
             parent.addSublayer(layer)
             guard let event = change.count else { continue }
             let emoji = event.isMade ? "🏀 \(event.gameTime ?? "")" : "🧱"
-            let iconSize = min(88, max(64, size.height * 0.1))
+            let desiredIconSize = size.height * 0.16
+            let iconSize = min(110, max(64, desiredIconSize))
             let emojiFont = NSFont.systemFont(ofSize: iconSize * 0.78)
             let timeFont = NSFont.systemFont(ofSize: iconSize * 0.38, weight: .semibold)
             let iconAttributes: [NSAttributedString.Key: Any] = [.font: event.isMade ? timeFont : emojiFont]
