@@ -33,6 +33,26 @@ struct ShotCaption: Sendable {
     let player: String?
 }
 
+struct ClipAttempt: Sendable {
+    let originalSourceTime: Double
+    var sourceTime: Double
+    let text: String?
+    let location: CGPoint?
+    let player: String?
+
+    init(sourceTime: Double, text: String?, location: CGPoint?, player: String?) {
+        originalSourceTime = sourceTime
+        self.sourceTime = sourceTime
+        self.text = text
+        self.location = location
+        self.player = player
+    }
+
+    var caption: ShotCaption? {
+        text.map { ShotCaption(sourceTime: sourceTime, text: $0, location: location, player: player) }
+    }
+}
+
 struct CountEvent: Sendable {
     let made: Int
     let attempted: Int
@@ -48,11 +68,13 @@ struct Clip: Identifiable, Sendable {
     var end: Double
     var descriptions: [String]
     var gameTimes: [String]
-    var captions: [ShotCaption]
+    var attempts: [ClipAttempt]
+    var captions: [ShotCaption] { attempts.compactMap(\.caption) }
     var players: [String]
     var included: Bool = true
 
-    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [], captions: [ShotCaption] = [], players: [String] = []) {
+    init(start: Double, end: Double, descriptions: [String], gameTimes: [String] = [],
+         captions: [ShotCaption] = [], attempts: [ClipAttempt] = [], players: [String] = []) {
         id = UUID()
         originalStart = start
         originalEnd = end
@@ -60,8 +82,43 @@ struct Clip: Identifiable, Sendable {
         self.end = end
         self.descriptions = descriptions
         self.gameTimes = gameTimes
-        self.captions = captions
+        self.attempts = attempts.isEmpty ? captions.map {
+            ClipAttempt(sourceTime: $0.sourceTime, text: $0.text, location: $0.location, player: $0.player)
+        } : attempts
         self.players = players
+    }
+
+    mutating func moveHandle(_ index: Int, to proposedTime: Double, moveAll: Bool, in range: ClosedRange<Double>) {
+        guard (0...(attempts.count + 1)).contains(index), proposedTime.isFinite else { return }
+        let current = index == 0 ? start : index == attempts.count + 1 ? end : attempts[index - 1].sourceTime
+        if moveAll {
+            let offset = min(max(proposedTime - current, range.lowerBound - start), range.upperBound - end)
+            start += offset
+            end += offset
+            for attemptIndex in attempts.indices { attempts[attemptIndex].sourceTime += offset }
+            return
+        }
+        let minimumLength = min(0.01, originalEnd - originalStart)
+        if index == 0 {
+            start = min(max(proposedTime, range.lowerBound), min(attempts.first?.sourceTime ?? end, end - minimumLength))
+        } else if index == attempts.count + 1 {
+            end = max(min(proposedTime, range.upperBound), max(attempts.last?.sourceTime ?? start, start + minimumLength))
+        } else {
+            let lower = index == 1 ? start : attempts[index - 2].sourceTime
+            let upper = index == attempts.count ? end : attempts[index].sourceTime
+            attempts[index - 1].sourceTime = min(max(proposedTime, lower), upper)
+        }
+    }
+
+    mutating func resetTiming() {
+        start = originalStart
+        end = originalEnd
+        for index in attempts.indices { attempts[index].sourceTime = attempts[index].originalSourceTime }
+    }
+
+    var timingIsOriginal: Bool {
+        start == originalStart && end == originalEnd &&
+        attempts.allSatisfy { $0.sourceTime == $0.originalSourceTime }
     }
 }
 
@@ -246,11 +303,10 @@ enum ClipPlanner {
             let start = max(0, moment - 4)
             let end = min(videoDuration, moment + 2)
             if end > start {
-                let captions: [ShotCaption] = if let text = attempt.caption {
-                    [ShotCaption(sourceTime: moment, text: text, location: attempt.location, player: attempt.player)]
-                } else { [] }
+                let marker = ClipAttempt(sourceTime: moment, text: attempt.caption,
+                                         location: attempt.location, player: attempt.player)
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
-                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], captions: captions,
+                                       gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], attempts: [marker],
                                        players: attempt.player.map { [$0] } ?? []))
             }
         }
@@ -262,7 +318,7 @@ enum ClipPlanner {
                 merged[last].originalEnd = merged[last].end
                 merged[last].descriptions += clip.descriptions
                 merged[last].gameTimes += clip.gameTimes
-                merged[last].captions += clip.captions
+                merged[last].attempts += clip.attempts
                 for player in clip.players where !merged[last].players.contains(player) {
                     merged[last].players.append(player)
                 }

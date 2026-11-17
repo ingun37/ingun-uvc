@@ -444,13 +444,12 @@ private struct ClipRow: View {
     let previewSpeed: Double
     let isSelected: Bool
     let playToggle: Int
+    @State private var moveAll = true
 
-    private var minimumLength: Double { min(1, clip.originalEnd - clip.originalStart) }
-    private var startRange: ClosedRange<Double> {
-        max(0, clip.originalStart - 12)...min(clip.originalStart + 12, clip.end - minimumLength)
-    }
-    private var endRange: ClosedRange<Double> {
-        max(clip.originalEnd - 12, clip.start + minimumLength)...min(videoDuration, clip.originalEnd + 12)
+    private var timelineRange: ClosedRange<Double> {
+        let first = clip.attempts.map(\.originalSourceTime).min() ?? clip.originalStart
+        let last = clip.attempts.map(\.originalSourceTime).max() ?? clip.originalEnd
+        return max(0, first - 15)...min(videoDuration, last + 15)
     }
 
     var body: some View {
@@ -471,22 +470,21 @@ private struct ClipRow: View {
                 }
                 Text("\(ClipPlanner.clockLabel(clip.start)) – \(ClipPlanner.clockLabel(clip.end))")
                     .monospacedDigit().foregroundStyle(.secondary)
-                HStack {
-                    Text("Start")
-                    Slider(value: $clip.start, in: startRange)
-                    Text(ClipPlanner.clockLabel(clip.start)).monospacedDigit()
-                }
-                HStack {
-                    Text("End")
-                    Slider(value: $clip.end, in: endRange)
-                    Text(ClipPlanner.clockLabel(clip.end)).monospacedDigit()
-                }
+                Toggle("Move All", isOn: $moveAll)
+                    .toggleStyle(.checkbox)
+                ClipTimeline(clip: $clip, range: timelineRange, moveAll: moveAll)
+                    .frame(height: 32)
+                Text((["Start \(ClipPlanner.clockLabel(clip.start))"] +
+                      clip.attempts.enumerated().map { "Attempt \($0.offset + 1) \(ClipPlanner.clockLabel($0.element.sourceTime))" } +
+                      ["End \(ClipPlanner.clockLabel(clip.end))"]).joined(separator: " · "))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
                 Button("Reset timing") {
-                    clip.start = clip.originalStart
-                    clip.end = clip.originalEnd
+                    clip.resetTiming()
                 }
-                .disabled(clip.start == clip.originalStart && clip.end == clip.originalEnd)
-                Text("Drag either edge to include more or less source video.")
+                .disabled(clip.timingIsOriginal)
+                Text("Drag the edges to change the clip and the middle handles to time attempts.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -495,6 +493,55 @@ private struct ClipRow: View {
                     in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12)
             .strokeBorder(isSelected ? Color.accentColor : .clear, lineWidth: 2))
+    }
+}
+
+private struct ClipTimeline: View {
+    @Binding var clip: Clip
+    let range: ClosedRange<Double>
+    let moveAll: Bool
+
+    private let handleSize = 16.0
+    @State private var dragOrigin: (index: Int, time: Double)?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(1, geometry.size.width - handleSize)
+            let span = max(0.001, range.upperBound - range.lowerBound)
+            let times = [clip.start] + clip.attempts.map(\.sourceTime) + [clip.end]
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.3))
+                    .frame(height: 4)
+                    .padding(.horizontal, handleSize / 2)
+                Capsule()
+                    .fill(Color.accentColor.opacity(0.45))
+                    .frame(width: max(0, (clip.end - clip.start) / span * width), height: 4)
+                    .offset(x: handleSize / 2 + (clip.start - range.lowerBound) / span * width)
+                ForEach(times.indices, id: \.self) { index in
+                    let time = times[index]
+                    let isEdge = index == 0 || index == times.count - 1
+                    RoundedRectangle(cornerRadius: isEdge ? 4 : 8)
+                        .fill(isEdge ? Color.accentColor : Color.orange)
+                        .frame(width: handleSize, height: isEdge ? 24 : 20)
+                        .overlay(RoundedRectangle(cornerRadius: isEdge ? 4 : 8)
+                            .strokeBorder(.white, lineWidth: 1))
+                        .offset(x: (time - range.lowerBound) / span * width)
+                        .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("clipTimeline"))
+                            .onChanged { value in
+                                if dragOrigin?.index != index { dragOrigin = (index, time) }
+                                guard let dragOrigin else { return }
+                                clip.moveHandle(index, to: dragOrigin.time + value.translation.width / width * span,
+                                                moveAll: moveAll, in: range)
+                            }
+                            .onEnded { _ in dragOrigin = nil })
+                        .accessibilityLabel(index == 0 ? "Start" : index == times.count - 1 ? "End" : "Attempt \(index)")
+                        .accessibilityValue(ClipPlanner.clockLabel(time))
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
+            .coordinateSpace(name: "clipTimeline")
+        }
     }
 }
 

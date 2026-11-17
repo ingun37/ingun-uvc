@@ -137,6 +137,45 @@ struct ClipEditorTests {
         #expect(Set(plan.clips[0].players) == Set(["A|Alice", "B|Bob"]))
     }
 
+    @Test func timingHandlesKeepCaptionsAndWindowInSync() {
+        let attempts = [
+            ClipAttempt(sourceTime: 12, text: "Alice\n0/1", location: nil, player: "A|Alice"),
+            ClipAttempt(sourceTime: 15, text: "Bob\n0/1", location: nil, player: "B|Bob")
+        ]
+        var clip = Clip(start: 8, end: 18, descriptions: ["two misses"], attempts: attempts)
+        let range = 0.0...30.0
+
+        clip.moveHandle(1, to: 13, moveAll: false, in: range)
+        #expect(clip.start == 8 && clip.end == 18)
+        #expect(clip.captions.map(\.sourceTime) == [13, 15])
+
+        clip.moveHandle(2, to: 17, moveAll: true, in: range)
+        #expect(clip.start == 10 && clip.end == 20)
+        #expect(clip.captions.map(\.sourceTime) == [15, 17])
+
+        clip.moveHandle(0, to: -100, moveAll: true, in: range)
+        #expect(clip.start == 0 && clip.end == 10)
+        #expect(clip.captions.map(\.sourceTime) == [5, 7])
+
+        clip.resetTiming()
+        #expect(clip.timingIsOriginal)
+        #expect(clip.captions.map(\.sourceTime) == [12, 15])
+    }
+
+    @Test func uncaptionedAttemptStillHasHandleAndHandlesStayOrdered() throws {
+        let attempts = [MissedAttempt(period: "1ST", gameSecond: 100, description: "miss")]
+        let ranges = [ClockRange(period: "1ST", game_start_seconds: 100, game_end_seconds: 90,
+                                 video_start_seconds: 10, video_end_seconds: 20)]
+        var clip = try #require(ClipPlanner.plan(attempts: attempts, ranges: ranges,
+                                                 videoDuration: 30).clips.first)
+        #expect(clip.attempts.count == 1)
+        #expect(clip.captions.isEmpty)
+        clip.moveHandle(0, to: 25, moveAll: false, in: 0...30)
+        #expect(clip.start == clip.attempts[0].sourceTime)
+        clip.moveHandle(1, to: 25, moveAll: false, in: 0...30)
+        #expect(clip.attempts[0].sourceTime == clip.end)
+    }
+
     @Test func exportsVideoAndAudioWithClipTransitions() async throws {
         let fixture = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
