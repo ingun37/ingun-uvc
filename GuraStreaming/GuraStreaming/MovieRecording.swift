@@ -23,7 +23,6 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     var freezeCountdown: Int?
     var stopReason = "Stopped by clicking Stop"
     var savedURL: URL?
-    @ObservationIgnored private var maskLogTask: Task<String?, Never>?
 
     init(resource: CaptureResource) throws {
         self.resource = resource
@@ -71,7 +70,6 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         case .recording:
             phase = .stopping
             message = "Finishing recording…"
-            finishMaskLog()
             resource.stopRecording(output)
         default: break
         }
@@ -79,7 +77,6 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func failed(_ reason: String) {
         resource.freezeDetector.setActive(false)
-        resource.renderer.discardMaskLogging()
         phase = .failed
         message = "Stopped because of an error: \(reason)"
     }
@@ -88,11 +85,8 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                                 from connections: [AVCaptureConnection]) {
         Task { @MainActor [self] in
             if phase == .stopping {
-                resource.renderer.startMaskLogging()
-                finishMaskLog()
                 resource.stopRecording(self.output)
             } else if phase == .starting {
-                resource.renderer.startMaskLogging()
                 phase = .recording
                 message = "Recording…"
             }
@@ -111,29 +105,10 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 failed(failureText)
                 return
             }
-            let csv = await (maskLogTask ?? Task { await resource.renderer.endMaskLogging() }).value
             phase = .saved
             savedURL = outputFileURL
             message = "\(stopReason). Video is saved to \(outputFileURL.path)"
             print(message)
-            if let csv {
-                let csvURL = outputFileURL.deletingLastPathComponent()
-                    .appendingPathComponent("\(outputFileURL.deletingPathExtension().lastPathComponent)-masking-test.csv")
-                do {
-                    try await Task.detached {
-                        try csv.write(to: csvURL, atomically: true, encoding: .utf8)
-                    }.value
-                    message += " Mask test CSV is saved to \(csvURL.path)"
-                } catch {
-                    message += " Could not save mask test CSV: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
-
-    private func finishMaskLog() {
-        if maskLogTask == nil {
-            maskLogTask = Task { await resource.renderer.endMaskLogging() }
         }
     }
 }
