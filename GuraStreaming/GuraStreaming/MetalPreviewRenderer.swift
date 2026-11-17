@@ -1,4 +1,5 @@
 import CoreVideo
+import CoreMedia
 import AppKit
 import Metal
 import QuartzCore
@@ -18,11 +19,73 @@ nonisolated private final class MaskReadback: @unchecked Sendable {
     let captured: MTLTexture?
     let comparison: MTLBuffer?
     let generation: UInt64
+    let logGeneration: UInt64
+    let sampleTime: CMTime
 
-    init(captured: MTLTexture?, comparison: MTLBuffer?, generation: UInt64) {
+    init(captured: MTLTexture?, comparison: MTLBuffer?, generation: UInt64,
+         logGeneration: UInt64, sampleTime: CMTime) {
         self.captured = captured
         self.comparison = comparison
         self.generation = generation
+        self.logGeneration = logGeneration
+        self.sampleTime = sampleTime
+    }
+}
+
+/// Kept on the render queue. Rows record the initial judgment and later changes.
+nonisolated struct MaskChangeLog {
+    private(set) var recording = false
+    private(set) var maskActive = false
+    private var origin: CMTime?
+    private var lastJudgment: Bool?
+    private var changes: [(seconds: Double, similar: Bool)] = []
+
+    mutating func start(maskActive: Bool) {
+        recording = true
+        self.maskActive = maskActive
+        origin = nil
+        lastJudgment = nil
+        changes.removeAll()
+    }
+
+    mutating func observe(_ time: CMTime) {
+        if recording && origin == nil && time.isValid { origin = time }
+    }
+
+    mutating func replaceMask() {
+        maskActive = true
+        lastJudgment = nil
+        changes.removeAll()
+    }
+
+    mutating func removeMask() {
+        maskActive = false
+        lastJudgment = nil
+        changes.removeAll()
+    }
+
+    mutating func record(_ similar: Bool, at time: CMTime) {
+        guard recording && maskActive && time.isValid else { return }
+        observe(time)
+        guard lastJudgment != similar, let origin else { return }
+        let seconds = max(0, CMTimeSubtract(time, origin).seconds)
+        guard seconds.isFinite else { return }
+        changes.append((seconds, similar))
+        lastJudgment = similar
+    }
+
+    mutating func finish() -> String? {
+        defer { recording = false }
+        guard recording && maskActive else { return nil }
+        let rows = changes.map {
+            String(format: "%.6f,%@", $0.seconds, $0.similar ? "Similar" : "Not similar")
+        }
+        return (["video_timestamp_seconds,judgement"] + rows).joined(separator: "\n") + "\n"
+    }
+
+    mutating func discard() {
+        recording = false
+        removeMask()
     }
 }
 
@@ -39,13 +102,17 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
     private let comparePipeline: MTLComputePipelineState
     private let renderQueue = DispatchQueue(label: "com.ingun37.GuraStreaming.render", qos: .userInitiated)
     private let slotLock = NSLock()
-    private var waitingFrame: CVPixelBuffer?
+    private var waitingFrame: (CVPixelBuffer, CMTime)?
     private var renderActive = false
     private var pendingCapture: CGRect?
     private var maskTexture: MTLTexture?
     private var maskRegion: CGRect?
     private var similarityThreshold: Float = 0.9
     private var maskGeneration: UInt64 = 0
+    private var changeLog = MaskChangeLog()
+    private var logGeneration: UInt64 = 0
+    private var commandInFlight = false
+    private var pendingLogCompletion: (@Sendable (String?) -> Void)?
     var onMaskCaptured: (@Sendable (NSImage?) -> Void)?
     var onMaskCaptureFailed: (@Sendable () -> Void)?
     var onSimilarity: (@Sendable (Bool?) -> Void)?
@@ -164,6 +231,7 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
             pendingCapture = nil
             maskTexture = nil
             maskRegion = nil
+            changeLog.removeMask()
             onMaskCaptured?(nil)
             onSimilarity?(nil)
         }
@@ -173,11 +241,41 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
         renderQueue.async { [self] in similarityThreshold = Float(min(1, max(0, value))) }
     }
 
+    func startMaskLogging() {
+        renderQueue.async { [self] in
+            logGeneration &+= 1
+            changeLog.start(maskActive: maskTexture != nil)
+        }
+    }
+
+    func endMaskLogging() async -> String? {
+        await withCheckedContinuation { continuation in
+            renderQueue.async { [self] in
+                let complete: @Sendable (String?) -> Void = { continuation.resume(returning: $0) }
+                if commandInFlight {
+                    pendingLogCompletion = complete
+                } else {
+                    complete(changeLog.finish())
+                }
+            }
+        }
+    }
+
+    func discardMaskLogging() {
+        renderQueue.async { [self] in
+            logGeneration &+= 1
+            changeLog.discard()
+            let complete = pendingLogCompletion
+            pendingLogCompletion = nil
+            complete?(nil)
+        }
+    }
+
     /// Called on the capture delegate queue. Replacing a waiting frame releases
     /// the old one immediately; the frame being rendered is retained separately.
-    func offer(_ frame: CVPixelBuffer) {
+    func offer(_ frame: CVPixelBuffer, at time: CMTime) {
         slotLock.lock()
-        waitingFrame = frame
+        waitingFrame = (frame, time)
         let shouldStart = !renderActive
         if shouldStart { renderActive = true }
         slotLock.unlock()
@@ -186,11 +284,11 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
 
     private func renderLatest() {
         slotLock.lock()
-        let frame = waitingFrame
+        let item = waitingFrame
         waitingFrame = nil
-        if frame == nil { renderActive = false }
+        if item == nil { renderActive = false }
         slotLock.unlock()
-        guard let frame else { return }
+        guard let (frame, sampleTime) = item else { return }
         guard let commandBuffer = commandQueue.makeCommandBuffer(),
               let drawable = layer.nextDrawable() else {
             retryLatest()
@@ -280,17 +378,23 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
         }
         let threshold = similarityThreshold
         let readback = MaskReadback(captured: capturedTexture, comparison: comparison,
-                                    generation: maskGeneration)
+                                    generation: maskGeneration, logGeneration: logGeneration,
+                                    sampleTime: sampleTime)
         let lifetime = FrameLifetime(pixelBuffer: frame, wrappers: wrappers)
         commandBuffer.addCompletedHandler { [self, lifetime, readback] command in
             // Keep the Core Video image and wrappers alive until the GPU is done.
             withExtendedLifetime(lifetime) {}
             renderQueue.async { [self] in
+                commandInFlight = false
+                if readback.logGeneration == logGeneration {
+                    changeLog.observe(readback.sampleTime)
+                }
                 if command.status == .completed && readback.generation == maskGeneration {
                     if let capturedTexture = readback.captured {
                         if let image = maskImage(from: capturedTexture) {
                             maskTexture = capturedTexture
                             maskRegion = capture
+                            changeLog.replaceMask()
                             onMaskCaptured?(image)
                         } else {
                             onMaskCaptureFailed?()
@@ -299,15 +403,24 @@ nonisolated final class MetalPreviewRenderer: @unchecked Sendable {
                     if let comparison = readback.comparison {
                         let difference = comparison.contents().load(as: UInt32.self)
                         let similarity = 1 - Float(difference) / Float(36864 * 3 * 255)
-                        onSimilarity?(similarity >= threshold)
+                        let similar = similarity >= threshold
+                        if readback.logGeneration == logGeneration {
+                            changeLog.record(similar, at: readback.sampleTime)
+                        }
+                        onSimilarity?(similar)
                     }
                 } else if command.status != .completed && readback.captured != nil {
                     onMaskCaptureFailed?()
+                }
+                if let complete = pendingLogCompletion {
+                    pendingLogCompletion = nil
+                    complete(changeLog.finish())
                 }
                 renderLatest()
             }
         }
         commandBuffer.present(drawable)
+        commandInFlight = true
         commandBuffer.commit()
     }
 

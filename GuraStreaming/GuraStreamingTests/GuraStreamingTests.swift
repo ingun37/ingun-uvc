@@ -4,6 +4,33 @@ import Testing
 @testable import GuraStreaming
 
 struct GuraStreamingTests {
+    @Test func maskChangeLogResetsAndUsesRecordingTime() {
+        func time(_ seconds: Double) -> CMTime {
+            CMTime(seconds: seconds, preferredTimescale: 600)
+        }
+
+        var log = MaskChangeLog()
+        log.replaceMask()
+        log.record(true, at: time(9))
+        log.start(maskActive: true)
+        log.observe(time(10))
+        log.record(true, at: time(10.5))
+        log.record(true, at: time(11))
+        log.record(false, at: time(12))
+        log.replaceMask()
+        log.record(false, at: time(13))
+        #expect(log.finish() == "video_timestamp_seconds,judgement\n3.000000,Not similar\n")
+
+        log.start(maskActive: true)
+        log.record(true, at: time(20))
+        log.removeMask()
+        #expect(log.finish() == nil)
+
+        log.start(maskActive: false)
+        log.record(true, at: time(30))
+        #expect(log.finish() == nil)
+    }
+
     @Test func subregionMaskMatchesOnlyBottomLeft() async throws {
         let url = try #require(Bundle(for: BundleMarker.self).url(forResource: "subregion-binary-test", withExtension: "mp4"))
         let asset = AVURLAsset(url: url)

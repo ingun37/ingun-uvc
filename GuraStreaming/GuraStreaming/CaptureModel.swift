@@ -17,8 +17,9 @@ final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                                    didOutput sampleBuffer: CMSampleBuffer,
                                    from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        renderer.offer(pixelBuffer)
-        detector.offer(pixelBuffer, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+        let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        renderer.offer(pixelBuffer, at: time)
+        detector.offer(pixelBuffer, at: time)
     }
 }
 
