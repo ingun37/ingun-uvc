@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import Metal
 import Observation
 
@@ -28,6 +29,7 @@ final class CaptureResource: @unchecked Sendable {
     let frameDelegate: VideoFrameDelegate
     let renderer: MetalPreviewRenderer
     let freezeDetector: MetalFreezeDetector
+    let maskStatus = MaskStatus()
     let audioMeter = AudioLevelMeter()
     let audioSourceName: String?
     private let audioDelegate: AudioLevelDelegate?
@@ -130,6 +132,22 @@ final class CaptureResource: @unchecked Sendable {
         self.audioSourceName = installedAudioName
         self.device = device
         self.frameDuration = frameDuration
+        renderer.onMaskCaptured = { [maskStatus] image in
+            Task { @MainActor in
+                maskStatus.image = image
+                maskStatus.capturing = false
+                maskStatus.error = nil
+            }
+        }
+        renderer.onMaskCaptureFailed = { [maskStatus] in
+            Task { @MainActor in
+                maskStatus.capturing = false
+                maskStatus.error = "Could not capture the mask image. Try again."
+            }
+        }
+        renderer.onSimilarity = { [maskStatus] result in
+            Task { @MainActor in maskStatus.similar = result }
+        }
     }
 
     func startRecording(_ recording: MovieRecording) {
@@ -197,6 +215,15 @@ final class CaptureResource: @unchecked Sendable {
             session.commitConfiguration()
         }
     }
+}
+
+@Observable
+final class MaskStatus {
+    var image: NSImage?
+    var similar: Bool?
+    var capturing = false
+    var error: String?
+    var threshold = 0.9
 }
 
 private enum CaptureFailure: LocalizedError {
