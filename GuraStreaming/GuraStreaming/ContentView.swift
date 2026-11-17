@@ -5,263 +5,80 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = CaptureModel()
-    @State private var selectingMask = false
-    @State private var maskSelection: CGRect?
-    @State private var dragOrigin: CGPoint?
     private var bundleVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
-            as? String ?? "?"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             switch model.screen {
             case .devices:
                 deviceList
-            case .frequency(let device):
+            case let .frequency(device):
                 VStack(alignment: .leading, spacing: 20) {
-                    Button("Back to video sources", systemImage: "chevron.left")
-                    { model.back() }
+                    Button("Back to video sources", systemImage: "chevron.left") { model.back() }
                     Text(device.localizedName).font(.largeTitle.bold())
-                    Text(
-                        "Choose a capture frame rate before opening this source."
-                    )
-                    .foregroundStyle(.secondary)
+                    Text("Choose a capture frame rate before opening this source.")
+                        .foregroundStyle(.secondary)
                     if model.supportedFrameRates.isEmpty {
-                        ContentUnavailableView(
-                            "No frame rates reported",
-                            systemImage: "video.slash",
-                            description: Text(
-                                "This source does not report a supported frame rate for its active format."
-                            )
-                        )
+                        ContentUnavailableView("No frame rates reported", systemImage: "video.slash",
+                                               description: Text("This source does not report a supported frame rate for its active format."))
                     } else {
-                        Picker(
-                            "Video frequency",
-                            selection: $model.selectedFrameRate
-                        ) {
-                            ForEach(model.supportedFrameRates, id: \.self) {
-                                rate in
+                        Picker("Video frequency", selection: $model.selectedFrameRate) {
+                            ForEach(model.supportedFrameRates, id: \.self) { rate in
                                 Text(String(format: "%.2f fps", rate)).tag(rate)
                             }
                         }
                         .frame(maxWidth: 360)
-                        Button("Open video source", systemImage: "arrow.right")
-                        {
+                        Button("Open video source", systemImage: "arrow.right") {
                             Task { await model.open(device) }
                         }
                         .disabled(model.preparingCapture)
                     }
                     if !model.message.isEmpty {
-                        Label(
-                            model.message,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .foregroundStyle(.orange)
+                        Label(model.message, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
                     }
                     Spacer()
                 }
-            case .detail(let device, let resource):
+            case let .detail(device, resource):
                 HStack {
                     Button("Back", systemImage: "chevron.left") {
-                        selectingMask = false
-                        maskSelection = nil
                         model.back()
                     }
                     .disabled(model.recording?.phase.isBusy == true)
                     Text(device.localizedName).font(.title2.bold())
                     Spacer()
-                    Button("Record", systemImage: "record.circle") {
-                        model.record(resource)
-                    }
-                    .disabled(model.recording?.phase.isBusy == true)
-                    Button("Stop", systemImage: "stop.circle") {
-                        model.recording?.stop()
-                    }
-                    .disabled(
-                        model.recording?.phase != .recording
-                            && model.recording?.phase != .starting
-                    )
+                    Button("Record", systemImage: "record.circle") { model.record(resource) }
+                        .disabled(model.recording?.phase.isBusy == true)
+                    Button("Stop", systemImage: "stop.circle") { model.recording?.stop() }
+                        .disabled(model.recording?.phase != .recording && model.recording?.phase != .starting)
                 }
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 16) {
                         CapturePreview(renderer: resource.renderer)
-                            .overlay {
-                                if selectingMask {
-                                    GeometryReader { geometry in
-                                        Rectangle().fill(.clear).contentShape(
-                                            Rectangle()
-                                        )
-                                        .gesture(maskDrag(in: geometry.size))
-                                        if let maskSelection {
-                                            Rectangle()
-                                                .strokeBorder(
-                                                    .yellow,
-                                                    lineWidth: 2
-                                                )
-                                                .background(
-                                                    .yellow.opacity(0.12)
-                                                )
-                                                .frame(
-                                                    width: maskSelection.width
-                                                        * geometry.size.width,
-                                                    height: maskSelection.height
-                                                        * geometry.size.height
-                                                )
-                                                .position(
-                                                    x: maskSelection.midX
-                                                        * geometry.size.width,
-                                                    y: maskSelection.midY
-                                                        * geometry.size.height
-                                                )
-                                                .allowsHitTesting(false)
-                                        }
-                                    }
-                                }
-                            }
                             .aspectRatio(
-                                {
-                                    let size =
-                                        CMVideoFormatDescriptionGetDimensions(
-                                            device.activeFormat
-                                                .formatDescription
-                                        )
-                                    return CGFloat(size.width)
-                                        / CGFloat(size.height)
-                                }(),
+                                { let size = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                                    return CGFloat(size.width) / CGFloat(size.height) }(),
                                 contentMode: .fit
                             )
                             .frame(minWidth: 320, maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .accessibilityLabel("Live video preview")
-                        HStack {
-                            if selectingMask {
-                                Button("Cancel") {
-                                    selectingMask = false
-                                    maskSelection = nil
-                                }
-                                Button("Capture") {
-                                    if let maskSelection {
-                                        resource.maskStatus.capturing = true
-                                        resource.maskStatus.error = nil
-                                        resource.renderer.captureMask(
-                                            in: maskSelection
-                                        )
-                                        selectingMask = false
-                                        self.maskSelection = nil
-                                    }
-                                }
-                                .disabled(maskSelection == nil)
-                            } else {
-                                Button(
-                                    "Capture Mask",
-                                    systemImage: "viewfinder"
-                                ) {
-                                    maskSelection = nil
-                                    selectingMask = true
-                                }
-                                Button("Remove Mask", systemImage: "trash") {
-                                    resource.renderer.removeMask()
-                                }
-                                .disabled(
-                                    resource.maskStatus.image == nil
-                                        && !resource.maskStatus.capturing
-                                )
-                            }
-                            if resource.maskStatus.capturing {
-                                ProgressView().controlSize(.small)
-                            }
-                        }
-                        if let error = resource.maskStatus.error {
-                            Text(error).foregroundStyle(.orange)
-                        }
-                        if let image = resource.maskStatus.image {
-
-                            VStack(alignment: .leading) {
-
-                                HStack {
-                                    Text("Similarity threshold")
-                                    Slider(
-                                        value: Binding(
-                                            get: {
-                                                resource.maskStatus.threshold
-                                            },
-                                            set: { value in
-                                                resource.maskStatus.threshold =
-                                                    value
-                                                resource.renderer
-                                                    .setSimilarityThreshold(
-                                                        value
-                                                    )
-                                            }
-                                        ),
-                                        in: 0...1
-                                    )
-                                    Text(
-                                        resource.maskStatus.threshold,
-                                        format: .percent.precision(
-                                            .fractionLength(0)
-                                        )
-                                    )
-                                    .frame(width: 45)
-                                }
-                                HStack {
-                                    Image(nsImage: image)
-                                        .resizable().interpolation(.none)
-                                        .scaledToFit()
-                                        .frame(maxHeight: 60)
-                                        .border(.secondary)
-                                        .accessibilityLabel(
-                                            "Captured mask image"
-                                        )
-                                    Group {
-                                        if resource.maskStatus.similar == nil {
-                                            Label(
-                                                "Comparing ...",
-                                                systemImage: "ellipsis.circle"
-                                            )
-                                        } else if resource.maskStatus.similar
-                                            == true
-                                        {
-                                            Label(
-                                                "Similar",
-                                                systemImage: "equal.circle"
-                                            ).foregroundStyle(.blue)
-                                        } else {
-                                            Label(
-                                                "Not similar",
-                                                systemImage: "notequal.circle"
-                                            ).foregroundStyle(.orange)
-                                        }
-                                    }.font(.headline)
-
-                                }
-                            }
-
-                        }
-                        AudioVisualizer(
-                            meter: resource.audioMeter,
-                            sourceName: resource.audioSourceName,
-                            message: model.audioMessage
-                        )
+                        AudioVisualizer(meter: resource.audioMeter,
+                                        sourceName: resource.audioSourceName,
+                                        message: model.audioMessage)
                     }
                     DeviceDetail(device: device)
                         .frame(width: 440)
                 }
                 if !model.streamMessage.isEmpty {
-                    Label(
-                        model.streamMessage,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.orange)
+                    Label(model.streamMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
                 }
                 HStack {
                     Text("Stop after frozen video")
-                    TextField(
-                        "Seconds",
-                        value: $model.freezeTimeout,
-                        format: .number
-                    )
-                    .frame(width: 65)
+                    TextField("Seconds", value: $model.freezeTimeout, format: .number)
+                        .frame(width: 65)
                     Text("seconds")
                 }
                 .onChange(of: model.freezeTimeout) { _, value in
@@ -270,26 +87,16 @@ struct ContentView: View {
                 .disabled(model.recording?.phase.isBusy == true)
                 if let recording = model.recording {
                     if let remaining = recording.freezeCountdown {
-                        Label(
-                            "Video frozen · stopping in \(remaining) seconds",
-                            systemImage: "pause.circle"
-                        )
-                        .foregroundStyle(.orange)
-                    } else {
-                        Label("Video is moving", systemImage: "play.circle")
-                            .foregroundStyle(.blue)
+                        Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")
+                            .foregroundStyle(.orange)
                     }
                     Text(recording.message).textSelection(.enabled)
                     if let savedURL = recording.savedURL {
                         HStack {
                             Button("Open directory") {
-                                NSWorkspace.shared.open(
-                                    savedURL.deletingLastPathComponent()
-                                )
+                                NSWorkspace.shared.open(savedURL.deletingLastPathComponent())
                             }
-                            Button("Open file") {
-                                NSWorkspace.shared.open(savedURL)
-                            }
+                            Button("Open file") { NSWorkspace.shared.open(savedURL) }
                         }
                     }
                 }
@@ -299,71 +106,24 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 580)
         .navigationTitle("GuraStreaming v\(bundleVersion)")
         .task { await model.refresh() }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AVCaptureDevice.wasDisconnectedNotification
-            )
-        ) {
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureDevice.wasDisconnectedNotification)) {
             model.disconnected($0)
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AVCaptureSession.runtimeErrorNotification
-            )
-        ) {
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.runtimeErrorNotification)) {
             model.sessionFailed($0)
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AVCaptureSession.wasInterruptedNotification
-            )
-        ) { notification in
-            if case .detail(_, let resource) = model.screen,
-                let session = notification.object as? AVCaptureSession,
-                session === resource.session
-            {
-                model.streamMessage =
-                    "Capture was interrupted. It will resume when the device becomes available."
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.wasInterruptedNotification)) { notification in
+            if case let .detail(_, resource) = model.screen,
+               let session = notification.object as? AVCaptureSession, session === resource.session {
+                model.streamMessage = "Capture was interrupted. It will resume when the device becomes available."
             }
         }
-        .onReceive(
-            NotificationCenter.default.publisher(
-                for: AVCaptureSession.interruptionEndedNotification
-            )
-        ) { notification in
-            if case .detail(_, let resource) = model.screen,
-                let session = notification.object as? AVCaptureSession,
-                session === resource.session
-            {
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.interruptionEndedNotification)) { notification in
+            if case let .detail(_, resource) = model.screen,
+               let session = notification.object as? AVCaptureSession, session === resource.session {
                 model.streamMessage = ""
             }
         }
-    }
-
-    private func maskDrag(in size: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                guard size.width > 0, size.height > 0 else { return }
-                let point = CGPoint(
-                    x: min(max(value.location.x / size.width, 0), 1),
-                    y: min(max(value.location.y / size.height, 0), 1)
-                )
-                if dragOrigin == nil {
-                    dragOrigin = point
-                    maskSelection = nil
-                }
-                if let dragOrigin {
-                    let rect = CGRect(
-                        x: min(dragOrigin.x, point.x),
-                        y: min(dragOrigin.y, point.y),
-                        width: abs(point.x - dragOrigin.x),
-                        height: abs(point.y - dragOrigin.y)
-                    )
-                    maskSelection =
-                        rect.width >= 0.01 && rect.height >= 0.01 ? rect : nil
-                }
-            }
-            .onEnded { _ in dragOrigin = nil }
     }
 
     private var deviceList: some View {
@@ -371,80 +131,51 @@ struct ContentView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Video sources").font(.largeTitle.bold())
-                    Text(
-                        "Choose a capture card or camera to inspect its live video."
-                    )
-                    .foregroundStyle(.secondary)
+                    Text("Choose a capture card or camera to inspect its live video.")
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await model.refresh() }
-                }
+                Button("Refresh", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
             }
             if model.permissionDenied {
                 ContentUnavailableView {
-                    Label(
-                        "Camera access required",
-                        systemImage: "camera.badge.ellipsis"
-                    )
+                    Label("Camera access required", systemImage: "camera.badge.ellipsis")
                 } description: {
-                    Text(
-                        "Allow camera access in System Settings → Privacy & Security → Camera, then refresh."
-                    )
+                    Text("Allow camera access in System Settings → Privacy & Security → Camera, then refresh.")
                 } actions: {
                     Button("Open System Settings") {
-                        if let url = URL(
-                            string:
-                                "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"
-                        ) {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
                             NSWorkspace.shared.open(url)
                         }
                     }
                 }
             } else if model.devices.isEmpty {
-                ContentUnavailableView(
-                    "No video sources found",
-                    systemImage: "video.slash",
-                    description: Text(
-                        "Connect a USB capture card or camera, then click Refresh."
-                    )
-                )
+                ContentUnavailableView("No video sources found", systemImage: "video.slash",
+                                       description: Text("Connect a USB capture card or camera, then click Refresh."))
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(model.devices, id: \.uniqueID) { device in
-                            Button {
-                                model.select(device)
-                            } label: {
+                            Button { model.select(device) } label: {
                                 HStack(spacing: 14) {
-                                    Image(systemName: "video").font(.title2)
-                                        .frame(width: 36)
+                                    Image(systemName: "video").font(.title2).frame(width: 36)
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(device.localizedName).font(
-                                            .headline
-                                        )
-                                        Text(device.deviceType.rawValue).font(
-                                            .caption
-                                        ).foregroundStyle(.secondary)
+                                        Text(device.localizedName).font(.headline)
+                                        Text(device.deviceType.rawValue).font(.caption).foregroundStyle(.secondary)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
                                 }
                                 .padding(16).contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .background(
-                                .quaternary,
-                                in: RoundedRectangle(cornerRadius: 10)
-                            )
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                         }
                     }
                 }
             }
             if !model.message.isEmpty {
-                Label(model.message, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
+                Label(model.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
             }
         }
     }
@@ -464,12 +195,7 @@ private struct AudioVisualizer: View {
                         ZStack(alignment: .leading) {
                             Capsule().fill(.quaternary)
                             Capsule().fill(.green)
-                                .frame(
-                                    width: max(
-                                        2,
-                                        geometry.size.width * meter.level
-                                    )
-                                )
+                                .frame(width: max(2, geometry.size.width * meter.level))
                         }
                     }
                     .frame(height: 14)
@@ -515,9 +241,7 @@ private final class PreviewView: NSView {
         layer = renderer.layer
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) is not supported")
-    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     override func layout() {
         super.layout()
@@ -544,56 +268,27 @@ private struct DeviceDetail: View {
             DetailRow(label: "Unique ID", value: device.uniqueID),
             DetailRow(label: "Model ID", value: device.modelID),
             DetailRow(label: "Manufacturer", value: device.manufacturer),
-            DetailRow(
-                label: "Transport",
-                value: fourCC(UInt32(bitPattern: device.transportType))
-            ),
-            DetailRow(
-                label: "Media type",
-                value: fourCC(CMFormatDescriptionGetMediaType(description))
-            ),
-            DetailRow(
-                label: "Pixel format / codec",
-                value: fourCC(CMFormatDescriptionGetMediaSubType(description))
-            ),
-            DetailRow(
-                label: "Active resolution",
-                value: "\(dimensions.width) × \(dimensions.height)"
-            ),
+            DetailRow(label: "Transport", value: fourCC(UInt32(bitPattern: device.transportType))),
+            DetailRow(label: "Media type", value: fourCC(CMFormatDescriptionGetMediaType(description))),
+            DetailRow(label: "Pixel format / codec", value: fourCC(CMFormatDescriptionGetMediaSubType(description))),
+            DetailRow(label: "Active resolution", value: "\(dimensions.width) × \(dimensions.height)"),
             DetailRow(label: "Supported frame rates", value: rates),
-            DetailRow(
-                label: "Available formats",
-                value: "\(device.formats.count)"
-            ),
+            DetailRow(label: "Available formats", value: "\(device.formats.count)")
         ]
     }
 
     private var colorRows: [DetailRow] {
         let description = device.activeFormat.formatDescription
         func reported(_ key: CFString) -> String {
-            guard
-                let value = CMFormatDescriptionGetExtension(
-                    description,
-                    extensionKey: key
-                )
-            else {
+            guard let value = CMFormatDescriptionGetExtension(description, extensionKey: key) else {
                 return "Not reported"
             }
             return String(describing: value)
         }
         return [
-            DetailRow(
-                label: "Color primaries",
-                value: reported(kCMFormatDescriptionExtension_ColorPrimaries)
-            ),
-            DetailRow(
-                label: "Transfer function",
-                value: reported(kCMFormatDescriptionExtension_TransferFunction)
-            ),
-            DetailRow(
-                label: "YCbCr matrix",
-                value: reported(kCMFormatDescriptionExtension_YCbCrMatrix)
-            ),
+            DetailRow(label: "Color primaries", value: reported(kCMFormatDescriptionExtension_ColorPrimaries)),
+            DetailRow(label: "Transfer function", value: reported(kCMFormatDescriptionExtension_TransferFunction)),
+            DetailRow(label: "YCbCr matrix", value: reported(kCMFormatDescriptionExtension_YCbCrMatrix))
         ]
     }
 
@@ -605,15 +300,11 @@ private struct DeviceDetail: View {
                 GroupBox("USB descriptors") {
                     let usb = USBDetails.rows(for: device)
                     if usb.isEmpty {
-                        Text(
-                            "USB descriptors are unavailable for this source. The device may use a non-USB transport, or macOS may not expose its registry information."
-                        )
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                    } else {
-                        details(usb)
-                    }
+                        Text("USB descriptors are unavailable for this source. The device may use a non-USB transport, or macOS may not expose its registry information.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    } else { details(usb) }
                 }
             }
         }
