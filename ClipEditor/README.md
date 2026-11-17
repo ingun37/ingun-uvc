@@ -2,8 +2,19 @@
 
 ClipEditor combines missed NBA field goals into a video. Select a source video,
 the game time mapping JSON from TheMapper, and the attempts CSV from
-data_fetcher. Review the mapped clips, adjust their start and end times, and
-choose which clips to include before exporting.
+data_fetcher. Review the mapped clips, adjust their timing, and choose which
+clips to include before exporting.
+
+Each clip has one timing slider. The left and right handles set the clip start
+and end, and each middle handle marks a missed attempt. A single-attempt clip
+has three handles; a merged clip has one middle handle per attempt. The slider
+covers 15 seconds before the first attempt through 15 seconds after the last,
+limited by the video bounds for precise control in long videos. **Move All** is
+checked by default: dragging any handle shifts the whole clip window and all
+attempt markers together. Uncheck it to adjust a handle independently while
+keeping attempts inside the clip and in order. **Reset timing** restores the
+mapped positions. Moving an attempt handle changes when its shot caption and
+per-player missed-attempt count animation appear in the exported videos.
 
 The export saves the full compilation to the selected MP4 path. It also saves
 one square MP4 per player with included misses in the same folder, named
