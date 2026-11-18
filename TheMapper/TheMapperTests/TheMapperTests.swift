@@ -229,6 +229,14 @@ struct TheMapperTests {
         }
     }
 
+    @Test func fourthQuarterOCRReadsMixedLatinCyrillicLabel() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        #expect(GameTimeReader.parse(["4Tн", "11:50"], format: format) ==
+                .init(period: "4TH", gameSecond: 710))
+        #expect(GameTimeReader.preferredCandidateIndex(["4T0", "4Tн"], format: format) == 1)
+    }
+
     @Test func visionCandidatePrefersRecognizedPeriodLabel() {
         let short = GameTimeReader.ScoreboardFormat(periodStyle: .short,
                                                      underMinuteStyle: .colon)

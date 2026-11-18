@@ -142,7 +142,7 @@ nonisolated enum GameTimeReader {
         }
         // Vision can substitute visually similar Cyrillic glyphs in short labels.
         if labels.contains(where: { $0.label == "4TH" }) {
-            labels += [("4ТH", "4TH"), ("4ТН", "4TH"), ("4Tн", "4TH"), ("4Тн", "4TH")]
+            labels += [("4ТH", "4TH"), ("4ТН", "4TH"), ("4TН", "4TH")]
         }
         if labels.contains(where: { $0.label == "OT" }) {
             labels += [("ОT", "OT"), ("ОТ", "OT")]
