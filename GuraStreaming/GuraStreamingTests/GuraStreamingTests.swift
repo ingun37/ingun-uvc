@@ -4,6 +4,20 @@ import Testing
 @testable import GuraStreaming
 
 struct GuraStreamingTests {
+    @Test func thumbnailLogIsWrittenWhenRecordingEnds() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = ThumbnailCandidateDetector()
+        detector.start(for: root.appendingPathComponent("sample.mov"))
+        let result = await withCheckedContinuation { continuation in
+            detector.finish { continuation.resume(returning: $0) }
+        }
+        let csv = try result.get()
+        #expect(csv.path == root.appendingPathComponent("sample-thumbnail-candidates/log.csv").path)
+        #expect(try String(contentsOf: csv, encoding: .utf8)
+                == "video_timestamp,image_path,positive_score,positive_prompt,negative_score,negative_prompt,score_margin,top_1,top_2,top_3,top_4,top_5,bottom_1,bottom_2,bottom_3,bottom_4,bottom_5\n")
+    }
+
     @Test func frozenVideoTriggersTwoSecondTimeout() async throws {
         let url = try #require(Bundle(for: BundleMarker.self).url(forResource: "frozen-audible-small", withExtension: "mp4"))
         let asset = AVURLAsset(url: url)

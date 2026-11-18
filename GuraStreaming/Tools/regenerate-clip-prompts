@@ -1,0 +1,72 @@
+#!/bin/bash
+set -euo pipefail
+
+TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$TOOLS_DIR/.." && pwd)"
+PROMPTS="$PROJECT_DIR/GuraStreaming/clip-prompts.json"
+LABELS="$TOOLS_DIR/clip-labels.json"
+CACHE="$TOOLS_DIR/.cache"
+VOCAB="$TOOLS_DIR/clip-vocab.json"
+VOCAB_CHECKSUM='5047b556ce86ccaf6aa22b3ffccfc52d391ea4accdab9c2f2407da5b742d4363'
+VOCAB_URL='https://huggingface.co/openai/clip-vit-base-patch32/resolve/3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268/vocab.json'
+MERGES="$TOOLS_DIR/clip-merges.txt"
+MERGES_CHECKSUM='f526393189112391ce6f9795d4695f704121ce452c3aad1f5335cc41337eba85'
+MERGES_URL='https://huggingface.co/openai/clip-vit-base-patch32/resolve/3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268/merges.txt'
+ARCHIVE="$CACHE/clip-text.mlpackage.zip"
+MODEL="$CACHE/clip-text.mlmodelc"
+CHECKSUM='d48091c587b32033920870dfb9db3d30866162e46f3e69d07e79df1a99e5d7d3'
+URL='https://huggingface.co/veszelovszki/cmdr-clip-vit-b32-coreml/resolve/d75098e638ead36ef9bf1a86ec866aae1f066ea0/clip-text.mlpackage.zip'
+
+if [[ ! -f "$LABELS" ]]; then
+    echo 'Create Tools/clip-labels.json first: cp GuraStreaming/Tools/clip-labels.example.json GuraStreaming/Tools/clip-labels.json' >&2
+    exit 1
+fi
+
+mkdir -p "$CACHE"
+if [[ ! -f "$VOCAB" ]]; then
+    curl -L --fail --show-error --silent "$VOCAB_URL" -o "$CACHE/clip-vocab.download"
+    actual="$(shasum -a 256 "$CACHE/clip-vocab.download" | awk '{print $1}')"
+    if [[ "$actual" != "$VOCAB_CHECKSUM" ]]; then
+        echo 'CLIP vocabulary download failed SHA-256 verification.' >&2
+        exit 1
+    fi
+    mv "$CACHE/clip-vocab.download" "$VOCAB"
+fi
+actual="$(shasum -a 256 "$VOCAB" | awk '{print $1}')"
+if [[ "$actual" != "$VOCAB_CHECKSUM" ]]; then
+    echo 'CLIP vocabulary checksum mismatch; remove Tools/clip-vocab.json and retry.' >&2
+    exit 1
+fi
+if [[ ! -f "$MERGES" ]]; then
+    curl -L --fail --show-error --silent "$MERGES_URL" -o "$CACHE/clip-merges.download"
+    actual="$(shasum -a 256 "$CACHE/clip-merges.download" | awk '{print $1}')"
+    if [[ "$actual" != "$MERGES_CHECKSUM" ]]; then
+        echo 'CLIP merge table download failed SHA-256 verification.' >&2
+        exit 1
+    fi
+    mv "$CACHE/clip-merges.download" "$MERGES"
+fi
+actual="$(shasum -a 256 "$MERGES" | awk '{print $1}')"
+if [[ "$actual" != "$MERGES_CHECKSUM" ]]; then
+    echo 'CLIP merge table checksum mismatch; remove Tools/clip-merges.txt and retry.' >&2
+    exit 1
+fi
+if [[ ! -d "$MODEL" ]]; then
+    if [[ ! -f "$ARCHIVE" ]]; then
+        curl -L --fail --show-error --silent "$URL" -o "$ARCHIVE.part"
+        mv "$ARCHIVE.part" "$ARCHIVE"
+    fi
+    actual="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
+    if [[ "$actual" != "$CHECKSUM" ]]; then
+        echo 'CLIP text model checksum mismatch; remove Tools/.cache and retry.' >&2
+        exit 1
+    fi
+    unzip -q -o "$ARCHIVE" -d "$CACHE"
+    xcrun coremlc compile "$CACHE/clip-text.mlpackage" "$CACHE" >/dev/null
+fi
+
+TOKENS="$(mktemp "$CACHE/tokens.XXXXXX.json")"
+trap 'rm -f "$TOKENS"' EXIT
+python3 "$TOOLS_DIR/tokenize_clip_prompts.py" "$LABELS" "$TOKENS"
+swiftc -parse-as-library "$TOOLS_DIR/generate_clip_prompts.swift" -o "$CACHE/generate_clip_prompts"
+"$CACHE/generate_clip_prompts" "$MODEL" "$TOKENS" "$PROMPTS"

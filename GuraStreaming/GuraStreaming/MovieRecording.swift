@@ -62,6 +62,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     func stop(reason: String = "Stopped by clicking Stop") {
         stopReason = reason
         resource.freezeDetector.setActive(false)
+        resource.thumbnails.stopAccepting()
         freezeCountdown = nil
         switch phase {
         case .starting:
@@ -77,6 +78,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func failed(_ reason: String) {
         resource.freezeDetector.setActive(false)
+        resource.thumbnails.stopAccepting()
         phase = .failed
         message = "Stopped because of an error: \(reason)"
     }
@@ -85,10 +87,13 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                                 from connections: [AVCaptureConnection]) {
         Task { @MainActor [self] in
             if phase == .stopping {
+                resource.thumbnails.start(for: outputFileURL)
+                resource.thumbnails.stopAccepting()
                 resource.stopRecording(self.output)
             } else if phase == .starting {
                 phase = .recording
                 message = "Recording…"
+                resource.thumbnails.start(for: outputFileURL)
             }
         }
     }
@@ -101,6 +106,11 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         Task { @MainActor [self] in
             resource.freezeDetector.setActive(false)
             resource.removeRecordingOutput(self.output)
+            resource.thumbnails.finish { result in
+                if case let .failure(error) = result {
+                    print("Could not write thumbnail candidate log: \(error.localizedDescription)")
+                }
+            }
             guard success else {
                 failed(failureText)
                 return

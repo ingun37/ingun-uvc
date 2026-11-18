@@ -1,0 +1,24 @@
+{
+  "positivePrompts": [
+    "funny",
+    "goofy",
+    "incongruous",
+    "irony",
+    "close-up shot",
+    "injury",
+    "accident",
+    "collision",
+    "agony"
+  ],
+  "negativePrompts": [
+    "basketball game",
+    "sports",
+    "broadcasting",
+    "referee",
+    "blurry",
+    "audience",
+    "bench",
+    "cheerleaders",
+    "wide shot"
+  ]
+}

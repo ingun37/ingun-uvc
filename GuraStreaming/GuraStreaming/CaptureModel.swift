@@ -6,10 +6,13 @@ import Observation
 final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let renderer: MetalPreviewRenderer
     let detector: MetalFreezeDetector
+    let thumbnails: ThumbnailCandidateDetector
 
-    init(renderer: MetalPreviewRenderer, detector: MetalFreezeDetector) {
+    init(renderer: MetalPreviewRenderer, detector: MetalFreezeDetector,
+         thumbnails: ThumbnailCandidateDetector) {
         self.renderer = renderer
         self.detector = detector
+        self.thumbnails = thumbnails
     }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput,
@@ -17,7 +20,9 @@ final class VideoFrameDelegate: NSObject, AVCaptureVideoDataOutputSampleBufferDe
                                    from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         renderer.offer(pixelBuffer)
-        detector.offer(pixelBuffer, at: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+        let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        detector.offer(pixelBuffer, at: time)
+        thumbnails.offer(pixelBuffer, at: time)
     }
 }
 
@@ -28,6 +33,7 @@ final class CaptureResource: @unchecked Sendable {
     let frameDelegate: VideoFrameDelegate
     let renderer: MetalPreviewRenderer
     let freezeDetector: MetalFreezeDetector
+    let thumbnails: ThumbnailCandidateDetector
     let audioMeter = AudioLevelMeter()
     let audioSourceName: String?
     private let audioDelegate: AudioLevelDelegate?
@@ -55,8 +61,9 @@ final class CaptureResource: @unchecked Sendable {
         guard let metalDevice = MTLCreateSystemDefaultDevice() else { throw CaptureFailure.metalUnavailable }
         let renderer = try MetalPreviewRenderer(device: metalDevice)
         let detector = try MetalFreezeDetector(renderer: renderer)
+        let thumbnails = ThumbnailCandidateDetector()
         let output = AVCaptureVideoDataOutput()
-        let delegate = VideoFrameDelegate(renderer: renderer, detector: detector)
+        let delegate = VideoFrameDelegate(renderer: renderer, detector: detector, thumbnails: thumbnails)
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(delegate, queue: frameQueue)
 
@@ -126,6 +133,7 @@ final class CaptureResource: @unchecked Sendable {
         self.frameDelegate = delegate
         self.renderer = renderer
         self.freezeDetector = detector
+        self.thumbnails = thumbnails
         self.audioDelegate = installedAudioDelegate
         self.audioSourceName = installedAudioName
         self.device = device

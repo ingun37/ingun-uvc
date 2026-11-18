@@ -21,6 +21,25 @@ with included missed attempts. Player videos keep an animated FGM/FGA count visi
 
 ## GuraStreaming
 
+After cloning, set up the thumbnail classifier from the repository root before
+opening or building the Xcode project:
+
+```sh
+GuraStreaming/Tools/download-clip-image-model
+cp GuraStreaming/Tools/clip-labels.example.json GuraStreaming/Tools/clip-labels.json
+GuraStreaming/Tools/regenerate-clip-prompts
+```
+
+The first command downloads the pinned 8-bit CLIP image encoder (about 83 MB), checks
+its SHA-256, and installs it at
+`GuraStreaming/GuraStreaming/Models/clip-image.mlpackage`. The model package is
+git-ignored; rerunning the command verifies an existing copy. Edit the ignored
+`GuraStreaming/Tools/clip-labels.json` to change the positive and negative
+descriptions, then rerun `regenerate-clip-prompts`. That command generates the
+ignored `GuraStreaming/GuraStreaming/clip-prompts.json` required by the app and
+downloads the matching text encoder on its first run. See
+[GuraStreaming/CLIP-MODEL.md](GuraStreaming/CLIP-MODEL.md) for details.
+
 Open `GuraStreaming/GuraStreaming.xcodeproj` and run the `GuraStreaming` scheme.
 Choose a capture card or camera, then select a supported video frame rate. The
 picker defaults to 29.97 fps when available, then 30 fps. The detail view shows

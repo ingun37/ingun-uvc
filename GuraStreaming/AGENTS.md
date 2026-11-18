@@ -49,6 +49,20 @@ required. Prefer clear resource ownership and keep capture callbacks short.
   256 × 144 pixel grid. It shares the preview device, command queue, and texture
   cache, holds one latest waiting frame, and uses sample timestamps for the
   countdown. Small codec differences are tolerated.
+- `GuraStreaming/ThumbnailCandidateDetector.swift`: recording-only CLIP
+  image/text scoring on the Neural Engine. A background queue analyzes at most
+  one frame every five seconds using one latest-frame slot, writes candidate
+  JPEGs to a recording-specific folder, and writes `log.csv` after queued work
+  finishes. The CSV includes the top positive and negative descriptions, their
+  cosine scores, the score margin, and five highest and lowest ranked prompts.
+  An MIT-licensed CLIP image encoder and generated text embeddings are bundled
+  with the app; the model license is in the project root. The image model and
+  generated `clip-prompts.json` are git-ignored. Before building, run
+  `GuraStreaming/Tools/download-clip-image-model`, copy
+  `GuraStreaming/Tools/clip-labels.example.json` to the ignored
+  `GuraStreaming/Tools/clip-labels.json`, and run
+  `GuraStreaming/Tools/regenerate-clip-prompts`. Edit the labels file and rerun
+  the generator to refresh the embeddings.
 - `GuraStreaming/AudioLevelMeter.swift`: audio callback retains only the latest
   waiting sample. A utility queue computes a bounded RMS level and publishes
   UI updates at most 20 times per second.
@@ -67,9 +81,10 @@ xcodebuild -project GuraStreaming/GuraStreaming.xcodeproj -scheme GuraStreaming 
 ```
 
 The frozen-video unit test reads `GuraStreamingTests/frozen-audible-small.mp4`
-with a two-second timeout. Builds and this file-backed test have passed; capture-card frame
+with a two-second timeout. Builds and the frozen-video and thumbnail-log unit tests have passed; capture-card frame
 cadence, preview, audio metering, movie finalization, and saved-file timestamps
-still require hardware validation. Frozen-video accuracy and recording stop
+still require hardware validation. Thumbnail classification quality and timestamp
+alignment with the recorded movie require capture-card validation. Frozen-video accuracy and recording stop
 behavior on capture hardware also require validation. Some devices advertise frame rates that do
 not match delivered or recorded cadence. Inspect sample timestamps and the
 saved movie if a rate looks wrong.

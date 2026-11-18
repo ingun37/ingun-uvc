@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euo pipefail
+
+TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$TOOLS_DIR/.." && pwd)"
+MODEL_DIR="${GURASTREAMING_CLIP_MODEL_DIR:-$PROJECT_DIR/GuraStreaming/Models/clip-image.mlpackage}"
+WEIGHTS="$MODEL_DIR/Data/com.apple.CoreML/weights/weight.bin"
+WEIGHTS_SHA256='b00aacd8c17fd0119dfd69715f3b8c8ee696bf8a17a6689ab7aacb941249bf14'
+ARCHIVE_SHA256='61ff585ef207495b435e57b4f73e353d11a1820358f8c6fc3155257fb2b7d396'
+URL='https://huggingface.co/veszelovszki/cmdr-clip-vit-b32-coreml/resolve/d75098e638ead36ef9bf1a86ec866aae1f066ea0/clip-image-p8.mlpackage.zip'
+
+sha256() {
+    shasum -a 256 "$1" | awk '{print $1}'
+}
+
+if [[ -e "$MODEL_DIR" ]]; then
+    if [[ -f "$WEIGHTS" && -f "$MODEL_DIR/Manifest.json" &&
+          -f "$MODEL_DIR/Data/com.apple.CoreML/model.mlmodel" &&
+          "$(sha256 "$WEIGHTS")" == "$WEIGHTS_SHA256" ]]; then
+        echo "CLIP image model is ready: $MODEL_DIR"
+        exit 0
+    fi
+    echo "Incomplete or unexpected model at $MODEL_DIR; move it aside and rerun this command." >&2
+    exit 1
+fi
+
+CACHE="$TOOLS_DIR/.cache"
+mkdir -p "$CACHE" "$(dirname "$MODEL_DIR")"
+STAGE="$(mktemp -d "$CACHE/clip-image.XXXXXX")"
+trap 'rm -rf "$STAGE"' EXIT
+
+curl -L --fail --show-error --silent "$URL" -o "$STAGE/clip-image-p8.mlpackage.zip"
+if [[ "$(sha256 "$STAGE/clip-image-p8.mlpackage.zip")" != "$ARCHIVE_SHA256" ]]; then
+    echo 'CLIP image model download failed SHA-256 verification.' >&2
+    exit 1
+fi
+unzip -q "$STAGE/clip-image-p8.mlpackage.zip" -d "$STAGE"
+PACKAGE="$STAGE/clip-image.mlpackage"
+if [[ ! -f "$PACKAGE/Manifest.json" || ! -f "$PACKAGE/Data/com.apple.CoreML/model.mlmodel" ||
+      ! -f "$PACKAGE/Data/com.apple.CoreML/weights/weight.bin" ||
+      "$(sha256 "$PACKAGE/Data/com.apple.CoreML/weights/weight.bin")" != "$WEIGHTS_SHA256" ]]; then
+    echo 'The downloaded CLIP image model package is incomplete or unexpected.' >&2
+    exit 1
+fi
+mv "$PACKAGE" "$MODEL_DIR"
+echo "CLIP image model is ready: $MODEL_DIR"

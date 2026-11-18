@@ -1,0 +1,5 @@
+.cache/
+__pycache__/
+/clip-vocab.json
+/clip-merges.txt
+/clip-labels.json
