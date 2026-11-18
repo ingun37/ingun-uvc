@@ -80,44 +80,9 @@ nonisolated enum GameTimeReader {
         let normalized = texts.map(normalizedClockText)
         let combined = normalizedClockText(texts.joined(separator: " "))
         let candidates = normalized + [combined]
-        var labels: [(label: String, canonical: String)] = format.map { selection in
-            Period.allCases.map { period in
-                (selection.periodStyles[period] == .long ? period.longLabel : period.shortLabel,
-                 period.shortLabel)
-            }
-        } ?? Period.allCases.map { ($0.shortLabel, $0.shortLabel) }
-        // OCR sometimes inserts a space between the quarter number and suffix.
-        for label in ["1ST", "2ND", "3RD", "4TH"] where labels.contains(where: { $0.label == label }) {
-            labels.append((String(label.prefix(1)) + " " + String(label.dropFirst()), label))
-        }
-        if labels.contains(where: { $0.label == "1ST" }) {
-            labels += [("IST", "1ST"), ("15T", "1ST")]
-        }
-        if labels.contains(where: { $0.label == "3RD" }) {
-            labels += [("3ED", "3RD"), ("38D", "3RD"), ("3AD", "3RD"), ("ЗRD", "3RD")] // The last 3RD is Cyrillic З (U+0417)
-        }
-        // Vision can substitute visually similar Cyrillic glyphs in short labels.
-        if labels.contains(where: { $0.label == "4TH" }) {
-            labels += [("4ТH", "4TH"), ("4ТН", "4TH")]
-        }
-        if labels.contains(where: { $0.label == "OT" }) {
-            labels += [("ОT", "OT"), ("ОТ", "OT")]
-        }
-        // Vision can read the letter O as zero in numbered overtime labels.
-        if labels.contains(where: { $0.label == "2OT" }) {
-            labels.append(("20T", "2OT"))
-        }
-        if labels.contains(where: { $0.label == "3OT" }) {
-            labels.append(("30T", "3OT"))
-        }
+        let labels = periodLabels(format: format)
         guard let period = candidates.lazy.compactMap({ text -> String? in
-            for (label, canonical) in labels {
-                let escaped = NSRegularExpression.escapedPattern(for: label)
-                    .replacingOccurrences(of: "\\ ", with: #"\s+"#)
-                if text.range(of: "(?<![A-Z0-9])\(escaped)(?![A-Z0-9])",
-                              options: .regularExpression) != nil { return canonical }
-            }
-            return nil
+            labels.first { periodLabel($0.label, matches: text) }?.canonical
         }).first else { return nil }
         let clockPattern: String
         switch format?.underMinuteStyle {
@@ -149,6 +114,56 @@ nonisolated enum GameTimeReader {
         return greatestUnderMinute.map { Reading(period: period, gameSecond: $0) }
     }
 
+    private static func periodLabels(format: ScoreboardFormat?) -> [(label: String, canonical: String)] {
+        var labels: [(label: String, canonical: String)] = format.map { selection in
+            Period.allCases.map { period in
+                (selection.periodStyles[period] == .long ? period.longLabel : period.shortLabel,
+                 period.shortLabel)
+            }
+        } ?? Period.allCases.map { ($0.shortLabel, $0.shortLabel) }
+        // OCR sometimes inserts a space between the quarter number and suffix.
+        for label in ["1ST", "2ND", "3RD", "4TH"] where labels.contains(where: { $0.label == label }) {
+            labels.append((String(label.prefix(1)) + " " + String(label.dropFirst()), label))
+        }
+        if labels.contains(where: { $0.label == "1ST" }) {
+            labels += [("IST", "1ST"), ("15T", "1ST"), ("I5T", "1ST")]
+        }
+        if labels.contains(where: { $0.label == "2ND" }) {
+            labels += [("ZND", "2ND")]
+        }
+        if labels.contains(where: { $0.label == "3RD" }) {
+            labels += [("3ED", "3RD"), ("38D", "3RD"), ("3AD", "3RD"), ("ЗRD", "3RD")] // The last 3RD is Cyrillic З (U+0417)
+        }
+        // Vision can substitute visually similar Cyrillic glyphs in short labels.
+        if labels.contains(where: { $0.label == "4TH" }) {
+            labels += [("4ТH", "4TH"), ("4ТН", "4TH"), ("4Tн", "4TH")]
+        }
+        if labels.contains(where: { $0.label == "OT" }) {
+            labels += [("ОT", "OT"), ("ОТ", "OT")]
+        }
+        // Vision can read the letter O as zero in numbered overtime labels.
+        if labels.contains(where: { $0.label == "2OT" }) {
+            labels.append(("20T", "2OT"))
+        }
+        if labels.contains(where: { $0.label == "3OT" }) {
+            labels.append(("30T", "3OT"))
+        }
+        return labels
+    }
+
+    private static func periodLabel(_ label: String, matches text: String) -> Bool {
+        let escaped = NSRegularExpression.escapedPattern(for: label)
+            .replacingOccurrences(of: "\\ ", with: #"\s+"#)
+        return text.uppercased().range(of: "(?<![A-Z0-9])\(escaped)(?![A-Z0-9])",
+                                     options: .regularExpression) != nil
+    }
+
+    static func preferredCandidateIndex(_ texts: [String], format: ScoreboardFormat) -> Int? {
+        guard !texts.isEmpty else { return nil }
+        let labels = periodLabels(format: format)
+        return texts.firstIndex { text in labels.contains { periodLabel($0.label, matches: text) } } ?? 0
+    }
+
     static func read(_ buffer: CVPixelBuffer, format: ScoreboardFormat,
                      regionOfInterest: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)) throws -> Reading? {
         try readWithTexts(buffer, format: format, regionOfInterest: regionOfInterest).reading
@@ -157,11 +172,12 @@ nonisolated enum GameTimeReader {
     static func readWithTexts(_ buffer: CVPixelBuffer, format: ScoreboardFormat,
                               regionOfInterest: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1))
         throws -> (reading: Reading?, texts: [String]) {
-        let texts = try visionTexts(buffer, regionOfInterest: regionOfInterest)
+        let texts = try visionTexts(buffer, format: format, regionOfInterest: regionOfInterest)
         return (parse(texts, format: format), texts)
     }
 
-    private static func visionTexts(_ buffer: CVPixelBuffer, regionOfInterest: CGRect) throws -> [String] {
+    private static func visionTexts(_ buffer: CVPixelBuffer, format: ScoreboardFormat,
+                                    regionOfInterest: CGRect) throws -> [String] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.recognitionLanguages = ["en-US"]
@@ -169,7 +185,13 @@ nonisolated enum GameTimeReader {
         request.usesLanguageCorrection = false
         request.regionOfInterest = regionOfInterest
         try VNImageRequestHandler(cvPixelBuffer: buffer).perform([request])
-        return (request.results ?? []).compactMap { $0.topCandidates(1).first }
+        return (request.results ?? []).compactMap { observation -> VNRecognizedText? in
+            let candidates = observation.topCandidates(10)
+            guard let index = preferredCandidateIndex(candidates.map(\.string), format: format) else {
+                return nil
+            }
+            return candidates[index]
+        }
             .filter { $0.confidence >= 0.5 }.map(\.string)
     }
 

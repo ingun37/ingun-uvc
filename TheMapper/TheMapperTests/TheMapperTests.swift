@@ -207,6 +207,19 @@ struct TheMapperTests {
         }
     }
 
+    @Test func visionCandidatePrefersRecognizedPeriodLabel() {
+        let short = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                     underMinuteStyle: .colon)
+        let long = GameTimeReader.ScoreboardFormat(periodStyle: .long,
+                                                    underMinuteStyle: .natural)
+        #expect(GameTimeReader.preferredCandidateIndex(["3R0", "3ED", "3RD"], format: short) == 1)
+        #expect(GameTimeReader.preferredCandidateIndex(["3R0", "4TH"], format: short) == 1)
+        #expect(GameTimeReader.preferredCandidateIndex(["3R0", "5:42"], format: short) == 0)
+        #expect(GameTimeReader.preferredCandidateIndex(["THIRD QUARTER", "3RD"], format: short) == 1)
+        #expect(GameTimeReader.preferredCandidateIndex(["3RD", "THIRD QUARTER"], format: long) == 1)
+        #expect(GameTimeReader.preferredCandidateIndex([], format: short) == nil)
+    }
+
     @Test func overtimeShortLabels() {
         let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
                                                       underMinuteStyle: .colon)
