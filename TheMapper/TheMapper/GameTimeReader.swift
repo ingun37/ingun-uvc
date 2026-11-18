@@ -73,7 +73,13 @@ nonisolated enum GameTimeReader {
                 .replacingOccurrences(of: #"(?<![\d.])(\d{1,2})\s*:\s*(?=\d)"#,
                                       with: "$1:", options: .regularExpression)
                 .replacingOccurrences(of: #":\s+(?=\d)"#, with: ":", options: .regularExpression)
+                // Vision occasionally splits the last second digit: "5:5 1" -> "5:51".
+                .replacingOccurrences(of: #"(?<!\w)(\d):(\d)\s+(\d)(?!\w)"#,
+                                      with: "$1:$2$3", options: .regularExpression)
                 .replacingOccurrences(of: #"(?<=\d)\s*\.\s*(?=\d)"#, with: ".", options: .regularExpression)
+                // Vision can also split a sub-minute clock: ":0 1.5" -> ":01.5".
+                .replacingOccurrences(of: #"(?<!\w):(\d)\s+(\d)\.(\d)(?!\w)"#,
+                                      with: ":$1$2.$3", options: .regularExpression)
                 .replacingOccurrences(of: #"(?<=:[0-5])Б(?![\p{L}0-9])"#,
                                       with: "6", options: .regularExpression)
         }
@@ -132,11 +138,11 @@ nonisolated enum GameTimeReader {
             labels += [("ZND", "2ND")]
         }
         if labels.contains(where: { $0.label == "3RD" }) {
-            labels += [("3ED", "3RD"), ("38D", "3RD"), ("3AD", "3RD"), ("ЗRD", "3RD")] // The last 3RD is Cyrillic З (U+0417)
+            labels += [("3ED", "3RD"), ("38D", "3RD"), ("3AD", "3RD"), ("ЗRD", "3RD"), ("ЭRD", "3RD")] // The last 3RD is Cyrillic З (U+0417)
         }
         // Vision can substitute visually similar Cyrillic glyphs in short labels.
         if labels.contains(where: { $0.label == "4TH" }) {
-            labels += [("4ТH", "4TH"), ("4ТН", "4TH"), ("4Tн", "4TH")]
+            labels += [("4ТH", "4TH"), ("4ТН", "4TH"), ("4Tн", "4TH"), ("4Тн", "4TH")]
         }
         if labels.contains(where: { $0.label == "OT" }) {
             labels += [("ОT", "OT"), ("ОТ", "OT")]

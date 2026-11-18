@@ -197,6 +197,28 @@ struct TheMapperTests {
                 .init(period: "1ST", gameSecond: 661))
     }
 
+    @Test func clockOCRJoinsSplitSecondDigit() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        let expected = GameTimeReader.Reading(period: "1ST", gameSecond: 351)
+        #expect(GameTimeReader.parse(["1ST", "5:5 1"], format: format) == expected)
+        #expect(GameTimeReader.parse(["1ST 5:5 1"], format: format) == expected)
+        #expect(GameTimeReader.parse(["1ST", "A5:5 1"], format: format) == nil)
+        #expect(GameTimeReader.parse(["1ST", "5:5 1A"], format: format) == nil)
+        #expect(GameTimeReader.parse(["1ST", "15:5 1"], format: format) == nil)
+    }
+
+    @Test func clockOCRJoinsSplitSubMinuteDigit() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        let expected = GameTimeReader.Reading(period: "2ND", gameSecond: 1.5)
+        #expect(GameTimeReader.parse(["2ND", ":0 1.5"], format: format) == expected)
+        #expect(GameTimeReader.parse(["2ND :0 1.5"], format: format) == expected)
+        #expect(GameTimeReader.parse(["2ND", "A:0 1.5"], format: format) == nil)
+        #expect(GameTimeReader.parse(["2ND", ":0 1.5A"], format: format) == nil)
+        #expect(GameTimeReader.parse(["2ND", "1:0 1.5"], format: format) == nil)
+    }
+
     @Test func thirdQuarterOCRReadsVariants() {
         let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
                                                       underMinuteStyle: .colon)
