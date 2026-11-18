@@ -197,6 +197,16 @@ struct TheMapperTests {
                 .init(period: "1ST", gameSecond: 661))
     }
 
+    @Test func thirdQuarterOCRReadsVariants() {
+        let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
+                                                      underMinuteStyle: .colon)
+        for label in ["3ED", "38E"] {
+            let expected = GameTimeReader.Reading(period: "3RD", gameSecond: 661)
+            #expect(GameTimeReader.parse(["\(label) 11:01"], format: format) == expected)
+            #expect(GameTimeReader.parse(["\(label) 11:01"]) == expected)
+        }
+    }
+
     @Test func overtimeShortLabels() {
         let format = GameTimeReader.ScoreboardFormat(periodStyle: .short,
                                                       underMinuteStyle: .colon)

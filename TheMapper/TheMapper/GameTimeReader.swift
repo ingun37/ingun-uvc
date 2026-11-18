@@ -93,6 +93,9 @@ nonisolated enum GameTimeReader {
         if labels.contains(where: { $0.label == "1ST" }) {
             labels += [("IST", "1ST"), ("15T", "1ST")]
         }
+        if labels.contains(where: { $0.label == "3RD" }) {
+            labels += [("3ED", "3RD"), ("38E", "3RD")]
+        }
         // Vision can substitute visually similar Cyrillic glyphs in short labels.
         if labels.contains(where: { $0.label == "4TH" }) {
             labels += [("4ТH", "4TH"), ("4ТН", "4TH")]
