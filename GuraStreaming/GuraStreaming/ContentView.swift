@@ -89,6 +89,9 @@ struct ContentView: View {
                     if let remaining = recording.freezeCountdown {
                         Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")
                             .foregroundStyle(.orange)
+                    } else {
+                        Label("Video is moving", systemImage: "play.circle")
+                            .foregroundStyle(.blue)
                     }
                     Text(recording.message).textSelection(.enabled)
                     if let savedURL = recording.savedURL {
