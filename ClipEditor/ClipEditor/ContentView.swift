@@ -225,6 +225,7 @@ struct ContentView: View {
     @State private var didLoadLaunchInputs = false
     @State private var previewSpeed = 4.0
     @State private var selectedPreviewID: UUID?
+    @State private var moveAllByClipID: [UUID: Bool] = [:]
     @State private var previewPlayToggle = 0
     @State private var previewKeyMonitor: Any?
 
@@ -344,7 +345,7 @@ struct ContentView: View {
                     .monospacedDigit()
                     .frame(width: 42, alignment: .trailing)
             }
-            Text("↑/↓ Select preview · Space Play/Pause")
+            Text("↑/↓ Select preview · ←/→ Move selected clip 0.5s with Move All · Space Play/Pause")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             ScrollViewReader { proxy in
@@ -354,7 +355,7 @@ struct ContentView: View {
                             if let videoURL = model.videoURL {
                                 ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration,
                                         previewSpeed: previewSpeed, isSelected: selectedPreviewID == clip.id,
-                                        playToggle: previewPlayToggle)
+                                        playToggle: previewPlayToggle, moveAll: moveAllBinding(for: clip.id))
                                     .id(clip.id)
                             }
                         }
@@ -378,6 +379,19 @@ struct ContentView: View {
                             return nil
                         case 49: // Space
                             if selectedPreviewID != nil { previewPlayToggle += 1 }
+                            return nil
+                        case 123, 124: // Left, right
+                            guard let selectedPreviewID,
+                                  moveAllByClipID[selectedPreviewID, default: true],
+                                  let index = model.clips.firstIndex(where: { $0.id == selectedPreviewID }) else {
+                                return event
+                            }
+                            let clip = model.clips[index]
+                            let first = clip.attempts.map(\.originalSourceTime).min() ?? clip.originalStart
+                            let last = clip.attempts.map(\.originalSourceTime).max() ?? clip.originalEnd
+                            let range = max(0, first - 15)...min(model.videoDuration, last + 15)
+                            let offset = event.keyCode == 123 ? -0.5 : 0.5
+                            model.clips[index].moveHandle(0, to: clip.start + offset, moveAll: true, in: range)
                             return nil
                         default:
                             return event
@@ -435,6 +449,13 @@ struct ContentView: View {
             }
         }
     }
+
+    private func moveAllBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { moveAllByClipID[id, default: true] },
+            set: { moveAllByClipID[id] = $0 }
+        )
+    }
 }
 
 private struct ClipRow: View {
@@ -444,7 +465,7 @@ private struct ClipRow: View {
     let previewSpeed: Double
     let isSelected: Bool
     let playToggle: Int
-    @State private var moveAll = true
+    @Binding var moveAll: Bool
 
     private var timelineRange: ClosedRange<Double> {
         let first = clip.attempts.map(\.originalSourceTime).min() ?? clip.originalStart
