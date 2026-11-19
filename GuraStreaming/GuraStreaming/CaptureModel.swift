@@ -35,6 +35,7 @@ final class CaptureResource: @unchecked Sendable {
     let freezeDetector: MetalFreezeDetector
     let thumbnails: ThumbnailCandidateDetector
     let audioMeter = AudioLevelMeter()
+    let silenceDetector = AudioSilenceDetector()
     let audioSourceName: String?
     private let audioDelegate: AudioLevelDelegate?
     private let device: AVCaptureDevice
@@ -94,7 +95,7 @@ final class CaptureResource: @unchecked Sendable {
                         AVLinearPCMIsNonInterleaved: false
                     ]
                     if session.canAddOutput(audioOutput) {
-                        let processor = AudioLevelProcessor(meter: audioMeter)
+                        let processor = AudioLevelProcessor(meter: audioMeter, silenceDetector: silenceDetector)
                         let delegate = AudioLevelDelegate(processor: processor)
                         audioOutput.setSampleBufferDelegate(delegate, queue: audioQueue)
                         session.addOutput(audioOutput)
@@ -243,6 +244,7 @@ final class CaptureModel {
     var preparingCapture = false
     var recording: MovieRecording?
     var freezeTimeout = 60.0
+    var silenceTimeout = 60.0
 
     var supportedFrameRates: [Double] {
         guard case let .frequency(device) = screen else { return [] }
@@ -354,7 +356,8 @@ final class CaptureModel {
         do {
             let newRecording = try MovieRecording(resource: resource)
             recording = newRecording
-            newRecording.start(freezeTimeout: max(1, freezeTimeout))
+            newRecording.start(freezeTimeout: max(1, freezeTimeout),
+                               silenceTimeout: max(1, silenceTimeout))
         } catch {
             streamMessage = "Could not start recording: \(error.localizedDescription)"
         }

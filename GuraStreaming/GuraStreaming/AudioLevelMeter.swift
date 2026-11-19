@@ -10,13 +10,17 @@ final class AudioLevelMeter {
 /// and UI updates run on other queues, and older waiting buffers are dropped.
 nonisolated final class AudioLevelProcessor: @unchecked Sendable {
     let meter: AudioLevelMeter
+    let silenceDetector: AudioSilenceDetector
     private let lock = NSLock()
     private let queue = DispatchQueue(label: "com.ingun37.GuraStreaming.audioLevels", qos: .utility)
     private var waitingBuffer: CMSampleBuffer?
     private var active = false
     private var lastPublished = 0.0
 
-    init(meter: AudioLevelMeter) { self.meter = meter }
+    init(meter: AudioLevelMeter, silenceDetector: AudioSilenceDetector) {
+        self.meter = meter
+        self.silenceDetector = silenceDetector
+    }
 
     func offer(_ sampleBuffer: CMSampleBuffer) {
         lock.lock()
@@ -35,10 +39,14 @@ nonisolated final class AudioLevelProcessor: @unchecked Sendable {
         lock.unlock()
         guard let sampleBuffer else { return }
 
-        let now = ProcessInfo.processInfo.systemUptime
-        if now - lastPublished >= 0.05, let level = rmsLevel(sampleBuffer) {
-            lastPublished = now
-            Task { @MainActor [meter] in meter.level = level }
+        if let rms = rmsLevel(sampleBuffer) {
+            if rms > 0.01 { silenceDetector.heardSound() }
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastPublished >= 0.05 {
+                lastPublished = now
+                let level = min(1, sqrt(rms) * 1.8)
+                Task { @MainActor [meter] in meter.level = level }
+            }
         }
         queue.async { [self] in processLatest() }
     }
@@ -60,8 +68,7 @@ nonisolated final class AudioLevelProcessor: @unchecked Sendable {
             sum += value * value
         }
         let rms = sqrt(sum / Double(count))
-        // A square-root display curve makes quiet audio visibly move the meter.
-        return min(1, sqrt(rms) * 1.8)
+        return rms
     }
 }
 

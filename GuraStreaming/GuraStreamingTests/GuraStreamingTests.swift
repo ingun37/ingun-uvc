@@ -47,6 +47,36 @@ struct GuraStreamingTests {
         #expect(result.sawCountdown)
         #expect(result.didTimeout)
     }
+
+    @Test func videoWithoutAudioTriggersTwoSecondSilenceTimeout() async throws {
+        let url = try #require(Bundle(for: BundleMarker.self).url(forResource: "no_audio", withExtension: "mp4"))
+        let asset = AVURLAsset(url: url)
+        #expect(try await asset.loadTracks(withMediaType: .audio).isEmpty)
+        let track = try #require((try await asset.loadTracks(withMediaType: .video)).first)
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        reader.add(output)
+
+        let detector = AudioSilenceDetector()
+        let result = SilenceResult()
+        detector.start(timeout: 2) { result.timedOut() }
+        defer { detector.stop() }
+        #expect(reader.startReading())
+        let started = ProcessInfo.processInfo.systemUptime
+        var firstTimestamp: Double?
+        var lastTimestamp = 0.0
+        while let sample = output.copyNextSampleBuffer() {
+            let timestamp = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            if firstTimestamp == nil { firstTimestamp = timestamp }
+            lastTimestamp = timestamp
+            let videoElapsed = timestamp - firstTimestamp!
+            let wallElapsed = ProcessInfo.processInfo.systemUptime - started
+            let delay = max(0, videoElapsed - wallElapsed)
+            if delay > 0 { try await Task.sleep(for: .milliseconds(Int(delay * 1000))) }
+        }
+        #expect(lastTimestamp - (firstTimestamp ?? 0) >= 2.9)
+        #expect(result.didTimeout)
+    }
 }
 
 private final class BundleMarker {}
@@ -57,5 +87,12 @@ private final class FreezeResult: @unchecked Sendable {
     var sawCountdown: Bool { lock.lock(); defer { lock.unlock() }; return countdown }
     var didTimeout: Bool { lock.lock(); defer { lock.unlock() }; return timeout }
     func record(_ remaining: Int?) { lock.lock(); if remaining != nil { countdown = true }; lock.unlock() }
+    func timedOut() { lock.lock(); timeout = true; lock.unlock() }
+}
+
+private final class SilenceResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private var timeout = false
+    var didTimeout: Bool { lock.lock(); defer { lock.unlock() }; return timeout }
     func timedOut() { lock.lock(); timeout = true; lock.unlock() }
 }

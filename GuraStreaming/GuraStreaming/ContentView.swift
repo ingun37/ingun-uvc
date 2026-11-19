@@ -85,6 +85,16 @@ struct ContentView: View {
                     if !value.isFinite { model.freezeTimeout = 60 }
                 }
                 .disabled(model.recording?.phase.isBusy == true)
+                HStack {
+                    Text("Stop after no sound")
+                    TextField("Seconds", value: $model.silenceTimeout, format: .number)
+                        .frame(width: 65)
+                    Text("seconds")
+                }
+                .onChange(of: model.silenceTimeout) { _, value in
+                    if !value.isFinite { model.silenceTimeout = 60 }
+                }
+                .disabled(model.recording?.phase.isBusy == true)
                 if let recording = model.recording {
                     if let remaining = recording.freezeCountdown {
                         Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")

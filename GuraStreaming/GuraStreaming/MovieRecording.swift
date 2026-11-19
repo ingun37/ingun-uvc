@@ -23,6 +23,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     var freezeCountdown: Int?
     var stopReason = "Stopped by clicking Stop"
     var savedURL: URL?
+    private var silenceTimeout: TimeInterval = 60
 
     init(resource: CaptureResource) throws {
         self.resource = resource
@@ -42,7 +43,8 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         super.init()
     }
 
-    func start(freezeTimeout: TimeInterval) {
+    func start(freezeTimeout: TimeInterval, silenceTimeout: TimeInterval) {
+        self.silenceTimeout = silenceTimeout
         let detector = resource.freezeDetector
         detector.timeout = freezeTimeout
         detector.onCountdown = { [weak self] remaining in
@@ -62,6 +64,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     func stop(reason: String = "Stopped by clicking Stop") {
         stopReason = reason
         resource.freezeDetector.setActive(false)
+        resource.silenceDetector.stop()
         resource.thumbnails.stopAccepting()
         freezeCountdown = nil
         switch phase {
@@ -78,6 +81,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
 
     func failed(_ reason: String) {
         resource.freezeDetector.setActive(false)
+        resource.silenceDetector.stop()
         resource.thumbnails.stopAccepting()
         phase = .failed
         message = "Stopped because of an error: \(reason)"
@@ -94,6 +98,13 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 phase = .recording
                 message = "Recording…"
                 resource.thumbnails.start(for: outputFileURL)
+                resource.silenceDetector.start(timeout: silenceTimeout) { [weak self] in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.phase == .recording else { return }
+                        self.stop(reason: "Stopped because there was no sound")
+                        self.message = "Recording stopped because there was no sound. Finishing…"
+                    }
+                }
             }
         }
     }
@@ -105,6 +116,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         let failureText = failure?.localizedDescription ?? "Recording did not finish successfully."
         Task { @MainActor [self] in
             resource.freezeDetector.setActive(false)
+            resource.silenceDetector.stop()
             resource.removeRecordingOutput(self.output)
             resource.thumbnails.finish { result in
                 if case let .failure(error) = result {
