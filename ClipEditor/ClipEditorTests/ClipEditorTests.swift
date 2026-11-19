@@ -100,6 +100,23 @@ struct ClipEditorTests {
         #expect(events[1].gameTime == "1st 10′0″")
     }
 
+    @Test func exportedPlayerRankingsUseGameTotalsAndOnlyExportedPlayers() throws {
+        let csv = "period,clock,team,player,result,description\n" +
+            "1,PT11M00S,A,Alice,missed,miss\n" +
+            "1,PT10M00S,A,Alice,made,make\n" +
+            "1,PT09M00S,A,Alice,missed,miss\n" +
+            "1,PT08M00S,B,Bob,missed,miss\n" +
+            "1,PT07M00S,B,Bob,missed,miss\n" +
+            "1,PT06M00S,C,Chris,made,make\n"
+        let events = try ClipPlanner.countEvents(from: csv)
+        let stats = PlayerFieldGoalStats.exportedPlayers(["A|Alice", "B|Bob"], countEvents: events)
+        #expect(PlayerFieldGoalStats.byMisses(stats).map(\.id) == ["A|Alice", "B|Bob"])
+        #expect(PlayerFieldGoalStats.byPercentage(stats).map(\.id) == ["B|Bob", "A|Alice"])
+        #expect(stats.first?.misses == 2)
+        #expect(abs((stats.first?.percentage ?? 0) - 100.0 / 3.0) < 0.001)
+        #expect(stats.count == 2)
+    }
+
     @Test func madeShotTimeUsesPeriodAndPrimeNotation() throws {
         let csv = "period,clock,team,player,result,description\n" +
             "2,PT11M02S,A,Alice,made,make\n"

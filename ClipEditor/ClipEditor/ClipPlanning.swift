@@ -60,6 +60,41 @@ struct CountEvent: Sendable {
     let gameTime: String?
 }
 
+struct PlayerFieldGoalStats: Sendable, Identifiable {
+    let id: String
+    let name: String
+    let made: Int
+    let attempted: Int
+
+    var misses: Int { attempted - made }
+    var percentage: Double { attempted == 0 ? 0 : Double(made) / Double(attempted) * 100 }
+
+    static func exportedPlayers(_ keys: [String], countEvents: [String: [CountEvent]]) -> [Self] {
+        keys.compactMap { key in
+            guard let last = countEvents[key]?.last else { return nil }
+            let name = String(key.split(separator: "|", maxSplits: 1,
+                                        omittingEmptySubsequences: false).last ?? "")
+            return Self(id: key, name: name, made: last.made, attempted: last.attempted)
+        }
+    }
+
+    static func byMisses(_ stats: [Self]) -> [Self] {
+        stats.sorted { left, right in
+            if left.misses != right.misses { return left.misses > right.misses }
+            return left.name.localizedStandardCompare(right.name) == .orderedAscending
+        }
+    }
+
+    static func byPercentage(_ stats: [Self]) -> [Self] {
+        stats.sorted { left, right in
+            let leftMade = left.made * right.attempted
+            let rightMade = right.made * left.attempted
+            if leftMade != rightMade { return leftMade < rightMade }
+            return left.name.localizedStandardCompare(right.name) == .orderedAscending
+        }
+    }
+}
+
 struct Clip: Identifiable, Sendable {
     let id: UUID
     let originalStart: Double

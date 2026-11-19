@@ -83,6 +83,7 @@ private final class EditorModel {
     var isBusy = false
     var exportedURL: URL?
     var playerExportURLs: [URL] = []
+    var exportedPlayerStats: [PlayerFieldGoalStats] = []
     private var files: [InputKind: FileAccess] = [:]
 
     var videoURL: URL? { files[.video]?.url }
@@ -111,6 +112,7 @@ private final class EditorModel {
         countEvents = [:]
         exportedURL = nil
         playerExportURLs = []
+        exportedPlayerStats = []
         message = ""
         return true
     }
@@ -168,6 +170,9 @@ private final class EditorModel {
         let access = FileAccess(destination)
         let groups = playerGroups
         isBusy = true
+        exportedURL = nil
+        playerExportURLs = []
+        exportedPlayerStats = []
         message = "Exporting compilation…"
         defer { isBusy = false; _ = access }
         do {
@@ -206,6 +211,7 @@ private final class EditorModel {
             }
             exportedURL = destination
             playerExportURLs = playerURLs
+            exportedPlayerStats = PlayerFieldGoalStats.exportedPlayers(groups.map(\.key), countEvents: countEvents)
             message = "Saved compilation and \(playerURLs.count) player videos to \(destination.deletingLastPathComponent().path)."
         } catch {
             message = error.localizedDescription
@@ -259,6 +265,9 @@ struct ContentView: View {
                 Text(model.message)
                     .foregroundStyle(model.exportedURL == nil ? .orange : .green)
                     .accessibilityIdentifier("statusMessage")
+            }
+            if model.exportedURL != nil, !model.exportedPlayerStats.isEmpty {
+                exportRankings
             }
         }
         .padding(24)
@@ -448,6 +457,42 @@ struct ContentView: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
+    }
+
+    private var exportRankings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Exported players · game field goal totals")
+                .font(.headline)
+            HStack(alignment: .top, spacing: 24) {
+                rankingList("Most misses", stats: PlayerFieldGoalStats.byMisses(model.exportedPlayerStats)) { stats in
+                    "\(stats.misses) misses"
+                }
+                rankingList("Lowest field goal percentage", stats: PlayerFieldGoalStats.byPercentage(model.exportedPlayerStats)) { stats in
+                    String(format: "%.1f%% (%d/%d)", stats.percentage, stats.made, stats.attempted)
+                }
+            }
+        }
+    }
+
+    private func rankingList(_ title: String, stats: [PlayerFieldGoalStats],
+                             value: @escaping (PlayerFieldGoalStats) -> String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline.bold())
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(stats.enumerated()), id: \.element.id) { index, player in
+                        HStack {
+                            Text("\(index + 1). \(player.name)")
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            Text(value(player)).monospacedDigit()
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 150)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func moveAllBinding(for id: UUID) -> Binding<Bool> {
