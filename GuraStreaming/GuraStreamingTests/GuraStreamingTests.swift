@@ -59,7 +59,7 @@ struct GuraStreamingTests {
 
         let detector = AudioSilenceDetector()
         let result = SilenceResult()
-        detector.start(timeout: 2) { result.timedOut() }
+        detector.start(timeout: 2, onCountdown: { result.record($0) }) { result.timedOut() }
         defer { detector.stop() }
         #expect(reader.startReading())
         let started = ProcessInfo.processInfo.systemUptime
@@ -75,6 +75,7 @@ struct GuraStreamingTests {
             if delay > 0 { try await Task.sleep(for: .milliseconds(Int(delay * 1000))) }
         }
         #expect(lastTimestamp - (firstTimestamp ?? 0) >= 2.9)
+        #expect(result.sawCountdown)
         #expect(result.didTimeout)
     }
 }
@@ -92,7 +93,10 @@ private final class FreezeResult: @unchecked Sendable {
 
 private final class SilenceResult: @unchecked Sendable {
     private let lock = NSLock()
+    private var countdown = false
     private var timeout = false
+    var sawCountdown: Bool { lock.lock(); defer { lock.unlock() }; return countdown }
     var didTimeout: Bool { lock.lock(); defer { lock.unlock() }; return timeout }
+    func record(_ remaining: Int?) { lock.lock(); if remaining != nil { countdown = true }; lock.unlock() }
     func timedOut() { lock.lock(); timeout = true; lock.unlock() }
 }

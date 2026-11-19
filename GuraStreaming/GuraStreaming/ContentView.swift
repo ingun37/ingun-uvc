@@ -79,30 +79,41 @@ struct ContentView: View {
                     Text("Stop after frozen video")
                     TextField("Seconds", value: $model.freezeTimeout, format: .number)
                         .frame(width: 65)
+                        .disabled(model.recording?.phase.isBusy == true)
                     Text("seconds")
+                    if let recording = model.recording {
+                        if let remaining = recording.freezeCountdown {
+                            Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")
+                                .foregroundStyle(.orange)
+                        } else {
+                            Label("Video is moving", systemImage: "play.circle")
+                                .foregroundStyle(.blue)
+                        }
+                    }
                 }
                 .onChange(of: model.freezeTimeout) { _, value in
                     if !value.isFinite { model.freezeTimeout = 60 }
                 }
-                .disabled(model.recording?.phase.isBusy == true)
                 HStack {
                     Text("Stop after no sound")
                     TextField("Seconds", value: $model.silenceTimeout, format: .number)
                         .frame(width: 65)
+                        .disabled(model.recording?.phase.isBusy == true)
                     Text("seconds")
+                    if let recording = model.recording, recording.phase == .recording {
+                        if let remaining = recording.silenceCountdown {
+                            Label("No sound · stopping in \(remaining) seconds", systemImage: "speaker.slash")
+                                .foregroundStyle(.orange)
+                        } else {
+                            Label("Sound detected", systemImage: "speaker.wave.2")
+                                .foregroundStyle(.blue)
+                        }
+                    }
                 }
                 .onChange(of: model.silenceTimeout) { _, value in
                     if !value.isFinite { model.silenceTimeout = 60 }
                 }
-                .disabled(model.recording?.phase.isBusy == true)
                 if let recording = model.recording {
-                    if let remaining = recording.freezeCountdown {
-                        Label("Video frozen · stopping in \(remaining) seconds", systemImage: "pause.circle")
-                            .foregroundStyle(.orange)
-                    } else {
-                        Label("Video is moving", systemImage: "play.circle")
-                            .foregroundStyle(.blue)
-                    }
                     Text(recording.message).textSelection(.enabled)
                     if let savedURL = recording.savedURL {
                         HStack {

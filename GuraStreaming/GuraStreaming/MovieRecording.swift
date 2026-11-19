@@ -21,6 +21,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
     var phase: Phase = .starting
     var message = "Starting recording…"
     var freezeCountdown: Int?
+    var silenceCountdown: Int?
     var stopReason = "Stopped by clicking Stop"
     var savedURL: URL?
     private var silenceTimeout: TimeInterval = 60
@@ -67,6 +68,7 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
         resource.silenceDetector.stop()
         resource.thumbnails.stopAccepting()
         freezeCountdown = nil
+        silenceCountdown = nil
         switch phase {
         case .starting:
             phase = .stopping
@@ -98,7 +100,13 @@ final class MovieRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
                 phase = .recording
                 message = "Recording…"
                 resource.thumbnails.start(for: outputFileURL)
-                resource.silenceDetector.start(timeout: silenceTimeout) { [weak self] in
+                silenceCountdown = Int(ceil(silenceTimeout))
+                resource.silenceDetector.start(timeout: silenceTimeout) { [weak self] remaining in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.phase == .recording else { return }
+                        self.silenceCountdown = remaining
+                    }
+                } onTimeout: { [weak self] in
                     Task { @MainActor [weak self] in
                         guard let self, self.phase == .recording else { return }
                         self.stop(reason: "Stopped because there was no sound")
