@@ -1,6 +1,6 @@
 # GuraStreaming project guidance
 
-Updated 2026-11-15 (Asia/Seoul).
+Updated 2026-11-19 (Asia/Seoul).
 
 ## Scope
 
@@ -26,12 +26,15 @@ required. Prefer clear resource ownership and keep capture callbacks short.
 5. Record adds an `AVCaptureMovieFileOutput` to the existing session on its
    serial queue. Stop finalizes a timestamped `.mov` directly in `~/Movies`.
    The saved-path message appears only after the file-output delegate reports
-   successful completion. The message reports whether Stop was clicked or frozen video
-   triggered the stop; failures show their error. Saved recordings offer Open directory
-   and Open file buttons. Record is disabled while starting, recording, or
-   stopping; Back is disabled during those phases. The frozen-video timeout is
-   adjustable before recording and defaults to 60 seconds. Repeated frames start
-   a countdown; continued repetition through the timeout stops recording.
+   successful completion. The message reports whether Stop was clicked, frozen
+   video was detected, or sound was absent; failures show their error. Saved
+   recordings offer Open directory and Open file buttons. Record is disabled
+   while starting, recording, or stopping; Back is disabled during those phases.
+   Frozen-video and no-sound timeouts are adjustable before recording and each
+   defaults to 60 seconds. Each setting and its status share one row. Repeated
+   frames start the video countdown. A wall-clock silence countdown starts when
+   movie recording begins, even if no audio buffers arrive; detected sound
+   resets it. Either timeout stops recording.
 
 ## Code map
 
@@ -64,8 +67,11 @@ required. Prefer clear resource ownership and keep capture callbacks short.
   `GuraStreaming/Tools/regenerate-clip-prompts`. Edit the labels file and rerun
   the generator to refresh the embeddings.
 - `GuraStreaming/AudioLevelMeter.swift`: audio callback retains only the latest
-  waiting sample. A utility queue computes a bounded RMS level and publishes
-  UI updates at most 20 times per second.
+  waiting sample. A utility queue computes RMS, reports sound to the silence
+  detector, and publishes UI updates at most 20 times per second.
+- `GuraStreaming/AudioSilenceDetector.swift`: independent serial-queue timer
+  for the no-sound countdown and stop event. Audio capture callbacks never
+  wait for it.
 - `GuraStreaming/MovieRecording.swift`: movie-output delegate, recording phases,
   unique timestamped Movies path, and finalization result.
 - `GuraStreaming/USBDetails.swift`: best-effort IOKit USB descriptor lookup.
@@ -81,13 +87,15 @@ xcodebuild -project GuraStreaming/GuraStreaming.xcodeproj -scheme GuraStreaming 
 ```
 
 The frozen-video unit test reads `GuraStreamingTests/frozen-audible-small.mp4`
-with a two-second timeout. Builds and the frozen-video and thumbnail-log unit tests have passed; capture-card frame
-cadence, preview, audio metering, movie finalization, and saved-file timestamps
-still require hardware validation. Thumbnail classification quality and timestamp
-alignment with the recorded movie require capture-card validation. Frozen-video accuracy and recording stop
-behavior on capture hardware also require validation. Some devices advertise frame rates that do
-not match delivered or recorded cadence. Inspect sample timestamps and the
-saved movie if a rate looks wrong.
+with a two-second timeout. The silence unit test reads the three-second,
+audio-free `GuraStreamingTests/no_audio.mp4` at its recorded pace and checks a
+two-second timeout and countdown. Builds and all three unit tests have passed;
+capture-card frame cadence, preview, audio metering, recording stop and movie
+finalization, and saved-file timestamps still require hardware validation.
+Thumbnail classification quality and timestamp alignment with the recorded
+movie also require capture-card validation. Some devices advertise frame rates
+that do not match delivered or recorded cadence. Inspect sample timestamps
+and the saved movie if a rate looks wrong.
 
 The project enables camera, audio-input, and Movies-folder sandbox access and
 has camera and microphone usage descriptions. Some video sources do not expose

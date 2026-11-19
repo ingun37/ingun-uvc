@@ -4,7 +4,8 @@ This repository contains multiple projects:
 
 - `GuraStreaming/`: active native macOS SwiftUI capture-card inspector and
   recorder with frame-rate selection, a Metal preview, audio levels, and MOV
-  recording. Capture-card behavior requires hardware validation. Before
+  recording. Adjustable frozen-video and no-sound timeouts can stop recording
+  automatically. Capture-card behavior requires hardware validation. Before
   working on it, read and follow [GuraStreaming/AGENTS.md](GuraStreaming/AGENTS.md).
 - `streamer/`: legacy capture app, retained for reference after GuraStreaming
   replaced it. Before changing it, read [streamer/AGENTS.md](streamer/AGENTS.md).
