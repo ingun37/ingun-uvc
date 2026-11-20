@@ -21,6 +21,10 @@ struct ContentView: View {
         let gameTime: Double
         let kind: VideoTimeMapper.Kind
     }
+    private struct RemovedInterval {
+        let index: Int
+        let interval: VideoTimeMapper.Interval
+    }
     private struct JSONEntry: Encodable {
         let period: String
         let game_start_seconds: Double
@@ -42,6 +46,8 @@ struct ContentView: View {
     @State private var scoreboardFormat = GameTimeReader.ScoreboardFormat.Preset.a.format
     @State private var intervals: [VideoTimeMapper.Interval]?
     @State private var chartPoints: [ChartPoint] = []
+    @State private var selectedIntervalIndex: Int?
+    @State private var removedIntervals: [RemovedInterval] = []
     @State private var logLines: [String] = []
     @State private var processing = false
     @State private var errorMessage: String?
@@ -188,15 +194,46 @@ struct ContentView: View {
                              y: .value("Game time", point.gameTime),
                              series: .value("Interval", point.segment))
                         .foregroundStyle(point.kind == .paused ? .orange : .blue)
+                        .lineStyle(StrokeStyle(lineWidth: selectedIntervalIndex == point.segment ? 4 : 2))
+                        .opacity(selectedIntervalIndex == nil || selectedIntervalIndex == point.segment ? 1 : 0.35)
                 }
                 .chartXScale(domain: 0...max(duration, 1))
                 .chartXAxisLabel("Video time (s)")
                 .chartYAxisLabel("Game time remaining (s)")
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle().fill(.clear).contentShape(Rectangle())
+                            .gesture(SpatialTapGesture().onEnded { value in
+                                selectInterval(at: value.location, proxy: proxy, geometry: geometry)
+                            })
+                    }
+                }
                 .frame(maxHeight: .infinity)
             } else {
                 Text(processing ? "Reading frames and recognizing the game clock…" :
-                     "No intervals found.").foregroundStyle(.secondary)
+                     removedIntervals.isEmpty ? "No intervals found." : "All intervals removed. Undo a removal to restore one.")
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if !processing {
+                HStack {
+                    if let index = selectedIntervalIndex, let intervals, intervals.indices.contains(index) {
+                        let interval = intervals[index]
+                        Text(String(format: "%@ · video %.2f–%.2f s · game %.1f–%.1f s",
+                                    interval.period, interval.videoStart, interval.videoEnd,
+                                    interval.gameStart, interval.gameEnd))
+                            .font(.caption).monospacedDigit()
+                        Spacer()
+                        Button("Remove Interval") { removeSelectedInterval() }
+                            .disabled(savedURL != nil)
+                    } else {
+                        Text("Click a line to select an interval.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    Button("Undo Removal") { undoRemoval() }
+                        .disabled(removedIntervals.isEmpty || savedURL != nil)
+                }
             }
             Text("Processing log").font(.subheadline.bold())
             ScrollView {
@@ -229,6 +266,8 @@ struct ContentView: View {
         selectedRegion = nil
         intervals = nil
         chartPoints = []
+        selectedIntervalIndex = nil
+        removedIntervals = []
         logLines = []
         errorMessage = nil
         savedURL = nil
@@ -256,6 +295,8 @@ struct ContentView: View {
         step = .process
         intervals = nil
         chartPoints = []
+        selectedIntervalIndex = nil
+        removedIntervals = []
         logLines = []
         errorMessage = nil
         savedURL = nil
@@ -269,15 +310,63 @@ struct ContentView: View {
                 }
                 let result = try await work.value
                 intervals = result
-                chartPoints = result.enumerated().flatMap { index, interval in
-                    [ChartPoint(id: index * 2, segment: index, videoTime: interval.videoStart,
-                                gameTime: interval.gameStart, kind: interval.kind),
-                     ChartPoint(id: index * 2 + 1, segment: index, videoTime: interval.videoEnd,
-                                gameTime: interval.gameEnd, kind: interval.kind)]
-                }
+                updateChartPoints()
             } catch { errorMessage = error.localizedDescription }
             processing = false
         }
+    }
+
+    private func updateChartPoints() {
+        chartPoints = (intervals ?? []).enumerated().flatMap { index, interval in
+            [ChartPoint(id: index * 2, segment: index, videoTime: interval.videoStart,
+                        gameTime: interval.gameStart, kind: interval.kind),
+             ChartPoint(id: index * 2 + 1, segment: index, videoTime: interval.videoEnd,
+                        gameTime: interval.gameEnd, kind: interval.kind)]
+        }
+    }
+
+    private func selectInterval(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let intervals, let plotFrame = proxy.plotFrame else { return }
+        let plot = geometry[plotFrame]
+        let point = CGPoint(x: location.x - plot.minX, y: location.y - plot.minY)
+        guard point.x >= 0, point.x <= plot.width,
+              point.y >= 0, point.y <= plot.height else { return }
+
+        var nearest: (index: Int, distance: CGFloat)?
+        for (index, interval) in intervals.enumerated() {
+            guard let startX = proxy.position(forX: interval.videoStart),
+                  let endX = proxy.position(forX: interval.videoEnd),
+                  let startY = proxy.position(forY: interval.gameStart),
+                  let endY = proxy.position(forY: interval.gameEnd) else { continue }
+            let dx = endX - startX
+            let dy = endY - startY
+            let lengthSquared = dx * dx + dy * dy
+            let fraction = lengthSquared > 0
+                ? min(1, max(0, ((point.x - startX) * dx + (point.y - startY) * dy) / lengthSquared))
+                : 0
+            let xDistance = point.x - (startX + fraction * dx)
+            let yDistance = point.y - (startY + fraction * dy)
+            let distance = sqrt(xDistance * xDistance + yDistance * yDistance)
+            if distance < (nearest?.distance ?? .infinity) { nearest = (index, distance) }
+        }
+        selectedIntervalIndex = nearest.flatMap { $0.distance <= 12 ? $0.index : nil }
+    }
+
+    private func removeSelectedInterval() {
+        guard savedURL == nil, let index = selectedIntervalIndex,
+              var intervals, intervals.indices.contains(index) else { return }
+        removedIntervals.append(RemovedInterval(index: index, interval: intervals.remove(at: index)))
+        self.intervals = intervals
+        selectedIntervalIndex = nil
+        updateChartPoints()
+    }
+
+    private func undoRemoval() {
+        guard savedURL == nil, let removed = removedIntervals.popLast(), var intervals else { return }
+        intervals.insert(removed.interval, at: min(removed.index, intervals.count))
+        self.intervals = intervals
+        selectedIntervalIndex = removed.index
+        updateChartPoints()
     }
 
     private func saveMapping() {
