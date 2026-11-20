@@ -4,6 +4,8 @@ import AppKit
 import QuartzCore
 
 struct VideoCompilation {
+    private static let boxScoreFadeSeconds = 0.45
+
     static func export(videoURL: URL, clips: [Clip], destination: URL,
                        title: String? = nil, subtitle: String? = nil,
                        player: String? = nil, square: Bool = false,
@@ -68,6 +70,14 @@ struct VideoCompilation {
                 }
             }
             cursor = cursor + range.duration
+        }
+        let lastClipDuration = selected.last.map { max(0, $0.end - $0.start) } ?? 0
+        let boxScoreFade = endCard == nil ? 0 : min(boxScoreFadeSeconds, lastClipDuration / 2)
+        if boxScoreFade > 0, !audioParameters.isEmpty {
+            let fadeTime = CMTime(seconds: boxScoreFade, preferredTimescale: 600)
+            audioParameters[(selected.count - 1) % 2].setVolumeRamp(
+                fromStartVolume: 1, toEndVolume: 0,
+                timeRange: CMTimeRange(start: cursor - fadeTime, duration: fadeTime))
         }
         let transform = try await videoTrack.load(.preferredTransform)
         let natural = try await videoTrack.load(.naturalSize)
@@ -239,9 +249,17 @@ struct VideoCompilation {
                 card.contentsGravity = .resizeAspect
                 card.opacity = 0
                 let visibility = CAKeyframeAnimation(keyPath: "opacity")
-                visibility.values = [0, 1, 1]
-                visibility.keyTimes = [0, NSNumber(value: cursor.seconds / totalDuration.seconds), 1]
-                visibility.calculationMode = .discrete
+                if boxScoreFade > 0 {
+                    visibility.values = [0, 0, 1, 1]
+                    visibility.keyTimes = [0,
+                        NSNumber(value: (cursor.seconds - boxScoreFade) / totalDuration.seconds),
+                        NSNumber(value: cursor.seconds / totalDuration.seconds), 1]
+                    visibility.calculationMode = .linear
+                } else {
+                    visibility.values = [0, 1, 1]
+                    visibility.keyTimes = [0, NSNumber(value: cursor.seconds / totalDuration.seconds), 1]
+                    visibility.calculationMode = .discrete
+                }
                 visibility.beginTime = AVCoreAnimationBeginTimeAtZero
                 visibility.duration = totalDuration.seconds
                 visibility.isRemovedOnCompletion = false

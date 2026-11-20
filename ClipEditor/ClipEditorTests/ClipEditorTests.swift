@@ -131,6 +131,10 @@ struct ClipEditorTests {
         let asset = AVURLAsset(url: output)
         #expect(abs(try await asset.load(.duration).seconds - 6.5) < 0.1)
         let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let transitionFrame = try generator.copyCGImage(
+            at: CMTime(seconds: 1.4, preferredTimescale: 600), actualTime: nil)
         let finalFrame = try generator.copyCGImage(at: CMTime(seconds: 5, preferredTimescale: 600),
                                                    actualTime: nil)
         #expect(finalFrame.width == 320)
@@ -141,6 +145,8 @@ struct ClipEditorTests {
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         sample.draw(finalFrame, in: CGRect(x: 0, y: 0, width: 1, height: 1))
         #expect(Int(pixels[0]) > Int(pixels[1]) + 100)
+        sample.draw(transitionFrame, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        #expect(Int(pixels[0]) > Int(pixels[1]) + 90)
     }
 
     @Test func countHistoryIncludesMadeShotsBetweenMisses() throws {

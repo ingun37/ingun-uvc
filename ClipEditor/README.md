@@ -6,8 +6,9 @@ data_fetcher. Review the mapped clips, adjust their timing, and choose which
 clips to include before exporting.
 
 Optionally choose a final box score CSV on the input screen (or pass
-`--boxscore PATH`). When supplied, export appends a five-second box score card
-to the compilation and each player video. The compilation card has a 1920:1080
+`--boxscore PATH`). When supplied, export fades into a five-second box score card
+over the last 0.45 seconds of the final clip and fades out source audio at the
+same time. The compilation card has a 1920:1080
 design canvas; player cards have a square canvas. The compilation keeps its
 source dimensions, so a non-16:9 source letterboxes the card. Edit
 `BoxScoreLayout.compilationColumns` and `BoxScoreLayout.playerStats` in
