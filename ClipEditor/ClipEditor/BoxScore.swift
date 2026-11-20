@@ -10,6 +10,9 @@ struct BoxScorePlayer: Identifiable, Sendable {
     let stats: [String: String]
 
     func value(_ key: String) -> String {
+        if key.contains("/") {
+            return key.split(separator: "/").map { value(String($0)) }.joined(separator: "/")
+        }
         if key == "minutes" {
             if minutes.hasPrefix("PT"), minutes.hasSuffix("S"),
                let separator = minutes.firstIndex(of: "M"),
@@ -90,17 +93,15 @@ struct BoxScoreColumn {
 
 enum BoxScoreLayout {
     // Edit these arrays to change the columns or stats shown in the exported cards.
+    static let compilationNameWidth: CGFloat = 200
     static let compilationColumns: [BoxScoreColumn] = [
         .init(key: "minutes", title: "MIN", width: 72),
         .init(key: "points", title: "PTS", width: 58),
         .init(key: "reboundsTotal", title: "REB", width: 58),
         .init(key: "assists", title: "AST", width: 58),
-        .init(key: "fieldGoalsMade", title: "FGM", width: 58),
-        .init(key: "fieldGoalsAttempted", title: "FGA", width: 58),
-        .init(key: "threePointersMade", title: "3PM", width: 58),
-        .init(key: "threePointersAttempted", title: "3PA", width: 58),
-        .init(key: "freeThrowsMade", title: "FTM", width: 58),
-        .init(key: "freeThrowsAttempted", title: "FTA", width: 58),
+        .init(key: "fieldGoalsMade/fieldGoalsAttempted", title: "FGM/FGA", width: 112),
+        .init(key: "threePointersMade/threePointersAttempted", title: "3PM/3PA", width: 112),
+        .init(key: "freeThrowsMade/freeThrowsAttempted", title: "FTM/FTA", width: 112),
     ]
     static let playerStats: [BoxScoreColumn] = [
         .init(key: "minutes", title: "Minutes", width: 0),
@@ -110,12 +111,9 @@ enum BoxScoreLayout {
         .init(key: "steals", title: "Steals", width: 0),
         .init(key: "blocks", title: "Blocks", width: 0),
         .init(key: "turnovers", title: "Turnovers", width: 0),
-        .init(key: "fieldGoalsMade", title: "Field goals made", width: 0),
-        .init(key: "fieldGoalsAttempted", title: "Field goals attempted", width: 0),
-        .init(key: "threePointersMade", title: "Three-pointers made", width: 0),
-        .init(key: "threePointersAttempted", title: "Three-pointers attempted", width: 0),
-        .init(key: "freeThrowsMade", title: "Free throws made", width: 0),
-        .init(key: "freeThrowsAttempted", title: "Free throws attempted", width: 0),
+        .init(key: "fieldGoalsMade/fieldGoalsAttempted", title: "Field goals made/attempted", width: 0),
+        .init(key: "threePointersMade/threePointersAttempted", title: "3-pointers made/attempted", width: 0),
+        .init(key: "freeThrowsMade/freeThrowsAttempted", title: "Free throws made/attempted", width: 0),
         .init(key: "plusMinusPoints", title: "Plus/minus", width: 0),
     ]
 }
@@ -131,9 +129,9 @@ struct CompilationBoxScoreView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
             HStack(alignment: .firstTextBaseline) {
-                Text("FINAL BOX SCORE").font(.system(size: 54, weight: .black))
+                Text("FINAL BOX SCORE").font(.system(size: 58, weight: .black))
                 Spacer()
-                if let date { Text(date).font(.system(size: 28, weight: .semibold)) }
+                if let date { Text(date).font(.system(size: 30, weight: .semibold)) }
             }
             HStack(alignment: .top, spacing: 26) {
                 ForEach(boxScore.teams, id: \.self) { team in
@@ -150,15 +148,15 @@ struct CompilationBoxScoreView: View {
 
     private func teamTable(_ team: String) -> some View {
         let players = boxScore.players.filter { $0.team == team }
-        return VStack(alignment: .leading, spacing: 12) {
-            Text(team).font(.system(size: 40, weight: .bold))
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(team).font(.system(size: 44, weight: .bold))
             HStack(spacing: 4) {
-                Text("PLAYER").frame(maxWidth: .infinity, alignment: .leading)
+                Text("PLAYER").frame(width: BoxScoreLayout.compilationNameWidth, alignment: .leading)
                 ForEach(BoxScoreLayout.compilationColumns, id: \.key) { column in
                     Text(column.title).frame(width: column.width, alignment: .trailing)
                 }
             }
-            .font(.system(size: 17, weight: .bold))
+            .font(.system(size: 23, weight: .bold))
             .foregroundStyle(fontColor2)
             Rectangle().fill(haloPurpleDark).frame(height: 3)
                 .blur(radius: 5)
@@ -169,15 +167,16 @@ struct CompilationBoxScoreView: View {
             }
             ForEach(players) { player in
                 HStack(spacing: 4) {
-                    Text(player.name).lineLimit(1).minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(player.name)
+                        .frame(width: BoxScoreLayout.compilationNameWidth, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                     ForEach(BoxScoreLayout.compilationColumns, id: \.key) { column in
                         Text(player.value(column.key))
                             .frame(width: column.width, alignment: .trailing)
                     }
                 }
-                .font(.system(size: 19, weight: .medium).monospacedDigit())
-                .frame(height: 36)
+                .font(.system(size: 26, weight: .medium).monospacedDigit())
+                .frame(minHeight: 40)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -188,12 +187,12 @@ struct PlayerBoxScoreView: View {
     let player: BoxScorePlayer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("FINAL BOX SCORE")
-                .font(.system(size: 28, weight: .bold)).foregroundStyle(fontColor2)
+                .font(.system(size: 32, weight: .bold)).foregroundStyle(fontColor2)
             Text(player.name)
-                .font(.system(size: 58, weight: .black)).lineLimit(1).minimumScaleFactor(0.65)
-            Text(player.team).font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 64, weight: .black)).lineLimit(1).minimumScaleFactor(0.65)
+            Text(player.team).font(.system(size: 32, weight: .semibold))
             Rectangle().fill(haloPurpleDark).frame(height: 3)
                 .blur(radius: 5)
                 .overlay {
@@ -208,14 +207,14 @@ struct PlayerBoxScoreView: View {
                         Text(player.value(stat.key))
                             .monospacedDigit().frame(width: 170, alignment: .trailing)
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 7)
                     .background(index.isMultiple(of: 2) ? Color.white.opacity(0.06) : .clear)
                 }
             }
-            .font(.system(size: 30, weight: .medium))
+            .font(.system(size: 42, weight: .medium))
             Spacer(minLength: 0)
         }
-        .padding(70)
+        .padding(64)
         .foregroundStyle(fontColor1)
         .frame(width: 1080, height: 1080)
         .background(backgroundColor)

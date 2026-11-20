@@ -89,13 +89,14 @@ struct ClipEditorTests {
     }
 
     @Test func boxScoreExcludesNonPlayingPlayersAndMatchesExportName() throws {
-        let csv = "game_id,team,player_id,player,position,minutes,comment,points,reboundsTotal\n" +
-            "1,BOS,11,José Player,G,31:20,,24,7\n" +
-            "1,BOS,12,Bench Player,, ,DNP - Coach's Decision,0,0\n"
+        let csv = "game_id,team,player_id,player,position,minutes,comment,points,reboundsTotal,fieldGoalsMade,fieldGoalsAttempted\n" +
+            "1,BOS,11,José Player,G,31:20,,24,7,9,18\n" +
+            "1,BOS,12,Bench Player,, ,DNP - Coach's Decision,0,0,0,0\n"
         let score = try BoxScore(csv: csv)
         #expect(score.players.count == 1)
         #expect(score.players[0].matches("BOS|Jose Player"))
         #expect(score.players[0].value("points") == "24")
+        #expect(score.players[0].value("fieldGoalsMade/fieldGoalsAttempted") == "9/18")
     }
 
     @Test @MainActor func rendersBothBoxScoreViewsAtTemplateSize() throws {
