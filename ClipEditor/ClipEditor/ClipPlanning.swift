@@ -379,7 +379,7 @@ enum ClipPlanner {
         return components.count == 1 ? Double(components[0]) : nil
     }
 
-    private static func csvRows(_ text: String) throws -> [[String]] {
+    static func csvRows(_ text: String) throws -> [[String]] {
         var rows: [[String]] = []
         var row: [String] = []
         var field = ""

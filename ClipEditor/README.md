@@ -5,6 +5,15 @@ the game time mapping JSON from TheMapper, and the attempts CSV from
 data_fetcher. Review the mapped clips, adjust their timing, and choose which
 clips to include before exporting.
 
+Optionally choose a final box score CSV on the input screen (or pass
+`--boxscore PATH`). When supplied, export appends a five-second box score card
+to the compilation and each player video. The compilation card has a 1920:1080
+design canvas; player cards have a square canvas. The compilation keeps its
+source dimensions, so a non-16:9 source letterboxes the card. Edit
+`BoxScoreLayout.compilationColumns` and `BoxScoreLayout.playerStats` in
+`ClipEditor/BoxScore.swift` to choose the displayed statistics. The same file
+has Xcode previews for both SwiftUI templates.
+
 Each clip has one timing slider. The left and right handles set the clip start
 and end, and each middle handle marks a missed attempt. A single-attempt clip
 has three handles; a merged clip has one middle handle per attempt. The slider
@@ -41,7 +50,7 @@ To resize the per-player overlay, edit `addCountAnimation` in
 `emojiFont`, and `timeFont` control the emoji and game-time label. There is no
 single scale setting for the whole overlay.
 
-Launch options `--video/-v`, `--json/-j`, and `--csv/-c` prefill the inputs.
+Launch options `--video/-v`, `--json/-j`, `--csv/-c`, and `--boxscore` prefill the inputs.
 `--output/-o` exports directly to the given compilation path after clip review.
 `--date` supplies the formatted game date for player filenames.
 UnifiedApp passes all four paths.

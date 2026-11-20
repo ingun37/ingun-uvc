@@ -44,12 +44,15 @@ private enum InputKind: String, CaseIterable, Hashable {
     case video = "Video"
     case mapping = "Game time mapping JSON"
     case attempts = "Field goal attempts CSV"
+    case boxscore = "Final box score CSV (optional)"
+
+    static let required: [Self] = [.video, .mapping, .attempts]
 
     var types: [UTType] {
         switch self {
         case .video: [.movie, .video]
         case .mapping: [.json]
-        case .attempts: [.commaSeparatedText]
+        case .attempts, .boxscore: [.commaSeparatedText]
         }
     }
 }
@@ -78,6 +81,7 @@ private final class EditorModel {
     var videoDuration = 0.0
     var teams: [String] = []
     var countEvents: [String: [CountEvent]] = [:]
+    var boxScore: BoxScore?
     var gameDate: String?
     var message = ""
     var isBusy = false
@@ -87,7 +91,7 @@ private final class EditorModel {
     private var files: [InputKind: FileAccess] = [:]
 
     var videoURL: URL? { files[.video]?.url }
-    var canContinue: Bool { InputKind.allCases.allSatisfy { files[$0] != nil } && !isBusy }
+    var canContinue: Bool { InputKind.required.allSatisfy { files[$0] != nil } && !isBusy }
     var selectedClips: [Clip] { clips.filter(\.included) }
     var missingLocationCount: Int {
         selectedClips.flatMap(\.captions).filter { $0.location == nil }.count
@@ -110,6 +114,7 @@ private final class EditorModel {
         clips = []
         unmatched = []
         countEvents = [:]
+        boxScore = nil
         exportedURL = nil
         playerExportURLs = []
         exportedPlayerStats = []
@@ -144,6 +149,9 @@ private final class EditorModel {
             teams = try ClipPlanner.teams(from: csv)
             let shots = try ClipPlanner.attempts(from: csv)
             countEvents = try ClipPlanner.countEvents(from: csv)
+            boxScore = try files[.boxscore].map {
+                try BoxScore(csv: String(contentsOf: $0.url, encoding: .utf8))
+            }
             let plan = try ClipPlanner.plan(attempts: shots, ranges: ranges, videoDuration: duration)
             videoDuration = duration
             clips = plan.clips
@@ -176,7 +184,21 @@ private final class EditorModel {
         message = "Exporting compilation…"
         defer { isBusy = false; _ = access }
         do {
-            try await VideoCompilation.export(videoURL: video, clips: selectedClips, destination: destination)
+            let compilationCard = try boxScore.map {
+                try BoxScoreVideo.render(CompilationBoxScoreView(boxScore: $0, date: gameDate))
+            }
+            let playerCards: [String: CGImage] = try boxScore.map { score in
+                var cards: [String: CGImage] = [:]
+                for group in groups {
+                    guard let player = score.players.first(where: { $0.matches(group.key) }) else {
+                        throw BoxScore.BoxScoreError.playerMissing(group.name)
+                    }
+                    cards[group.key] = try BoxScoreVideo.render(PlayerBoxScoreView(player: player))
+                }
+                return cards
+            } ?? [:]
+            try await VideoCompilation.export(videoURL: video, clips: selectedClips,
+                                              destination: destination, endCard: compilationCard)
             var playerURLs: [URL] = []
             var usedNames: Set<String> = [destination.lastPathComponent.lowercased()]
             let compilationName = destination.deletingPathExtension().lastPathComponent
@@ -206,7 +228,8 @@ private final class EditorModel {
                                                   title: group.name,
                                                   subtitle: "Every 🧱 VS \(opponent) | \(shortDate)",
                                                   player: group.key, square: true,
-                                                  countEvents: countEvents[group.key] ?? [])
+                                                  countEvents: countEvents[group.key] ?? [],
+                                                  endCard: playerCards[group.key])
                 playerURLs.append(url)
             }
             exportedURL = destination
@@ -223,6 +246,7 @@ struct ContentView: View {
     let videoURL: URL?
     let mappingURL: URL?
     let attemptsURL: URL?
+    let boxscoreURL: URL?
     let outputURL: URL?
     let gameDate: String?
     private let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
@@ -236,10 +260,12 @@ struct ContentView: View {
     @State private var previewKeyMonitor: Any?
 
     init(videoURL: URL? = nil, mappingURL: URL? = nil,
-         attemptsURL: URL? = nil, outputURL: URL? = nil, gameDate: String? = nil) {
+         attemptsURL: URL? = nil, boxscoreURL: URL? = nil,
+         outputURL: URL? = nil, gameDate: String? = nil) {
         self.videoURL = videoURL
         self.mappingURL = mappingURL
         self.attemptsURL = attemptsURL
+        self.boxscoreURL = boxscoreURL
         self.outputURL = outputURL
         self.gameDate = gameDate
     }
@@ -278,7 +304,7 @@ struct ContentView: View {
             model.gameDate = gameDate
             var invalidPaths: [String] = []
             for (kind, url) in [(InputKind.video, videoURL), (.mapping, mappingURL),
-                                (.attempts, attemptsURL)] {
+                                (.attempts, attemptsURL), (.boxscore, boxscoreURL)] {
                 if let url, !model.accept(url, for: kind) {
                     invalidPaths.append("\(kind.rawValue): \(url.path)")
                 }

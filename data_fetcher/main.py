@@ -9,7 +9,35 @@ import sys
 import time
 from pathlib import Path
 
-from nba_api.stats.endpoints import CommonTeamRoster, LeagueGameFinder, PlayByPlayV3, ShotChartDetail
+from nba_api.stats.endpoints import BoxScoreTraditionalV3, CommonTeamRoster, LeagueGameFinder, PlayByPlayV3, ShotChartDetail
+
+
+BOXSCORE_STATS = (
+    "points", "fieldGoalsMade", "fieldGoalsAttempted", "fieldGoalsPercentage",
+    "threePointersMade", "threePointersAttempted", "threePointersPercentage",
+    "freeThrowsMade", "freeThrowsAttempted", "freeThrowsPercentage",
+    "reboundsOffensive", "reboundsDefensive", "reboundsTotal", "assists",
+    "steals", "blocks", "turnovers", "foulsPersonal", "plusMinusPoints",
+)
+
+
+def save_boxscore(game_id: str, output: str) -> None:
+    endpoint = BoxScoreTraditionalV3(game_id=game_id, get_request=False)
+    endpoint.get_request()
+    players = endpoint.player_stats.get_data_frame()
+    if players.empty:
+        raise RuntimeError(f"No final box score found for game {game_id}.")
+    path = Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(("game_id", "team", "player_id", "player", "position", "minutes", "comment", *BOXSCORE_STATS))
+        for row in players.to_dict("records"):
+            name = " ".join(part for part in (row.get("firstName"), row.get("familyName")) if isinstance(part, str))
+            values = [game_id, row.get("teamTricode"), row.get("personId"), name,
+                      row.get("position"), row.get("minutes"), row.get("comment"),
+                      *(row.get(stat) for stat in BOXSCORE_STATS)]
+            writer.writerow("" if value is None or str(value).lower() == "nan" else value for value in values)
 
 
 def current_season() -> str:
@@ -117,6 +145,9 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     if rows.empty:
         print("No play-by-play data found for this game.")
         return
+    if args.boxscore:
+        time.sleep(1)
+        save_boxscore(args.game_id, args.boxscore)
     season = args.season or season_for_game(args.game_id)
     season_type = args.season_type or ("Playoffs" if args.game_id.startswith("004") else "Regular Season")
     time.sleep(1)
@@ -186,6 +217,7 @@ def main() -> int:
     shots.add_argument("--season-type", choices=("Regular Season", "Playoffs", "PlayIn", "Pre Season", "All Star"),
                        help="default: Playoffs for 004 games, otherwise Regular Season")
     shots.add_argument("--output", "-o", metavar="FILE", help="write CSV to FILE instead of standard output")
+    shots.add_argument("--boxscore", metavar="FILE", help="write the final player box score as CSV")
     shots.set_defaults(func=field_goal_attempts)
     args = parser.parse_args()
     try:

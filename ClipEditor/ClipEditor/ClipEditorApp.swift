@@ -30,6 +30,7 @@ struct ClipEditorApp: App {
     private let videoURL = pathArgument(["--video", "-v"])
     private let mappingURL = pathArgument(["--json", "-j"])
     private let attemptsURL = pathArgument(["--csv", "-c"])
+    private let boxscoreURL = pathArgument(["--boxscore"])
     private let outputURL = pathArgument(["--output", "-o"])
     private let gameDate: String? = {
         let arguments = CommandLine.arguments.dropFirst()
@@ -41,7 +42,8 @@ struct ClipEditorApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(videoURL: videoURL, mappingURL: mappingURL,
-                        attemptsURL: attemptsURL, outputURL: outputURL, gameDate: gameDate)
+                        attemptsURL: attemptsURL, boxscoreURL: boxscoreURL,
+                        outputURL: outputURL, gameDate: gameDate)
         }
     }
 }

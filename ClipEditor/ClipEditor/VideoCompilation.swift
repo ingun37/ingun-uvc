@@ -7,10 +7,13 @@ struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL,
                        title: String? = nil, subtitle: String? = nil,
                        player: String? = nil, square: Bool = false,
-                       countEvents: [CountEvent] = []) async throws {
+                       countEvents: [CountEvent] = [], endCard: CGImage? = nil) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
+        let stillURL = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-boxscore-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: stillURL) }
         let asset = AVURLAsset(url: videoURL)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
             throw CompilationError.noVideo
@@ -66,18 +69,32 @@ struct VideoCompilation {
             }
             cursor = cursor + range.duration
         }
+        let transform = try await videoTrack.load(.preferredTransform)
+        let natural = try await videoTrack.load(.naturalSize)
+        let rect = CGRect(origin: .zero, size: natural).applying(transform)
+        let sourceSize = CGSize(width: abs(rect.width), height: abs(rect.height))
+        let side = min(sourceSize.width, sourceSize.height)
+        let size = square ? CGSize(width: side, height: side) : sourceSize
+        var cardTrack: AVMutableCompositionTrack?
+        if let endCard {
+            try await BoxScoreVideo.writeStill(endCard, size: size, to: stillURL)
+            let stillAsset = AVURLAsset(url: stillURL)
+            guard let source = try await stillAsset.loadTracks(withMediaType: .video).first,
+                  let track = composition.addMutableTrack(withMediaType: .video,
+                      preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw CompilationError.trackSetup
+            }
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: BoxScoreVideo.duration),
+                                      of: source, at: cursor)
+            cardTrack = track
+        }
+        let totalDuration = cursor + (endCard == nil ? .zero : BoxScoreVideo.duration)
         let mix = AVMutableAudioMix()
         mix.inputParameters = audioParameters
         guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw CompilationError.exportSetup
         }
-        if !overlays.isEmpty || title != nil {
-            let transform = try await videoTrack.load(.preferredTransform)
-            let natural = try await videoTrack.load(.naturalSize)
-            let rect = CGRect(origin: .zero, size: natural).applying(transform)
-            let sourceSize = CGSize(width: abs(rect.width), height: abs(rect.height))
-            let side = min(sourceSize.width, sourceSize.height)
-            let size = square ? CGSize(width: side, height: side) : sourceSize
+        if !overlays.isEmpty || title != nil || endCard != nil {
             let videoComposition = AVMutableVideoComposition()
             videoComposition.renderSize = size
             videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
@@ -93,7 +110,14 @@ struct VideoCompilation {
                 layerInstruction.setTransform(centered, at: .zero)
             }
             instruction.layerInstructions = [layerInstruction]
-            videoComposition.instructions = [instruction]
+            if let cardTrack {
+                let cardInstruction = AVMutableVideoCompositionInstruction()
+                cardInstruction.timeRange = CMTimeRange(start: cursor, duration: BoxScoreVideo.duration)
+                cardInstruction.layerInstructions = [AVMutableVideoCompositionLayerInstruction(assetTrack: cardTrack)]
+                videoComposition.instructions = [instruction, cardInstruction]
+            } else {
+                videoComposition.instructions = [instruction]
+            }
             let parent = CALayer(); parent.frame = CGRect(origin: .zero, size: size)
             let videoLayer = CALayer(); videoLayer.frame = parent.frame
             parent.addSublayer(videoLayer)
@@ -206,6 +230,24 @@ struct VideoCompilation {
                 box.opacity = 0
                 box.add(visibility, forKey: "visibility")
                 parent.addSublayer(box)
+            }
+            if let endCard {
+                let card = CALayer()
+                card.frame = parent.frame
+                card.backgroundColor = NSColor.black.cgColor
+                card.contents = endCard
+                card.contentsGravity = .resizeAspect
+                card.opacity = 0
+                let visibility = CAKeyframeAnimation(keyPath: "opacity")
+                visibility.values = [0, 1, 1]
+                visibility.keyTimes = [0, NSNumber(value: cursor.seconds / totalDuration.seconds), 1]
+                visibility.calculationMode = .discrete
+                visibility.beginTime = AVCoreAnimationBeginTimeAtZero
+                visibility.duration = totalDuration.seconds
+                visibility.isRemovedOnCompletion = false
+                visibility.fillMode = .both
+                card.add(visibility, forKey: "boxScoreVisibility")
+                parent.addSublayer(card)
             }
             videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: videoLayer, in: parent)
             session.videoComposition = videoComposition

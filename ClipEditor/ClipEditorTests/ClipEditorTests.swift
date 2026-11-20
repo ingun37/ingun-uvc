@@ -88,6 +88,60 @@ struct ClipEditorTests {
         #expect(!attempts.isEmpty)
     }
 
+    @Test func boxScoreExcludesNonPlayingPlayersAndMatchesExportName() throws {
+        let csv = "game_id,team,player_id,player,position,minutes,comment,points,reboundsTotal\n" +
+            "1,BOS,11,José Player,G,31:20,,24,7\n" +
+            "1,BOS,12,Bench Player,, ,DNP - Coach's Decision,0,0\n"
+        let score = try BoxScore(csv: csv)
+        #expect(score.players.count == 1)
+        #expect(score.players[0].matches("BOS|Jose Player"))
+        #expect(score.players[0].value("points") == "24")
+    }
+
+    @Test @MainActor func rendersBothBoxScoreViewsAtTemplateSize() throws {
+        let score = try BoxScore(csv: """
+        game_id,team,player_id,player,position,minutes,comment,points,reboundsTotal
+        1,BOS,11,Sample Player,G,31:20,,24,7
+        1,LAL,12,Other Player,F,29:14,,18,9
+        """)
+        let compilation = try BoxScoreVideo.render(CompilationBoxScoreView(boxScore: score, date: nil))
+        let player = try BoxScoreVideo.render(PlayerBoxScoreView(player: score.players[0]))
+        #expect(compilation.width == 1920 && compilation.height == 1080)
+        #expect(player.width == 1080 && player.height == 1080)
+    }
+
+    @Test func appendsStillBoxScoreToVideo() async throws {
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-boxscore-test-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        guard let context = CGContext(data: nil, width: 16, height: 9, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw BoxScoreVideo.RenderError.image
+        }
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 16, height: 9))
+        let image = try #require(context.makeImage())
+        try await VideoCompilation.export(videoURL: fixture,
+            clips: [Clip(start: 0.5, end: 2, descriptions: ["miss"])],
+            destination: output, endCard: image)
+        let asset = AVURLAsset(url: output)
+        #expect(abs(try await asset.load(.duration).seconds - 6.5) < 0.1)
+        let generator = AVAssetImageGenerator(asset: asset)
+        let finalFrame = try generator.copyCGImage(at: CMTime(seconds: 5, preferredTimescale: 600),
+                                                   actualTime: nil)
+        #expect(finalFrame.width == 320)
+        let pixels = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
+        defer { pixels.deallocate() }
+        let sample = try #require(CGContext(data: pixels, width: 1, height: 1,
+            bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        sample.draw(finalFrame, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        #expect(Int(pixels[0]) > Int(pixels[1]) + 100)
+    }
+
     @Test func countHistoryIncludesMadeShotsBetweenMisses() throws {
         let csv = "period,clock,team,player,player_full_name,result,description\n" +
             "1,PT11M00S,A,One,Alice,missed,miss\n" +

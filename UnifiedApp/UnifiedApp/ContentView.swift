@@ -209,10 +209,17 @@ private final class Workflow {
             directoryHint: .isDirectory
         )
     private var stagedCSVURL: URL { tempDirectory.appending(path: "attempts.csv") }
+    private var stagedBoxscoreURL: URL { tempDirectory.appending(path: "boxscore.csv") }
     private var csvURL: URL? {
         guard let videoURL, let selectedGame else { return nil }
         return videoURL.deletingLastPathComponent().appendingPathComponent(
             "\(videoURL.deletingPathExtension().lastPathComponent)-\(selectedGame.id).csv"
+        )
+    }
+    private var boxscoreURL: URL? {
+        guard let videoURL, let selectedGame else { return nil }
+        return videoURL.deletingLastPathComponent().appendingPathComponent(
+            "\(videoURL.deletingPathExtension().lastPathComponent)-\(selectedGame.id)-boxscore.csv"
         )
     }
     private var jsonURL: URL? {
@@ -231,8 +238,12 @@ private final class Workflow {
         let csv = url.deletingLastPathComponent().appendingPathComponent(
             "\(url.deletingPathExtension().lastPathComponent)-\(selectedGame.id).csv"
         )
+        let boxscore = url.deletingLastPathComponent().appendingPathComponent(
+            "\(url.deletingPathExtension().lastPathComponent)-\(selectedGame.id)-boxscore.csv"
+        )
         do {
             try Data(contentsOf: stagedCSVURL).write(to: csv, options: .atomic)
+            try Data(contentsOf: stagedBoxscoreURL).write(to: boxscore, options: .atomic)
             videoURL = url
             scene = .mapper
             Task { await runMapper() }
@@ -273,12 +284,17 @@ private final class Workflow {
                 withIntermediateDirectories: true
             )
             let csv = stagedCSVURL
+            let boxscore = stagedBoxscoreURL
             _ = try await Task.detached {
                 try Runner.runDataFetcher(
-                    arguments: ["attempts", game.id, "--output", csv.path],
+                    arguments: ["attempts", game.id, "--output", csv.path,
+                                "--boxscore", boxscore.path],
                     expectedOutput: csv
                 )
             }.value
+            guard FileManager.default.fileExists(atPath: boxscore.path) else {
+                throw Runner.RunError.missingOutput(boxscore.path)
+            }
             scene = .video
             message = "Choose the source video."
         } catch { message = error.localizedDescription }
@@ -311,7 +327,8 @@ private final class Workflow {
     }
 
     func runEditor(videoPath: String) async {
-        guard let selectedGame, let json = jsonURL, let csv = csvURL else { return }
+        guard let selectedGame, let json = jsonURL, let csv = csvURL,
+              let boxscore = boxscoreURL else { return }
         busy = true
         defer { busy = false }
         do {
@@ -326,7 +343,8 @@ private final class Workflow {
                 )
             let arguments = [
                 "--video", videoPath, "--json", json.path,
-                "--csv", csv.path, "--output", output.path,
+                "--csv", csv.path, "--boxscore", boxscore.path,
+                "--output", output.path,
                 "--date", selectedGame.displayDate,
             ]
             _ = try await Task.detached {
