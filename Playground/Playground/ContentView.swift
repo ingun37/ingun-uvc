@@ -1,5 +1,4 @@
 import AVFoundation
-import AppKit
 import CoreImage
 import SwiftUI
 import UniformTypeIdentifiers
@@ -8,14 +7,16 @@ import Vision
 struct ContentView: View {
     @State private var showingFilePicker = false
     @State private var videoURL: URL?
-    @State private var player: AVPlayer?
     @State private var duration = 0.0
     @State private var selectedTime = 0.0
+    @State private var frame: CGImage?
     @State private var masks: [PlayerMask] = []
     @State private var isLoadingVideo = false
+    @State private var isLoadingFrame = false
     @State private var isDetecting = false
     @State private var errorMessage: String?
     @State private var videoLoadTask: Task<Void, Never>?
+    @State private var frameTask: Task<Void, Never>?
     @State private var detectionTask: Task<Void, Never>?
 
     var body: some View {
@@ -33,13 +34,22 @@ struct ContentView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.black)
-                if let player {
-                    VideoPreview(player: player)
-                } else if isLoadingVideo {
-                    ProgressView("Loading video…")
+                if let frame {
+                    Image(decorative: frame, scale: 1)
+                        .resizable()
+                        .scaledToFit()
+                } else if isLoadingVideo || isLoadingFrame {
+                    ProgressView(isLoadingVideo ? "Loading video…" : "Loading frame…")
                         .foregroundStyle(.white)
                 } else {
                     ContentUnavailableView("Choose a Video", systemImage: "video")
+                }
+                if isLoadingFrame && frame != nil {
+                    ProgressView()
+                        .padding(8)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(8)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -51,7 +61,7 @@ struct ContentView: View {
                     .frame(width: 64, alignment: .leading)
                 Slider(value: $selectedTime, in: 0...max(duration, 0.001))
                     .disabled(videoURL == nil || duration <= 0)
-                    .onChange(of: selectedTime) { _, _ in seekPreview() }
+                    .onChange(of: selectedTime) { _, _ in loadFrame() }
                 Text(timeLabel(duration))
                     .monospacedDigit()
                     .frame(width: 64, alignment: .trailing)
@@ -59,7 +69,7 @@ struct ContentView: View {
 
             HStack {
                 Button("Detect Players") { detectPlayers() }
-                    .disabled(videoURL == nil || isLoadingVideo || isDetecting)
+                    .disabled(frame == nil || isLoadingFrame || isDetecting)
                 if isDetecting { ProgressView() }
             }
 
@@ -98,8 +108,8 @@ struct ContentView: View {
         }
         .onDisappear {
             videoLoadTask?.cancel()
+            frameTask?.cancel()
             detectionTask?.cancel()
-            player?.pause()
             videoURL?.stopAccessingSecurityScopedResource()
         }
     }
@@ -110,17 +120,18 @@ struct ContentView: View {
             return
         }
         videoLoadTask?.cancel()
+        frameTask?.cancel()
         detectionTask?.cancel()
-        player?.pause()
         videoURL?.stopAccessingSecurityScopedResource()
         videoURL = url
-        player = AVPlayer(url: url)
         duration = 0
         selectedTime = 0
+        frame = nil
         masks = []
         errorMessage = nil
         isDetecting = false
         isLoadingVideo = true
+        isLoadingFrame = false
 
         videoLoadTask = Task {
             do {
@@ -133,7 +144,7 @@ struct ContentView: View {
                 }
                 duration = seconds
                 isLoadingVideo = false
-                seekPreview()
+                loadFrame()
             } catch {
                 guard !Task.isCancelled else { return }
                 isLoadingVideo = false
@@ -142,35 +153,44 @@ struct ContentView: View {
         }
     }
 
-    private func seekPreview() {
-        guard let player, duration > 0 else { return }
+    private func loadFrame() {
+        guard let videoURL, duration > 0 else { return }
+        frameTask?.cancel()
         detectionTask?.cancel()
         masks = []
         isDetecting = false
+        isLoadingFrame = true
         errorMessage = nil
-        player.seek(
-            to: CMTime(seconds: frameTime, preferredTimescale: 600),
-            toleranceBefore: .zero,
-            toleranceAfter: .zero
-        )
+        let time = frameTime
+
+        frameTask = Task {
+            do {
+                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: videoURL))
+                generator.appliesPreferredTrackTransform = true
+                let image = try await generator.image(
+                    at: CMTime(seconds: time, preferredTimescale: 600)
+                ).image
+                guard !Task.isCancelled else { return }
+                frame = image
+                isLoadingFrame = false
+            } catch {
+                guard !Task.isCancelled else { return }
+                frame = nil
+                isLoadingFrame = false
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func detectPlayers() {
-        guard let videoURL, duration > 0 else { return }
+        guard let frame, !isLoadingFrame else { return }
         detectionTask?.cancel()
         masks = []
         errorMessage = nil
         isDetecting = true
-        let time = frameTime
 
         detectionTask = Task {
             do {
-                let generator = AVAssetImageGenerator(asset: AVURLAsset(url: videoURL))
-                generator.appliesPreferredTrackTransform = true
-                let frame = try await generator.image(
-                    at: CMTime(seconds: time, preferredTimescale: 600)
-                ).image
-                guard !Task.isCancelled else { return }
                 let detected = try await Task.detached(priority: .userInitiated) {
                     let request = VNGeneratePersonInstanceMaskRequest()
                     let handler = VNImageRequestHandler(cgImage: frame)
@@ -209,40 +229,6 @@ struct ContentView: View {
         guard seconds.isFinite else { return "0:00" }
         let wholeSeconds = Int(seconds)
         return String(format: "%d:%02d", wholeSeconds / 60, wholeSeconds % 60)
-    }
-}
-
-private struct VideoPreview: NSViewRepresentable {
-    let player: AVPlayer
-
-    func makeNSView(context: Context) -> PlayerLayerView {
-        let view = PlayerLayerView()
-        view.playerLayer.player = player
-        return view
-    }
-
-    func updateNSView(_ view: PlayerLayerView, context: Context) {
-        view.playerLayer.player = player
-    }
-}
-
-private final class PlayerLayerView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        playerLayer.videoGravity = .resizeAspect
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func makeBackingLayer() -> CALayer {
-        AVPlayerLayer()
-    }
-
-    var playerLayer: AVPlayerLayer {
-        layer as! AVPlayerLayer
     }
 }
 
