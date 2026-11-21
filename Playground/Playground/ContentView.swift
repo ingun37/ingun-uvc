@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 import UniformTypeIdentifiers
 import Vision
@@ -9,14 +10,20 @@ struct ContentView: View {
     @State private var videoURL: URL?
     @State private var duration = 0.0
     @State private var selectedTime = 0.0
+    @State private var originalFrame: CGImage?
     @State private var frame: CGImage?
+    @State private var noiseReductionEnabled = false
+    @State private var noiseLevel = 0.02
+    @State private var sharpness = 0.4
     @State private var masks: [PlayerMask] = []
     @State private var isLoadingVideo = false
     @State private var isLoadingFrame = false
+    @State private var isProcessingFrame = false
     @State private var isDetecting = false
     @State private var errorMessage: String?
     @State private var videoLoadTask: Task<Void, Never>?
     @State private var frameTask: Task<Void, Never>?
+    @State private var processingTask: Task<Void, Never>?
     @State private var detectionTask: Task<Void, Never>?
 
     var body: some View {
@@ -44,7 +51,7 @@ struct ContentView: View {
                 } else {
                     ContentUnavailableView("Choose a Video", systemImage: "video")
                 }
-                if isLoadingFrame && frame != nil {
+                if (isLoadingFrame || isProcessingFrame) && frame != nil {
                     ProgressView()
                         .padding(8)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -67,9 +74,38 @@ struct ContentView: View {
                     .frame(width: 64, alignment: .trailing)
             }
 
+            GroupBox("Noise Reduction") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("Apply to preview and detection", isOn: $noiseReductionEnabled)
+                        .onChange(of: noiseReductionEnabled) { _, _ in processFrame() }
+                    HStack {
+                        Text("Amount")
+                            .frame(width: 78, alignment: .leading)
+                        Slider(value: $noiseLevel, in: 0...0.2, step: 0.005)
+                            .onChange(of: noiseLevel) { _, _ in processFrame() }
+                        Text(noiseLevel.formatted(.number.precision(.fractionLength(3))))
+                            .monospacedDigit()
+                            .frame(width: 48, alignment: .trailing)
+                    }
+                    HStack {
+                        Text("Sharpness")
+                            .frame(width: 78, alignment: .leading)
+                        Slider(value: $sharpness, in: 0...1, step: 0.05)
+                            .onChange(of: sharpness) { _, _ in processFrame() }
+                        Text(sharpness.formatted(.number.precision(.fractionLength(2))))
+                            .monospacedDigit()
+                            .frame(width: 48, alignment: .trailing)
+                    }
+                    Button("Reset Parameters") {
+                        noiseLevel = 0.02
+                        sharpness = 0.4
+                    }
+                }
+            }
+
             HStack {
                 Button("Detect Players") { detectPlayers() }
-                    .disabled(frame == nil || isLoadingFrame || isDetecting)
+                    .disabled(frame == nil || isLoadingFrame || isProcessingFrame || isDetecting)
                 if isDetecting { ProgressView() }
             }
 
@@ -109,6 +145,7 @@ struct ContentView: View {
         .onDisappear {
             videoLoadTask?.cancel()
             frameTask?.cancel()
+            processingTask?.cancel()
             detectionTask?.cancel()
             videoURL?.stopAccessingSecurityScopedResource()
         }
@@ -121,17 +158,20 @@ struct ContentView: View {
         }
         videoLoadTask?.cancel()
         frameTask?.cancel()
+        processingTask?.cancel()
         detectionTask?.cancel()
         videoURL?.stopAccessingSecurityScopedResource()
         videoURL = url
         duration = 0
         selectedTime = 0
+        originalFrame = nil
         frame = nil
         masks = []
         errorMessage = nil
         isDetecting = false
         isLoadingVideo = true
         isLoadingFrame = false
+        isProcessingFrame = false
 
         videoLoadTask = Task {
             do {
@@ -156,10 +196,12 @@ struct ContentView: View {
     private func loadFrame() {
         guard let videoURL, duration > 0 else { return }
         frameTask?.cancel()
+        processingTask?.cancel()
         detectionTask?.cancel()
         masks = []
         isDetecting = false
         isLoadingFrame = true
+        isProcessingFrame = false
         errorMessage = nil
         let time = frameTime
 
@@ -171,10 +213,12 @@ struct ContentView: View {
                     at: CMTime(seconds: time, preferredTimescale: 600)
                 ).image
                 guard !Task.isCancelled else { return }
-                frame = image
+                originalFrame = image
                 isLoadingFrame = false
+                processFrame()
             } catch {
                 guard !Task.isCancelled else { return }
+                originalFrame = nil
                 frame = nil
                 isLoadingFrame = false
                 errorMessage = error.localizedDescription
@@ -182,8 +226,51 @@ struct ContentView: View {
         }
     }
 
+    private func processFrame() {
+        processingTask?.cancel()
+        detectionTask?.cancel()
+        masks = []
+        isDetecting = false
+        guard let originalFrame, !isLoadingFrame else { return }
+        errorMessage = nil
+
+        guard noiseReductionEnabled else {
+            frame = originalFrame
+            isProcessingFrame = false
+            return
+        }
+
+        isProcessingFrame = true
+        let noiseLevel = Float(noiseLevel)
+        let sharpness = Float(sharpness)
+        processingTask = Task {
+            do {
+                let processed = try await Task.detached(priority: .userInitiated) {
+                    let input = CIImage(cgImage: originalFrame)
+                    let filter = CIFilter.noiseReduction()
+                    filter.inputImage = input
+                    filter.noiseLevel = noiseLevel
+                    filter.sharpness = sharpness
+                    guard let output = filter.outputImage,
+                          let image = CIContext().createCGImage(output, from: input.extent) else {
+                        throw VideoError.filterRenderingFailed
+                    }
+                    return image
+                }.value
+                guard !Task.isCancelled else { return }
+                frame = processed
+                isProcessingFrame = false
+            } catch {
+                guard !Task.isCancelled else { return }
+                frame = nil
+                isProcessingFrame = false
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     private func detectPlayers() {
-        guard let frame, !isLoadingFrame else { return }
+        guard let frame, !isLoadingFrame, !isProcessingFrame else { return }
         detectionTask?.cancel()
         masks = []
         errorMessage = nil
@@ -240,11 +327,13 @@ private struct PlayerMask: Identifiable {
 
 private enum VideoError: LocalizedError {
     case invalidDuration
+    case filterRenderingFailed
     case maskRenderingFailed
 
     var errorDescription: String? {
         switch self {
         case .invalidDuration: "This video has no readable duration."
+        case .filterRenderingFailed: "Noise reduction could not be displayed."
         case .maskRenderingFailed: "A player mask could not be displayed."
         }
     }
