@@ -30,7 +30,34 @@ enum ShotEffectRendering {
         dark.add(darkAnimation, forKey: "playerHighlight")
         parent.addSublayer(dark)
 
-        let text = "\(effect.playerName)'s\n\(effect.shotDescription)\nat this area\n" +
+        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize)
+        let scaleX = size.width / effect.frameSize.width
+        let scaleY = size.height / effect.frameSize.height
+        let areaRect = CGRect(x: area.minX * scaleX,
+                              y: size.height - area.maxY * scaleY,
+                              width: area.width * scaleX,
+                              height: area.height * scaleY)
+        let areaLayer = CAShapeLayer()
+        areaLayer.frame = CGRect(origin: .zero, size: size)
+        areaLayer.path = CGPath(ellipseIn: areaRect, transform: nil)
+        areaLayer.fillColor = ShotEffectArea.highlightColor.withAlphaComponent(0.2).cgColor
+        areaLayer.strokeColor = ShotEffectArea.highlightColor.cgColor
+        areaLayer.lineWidth = max(2, size.height * 0.003)
+        areaLayer.opacity = 0
+        let areaVisibility = CAKeyframeAnimation(keyPath: "opacity")
+        areaVisibility.values = [0, 0, 1, 1, 0, 0]
+        areaVisibility.keyTimes = [0, NSNumber(value: time / timelineDuration),
+                                   NSNumber(value: min(end, time + fadeDuration) / timelineDuration),
+                                   NSNumber(value: end / timelineDuration),
+                                   NSNumber(value: end / timelineDuration), 1]
+        areaVisibility.beginTime = AVCoreAnimationBeginTimeAtZero
+        areaVisibility.duration = timelineDuration
+        areaVisibility.isRemovedOnCompletion = false
+        areaVisibility.fillMode = .both
+        areaLayer.add(areaVisibility, forKey: "areaVisibility")
+        parent.addSublayer(areaLayer)
+
+        let text = "\(effect.playerName)'s\n\(effect.shotDescription)\npast year\nwithin 2'\n" +
             String(format: "%02d%% (%d/%d)", prepared.stats.percent,
                    prepared.stats.makes, prepared.stats.attempts)
         let font = NSFont.systemFont(ofSize: max(22, size.height * 0.037), weight: .bold)
@@ -40,15 +67,16 @@ enum ShotEffectRendering {
             .font: font, .foregroundColor: NSColor.white,
             .paragraphStyle: paragraph
         ]
+        let caption = NSMutableAttributedString(string: text, attributes: attributes)
+        caption.addAttribute(.foregroundColor, value: ShotEffectArea.highlightColor,
+                             range: (text as NSString).range(of: "within 2'", options: .backwards))
         let width = min(size.width * 0.42, max(240, size.width - 32))
-        let textSize = (text as NSString).boundingRect(
+        let textSize = caption.boundingRect(
             with: CGSize(width: width - 28, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes).size
+            options: [.usesLineFragmentOrigin, .usesFontLeading]).size
         let height = min(size.height - 16, ceil(textSize.height) + 28)
-        let image = textImage(text, size: CGSize(width: width - 28, height: height - 28), attributes: attributes)
+        let image = textImage(caption, size: CGSize(width: width - 28, height: height - 28))
         guard let image else { return }
-        let scaleX = size.width / effect.frameSize.width
-        let scaleY = size.height / effect.frameSize.height
         let box = effect.bounds
         let x = box.midX < effect.frameSize.width / 2
             ? box.maxX * scaleX + 16
@@ -94,13 +122,22 @@ enum ShotEffectRendering {
         let width = Int(effect.frameSize.width)
         let height = Int(effect.frameSize.height)
         guard width > 0, height > 0, effect.maskPixels.count == width * height else { return nil }
+        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize)
+        let radiusX = max(area.width / 2, 1)
+        let radiusY = max(area.height / 2, 1)
         var pixels = Data(count: width * height * 4)
         effect.maskPixels.withUnsafeBytes { source in
             pixels.withUnsafeMutableBytes { destination in
                 guard let mask = source.baseAddress?.assumingMemoryBound(to: UInt8.self),
                       let rgba = destination.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                for index in 0..<(width * height) {
-                    rgba[index * 4 + 3] = 255 - mask[index]
+                for y in 0..<height {
+                    let normalizedY = (CGFloat(y) + 0.5 - area.midY) / radiusY
+                    for x in 0..<width {
+                        let index = y * width + x
+                        let normalizedX = (CGFloat(x) + 0.5 - area.midX) / radiusX
+                        let insideArea = normalizedX * normalizedX + normalizedY * normalizedY <= 1
+                        rgba[index * 4 + 3] = insideArea ? 0 : 255 - mask[index]
+                    }
                 }
             }
         }
@@ -113,8 +150,7 @@ enum ShotEffectRendering {
                        intent: .defaultIntent)
     }
 
-    private static func textImage(_ text: String, size: CGSize,
-                                  attributes: [NSAttributedString.Key: Any]) -> CGImage? {
+    private static func textImage(_ text: NSAttributedString, size: CGSize) -> CGImage? {
         let scale = 2
         guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
             pixelsWide: Int(ceil(size.width)) * scale, pixelsHigh: Int(ceil(size.height)) * scale,
@@ -125,9 +161,8 @@ enum ShotEffectRendering {
         NSGraphicsContext.current = context
         defer { NSGraphicsContext.current = previous }
         context.cgContext.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
-        (text as NSString).draw(with: CGRect(origin: .zero, size: size),
-                                options: [.usesLineFragmentOrigin, .usesFontLeading],
-                                attributes: attributes, context: nil)
+        text.draw(with: CGRect(origin: .zero, size: size),
+                  options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
         context.flushGraphics()
         return bitmap.cgImage
     }

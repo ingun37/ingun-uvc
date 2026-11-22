@@ -5,6 +5,37 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func areaEllipseSitsAtBoundingBoxBottomAndStaysInFrame() {
+        let area = ShotEffectArea.ellipse(
+            atBottomOf: CGRect(x: 50, y: 40, width: 60, height: 100),
+            in: CGSize(width: 320, height: 180))
+        #expect(abs(area.minX - 42.5) < 0.001)
+        #expect(abs(area.minY - 131.75) < 0.001)
+        #expect(abs(area.width - 75) < 0.001)
+        #expect(abs(area.height - 16.5) < 0.001)
+        let tallerBox = ShotEffectArea.ellipse(
+            atBottomOf: CGRect(x: 50, y: 0, width: 60, height: 140),
+            in: CGSize(width: 320, height: 180))
+        #expect(abs(tallerBox.height - area.height) < 0.001)
+        let widerBox = ShotEffectArea.ellipse(
+            atBottomOf: CGRect(x: 50, y: 40, width: 120, height: 100),
+            in: CGSize(width: 320, height: 180))
+        #expect(widerBox.width > area.width && widerBox.height > area.height)
+        let edge = ShotEffectArea.ellipse(
+            atBottomOf: CGRect(x: 0, y: 160, width: 60, height: 100),
+            in: CGSize(width: 320, height: 180))
+        #expect(edge.minX >= 0 && edge.maxY <= 180)
+    }
+
+    @Test func boundingBoxResizeKeepsBoxInsideFrame() {
+        let original = CGRect(x: 50, y: 40, width: 60, height: 100)
+        let frame = CGSize(width: 320, height: 180)
+        let adjusted = ShotEffectArea.resized(original, to: CGSize(width: 120, height: 80), in: frame)
+        #expect(adjusted == CGRect(x: 20, y: 50, width: 120, height: 80))
+        let clamped = ShotEffectArea.resized(original, to: CGSize(width: 500, height: 300), in: frame)
+        #expect(clamped == CGRect(x: 0, y: 0, width: 320, height: 180))
+    }
+
     @Test func localShotStatsUseTwoFootRadiusAndExcludeMissingLocations() throws {
         let csv = "loc_x,loc_y,result\n" +
             "0,0,made\n12,16,missed\n20.1,0,made\n,0,made\n-10,0,made\n"
@@ -61,6 +92,7 @@ struct ClipEditorTests {
         }
         #expect(try brightness(darkened, x: 20, y: 20) < brightness(early, x: 20, y: 20))
         #expect(try abs(brightness(darkened, x: 80, y: 90) - brightness(early, x: 80, y: 90)) < 35)
+        #expect(try brightness(darkened, x: 80, y: 140) > brightness(darkened, x: 20, y: 20))
     }
 
     @Test func shotEffectComposesFractionalCaptureTimes() async throws {

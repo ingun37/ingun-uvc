@@ -24,6 +24,32 @@ struct PreparedShotEffect: Sendable {
     let stats: LocalShotStats
 }
 
+enum ShotEffectArea {
+    static let highlightColor = NSColor(srgbRed: 1, green: 229.0 / 255.0,
+                                        blue: 28.0 / 255.0, alpha: 1)
+
+    // Coordinates match the displayed frame: the origin is at its top-left.
+    static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize) -> CGRect {
+        guard frameSize.width > 0, frameSize.height > 0 else { return .zero }
+        let width = min(frameSize.width, max(24, bounds.width * 1.25))
+        let height = min(frameSize.height, max(8, width * 0.22))
+        let centerX = min(max(bounds.midX, width / 2), frameSize.width - width / 2)
+        let centerY = min(max(bounds.maxY, height / 2), frameSize.height - height / 2)
+        return CGRect(x: centerX - width / 2, y: centerY - height / 2,
+                      width: width, height: height)
+    }
+
+    static func resized(_ bounds: CGRect, to size: CGSize, in frameSize: CGSize) -> CGRect {
+        guard frameSize.width > 0, frameSize.height > 0,
+              size.width.isFinite, size.height.isFinite else { return bounds }
+        let width = min(max(1, size.width), frameSize.width)
+        let height = min(max(1, size.height), frameSize.height)
+        let x = min(max(0, bounds.midX - width / 2), frameSize.width - width)
+        let y = min(max(0, bounds.midY - height / 2), frameSize.height - height)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+}
+
 @MainActor @Observable
 final class ShotEffectStore {
     var effects: [ShotEffectKey: AppliedShotEffect] = [:]

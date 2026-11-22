@@ -54,6 +54,15 @@ struct ShotEffectView: View {
                                 .allowsHitTesting(false)
                         }
                         if let maskBounds {
+                            let area = ShotEffectArea.ellipse(
+                                atBottomOf: maskBounds,
+                                in: CGSize(width: frame.width, height: frame.height))
+                            Ellipse()
+                                .fill(Color(ShotEffectArea.highlightColor).opacity(0.22))
+                                .overlay(Ellipse().strokeBorder(Color(ShotEffectArea.highlightColor), lineWidth: 2))
+                                .frame(width: area.width * scale, height: area.height * scale)
+                                .position(x: area.midX * scale, y: area.midY * scale)
+                                .allowsHitTesting(false)
                             Rectangle()
                                 .strokeBorder(.yellow, lineWidth: 3)
                                 .frame(width: maskBounds.width * scale,
@@ -93,6 +102,30 @@ struct ShotEffectView: View {
             Text("Frame: \(time, specifier: "%.3f") s · \(max(0, selection.attemptTime - time), specifier: "%.3f") s before attempt")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
+            if let frame, let maskBounds {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Box width").frame(width: 80, alignment: .leading)
+                        Slider(value: Binding(
+                            get: { Double(self.maskBounds?.width ?? maskBounds.width) },
+                            set: { resizeBox(width: CGFloat($0), in: frame) }),
+                            in: 1...Double(frame.width))
+                        Text("\(Int(maskBounds.width)) px")
+                            .monospacedDigit()
+                            .frame(width: 75, alignment: .trailing)
+                    }
+                    HStack {
+                        Text("Box height").frame(width: 80, alignment: .leading)
+                        Slider(value: Binding(
+                            get: { Double(self.maskBounds?.height ?? maskBounds.height) },
+                            set: { resizeBox(height: CGFloat($0), in: frame) }),
+                            in: 1...Double(frame.height))
+                        Text("\(Int(maskBounds.height)) px")
+                            .monospacedDigit()
+                            .frame(width: 75, alignment: .trailing)
+                    }
+                }
+            }
             if isFindingPerson {
                 ProgressView("Finding player…")
             }
@@ -119,7 +152,7 @@ struct ShotEffectView: View {
             }
         }
         .padding(20)
-        .frame(minWidth: 720, minHeight: 500)
+        .frame(minWidth: 720, minHeight: 580)
         .task(id: time) {
             maskRequestID = UUID()
             isFindingPerson = false
@@ -175,6 +208,15 @@ struct ShotEffectView: View {
             }
             if maskRequestID == requestID { isFindingPerson = false }
         }
+    }
+
+    private func resizeBox(width: CGFloat? = nil, height: CGFloat? = nil, in frame: CGImage) {
+        guard let maskBounds else { return }
+        message = nil
+        self.maskBounds = ShotEffectArea.resized(
+            maskBounds,
+            to: CGSize(width: width ?? maskBounds.width, height: height ?? maskBounds.height),
+            in: CGSize(width: frame.width, height: frame.height))
     }
 }
 
