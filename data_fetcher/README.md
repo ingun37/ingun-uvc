@@ -37,6 +37,14 @@ The `period` and `clock` columns give the time of each attempt. `clock` is the g
 
 The `games` command sends one NBA Stats request; `attempts` sends sequential play-by-play, shot-chart, and roster requests. NBA Stats can time out or block some networks; run locally or configure your proxy if that happens.
 
+Export every field goal attempt for one player between two game dates (inclusive):
+
+```sh
+data_fetcher/.venv/bin/python data_fetcher/main.py player-attempts 1630170 2026-10-01 2026-11-30 --output player-shots.csv
+```
+
+`player-attempts` queries `ShotChartDetail` for the regular season, playoffs, and play-in in every season touched by the range. It includes makes and misses, game and player IDs, shot time, shot type, court location (`loc_x`, `loc_y`), and shot distance. The output comes from the shot chart, so it does not include play-by-play descriptions or roster jersey numbers. Dates use `YYYY-MM-DD`; output defaults to standard output. Requests run one at a time with a one-second pause, and any failed request stops the command without writing a partial CSV.
+
 Here's a sample csv snippet
 
 ```csv

@@ -20,6 +20,16 @@ BOXSCORE_STATS = (
     "steals", "blocks", "turnovers", "foulsPersonal", "plusMinusPoints",
 )
 
+SEASON_TYPES = ("Regular Season", "Playoffs", "PlayIn", "Pre Season", "All Star")
+PLAYER_ATTEMPT_SEASON_TYPES = ("Regular Season", "Playoffs", "PlayIn")
+PLAYER_SHOT_COLUMNS = (
+    "season", "season_type", "game_date", "game_id", "game_event_id",
+    "player_id", "player_name", "team_id", "team_name", "period",
+    "minutes_remaining", "seconds_remaining", "result", "event_type",
+    "action_type", "shot_type", "shot_zone_basic", "shot_zone_area",
+    "shot_zone_range", "shot_distance", "loc_x", "loc_y", "home", "away",
+)
+
 
 def save_boxscore(game_id: str, output: str) -> None:
     endpoint = BoxScoreTraditionalV3(game_id=game_id, get_request=False)
@@ -63,6 +73,23 @@ def positive_int(value: str) -> int:
     if number < 1:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return number
+
+
+def iso_date(value: str) -> date:
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        raise argparse.ArgumentTypeError("date must be YYYY-MM-DD")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("date must be YYYY-MM-DD") from exc
+
+
+def seasons_between(start: date, end: date):
+    """NBA seasons run from fall into the following calendar year."""
+    first = start.year if start.month >= 9 else start.year - 1
+    last = end.year if end.month >= 9 else end.year - 1
+    for year in range(first, last + 1):
+        yield f"{year}-{(year + 1) % 100:02d}"
 
 
 def season_for_game(game_id: str) -> str:
@@ -201,12 +228,65 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
                              player_names.get(valid_id(row.personId), "")))
 
 
+def player_attempts(args: argparse.Namespace) -> None:
+    if args.start_date > args.end_date:
+        raise ValueError("start date must be on or before end date")
+    date_from = args.start_date.strftime("%m/%d/%Y")
+    date_to = args.end_date.strftime("%m/%d/%Y")
+    attempts = []
+    seen = set()
+    request_count = 0
+    for season in seasons_between(args.start_date, args.end_date):
+        for season_type in PLAYER_ATTEMPT_SEASON_TYPES:
+            if request_count:
+                time.sleep(1)
+            request_count += 1
+            chart = ShotChartDetail(
+                team_id=0, player_id=args.player_id, season_nullable=season,
+                season_type_all_star=season_type, context_measure_simple="FGA",
+                date_from_nullable=date_from, date_to_nullable=date_to,
+                get_request=False,
+            )
+            try:
+                chart.get_request()
+                rows = chart.shot_chart_detail.get_data_frame()
+            except Exception as exc:
+                raise RuntimeError(f"Could not fetch {season} {season_type} shot chart: {exc}") from exc
+            for shot in rows.itertuples(index=False):
+                shot_date = date.fromisoformat(str(shot.GAME_DATE)[:10])
+                if not args.start_date <= shot_date <= args.end_date:
+                    continue
+                if int(shot.SHOT_ATTEMPTED_FLAG) != 1:
+                    continue
+                key = (str(shot.GAME_ID).zfill(10), int(shot.GAME_EVENT_ID))
+                if key in seen:
+                    continue
+                seen.add(key)
+                attempts.append((
+                    season, season_type, shot_date.isoformat(), key[0], key[1],
+                    shot.PLAYER_ID, shot.PLAYER_NAME, shot.TEAM_ID, shot.TEAM_NAME,
+                    shot.PERIOD, shot.MINUTES_REMAINING, shot.SECONDS_REMAINING,
+                    "made" if int(shot.SHOT_MADE_FLAG) == 1 else "missed",
+                    shot.EVENT_TYPE, shot.ACTION_TYPE, shot.SHOT_TYPE,
+                    shot.SHOT_ZONE_BASIC, shot.SHOT_ZONE_AREA, shot.SHOT_ZONE_RANGE,
+                    shot.SHOT_DISTANCE, shot.LOC_X, shot.LOC_Y, shot.HTM, shot.VTM,
+                ))
+    attempts.sort(key=lambda row: (row[2], row[3], row[4]))
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
+    with destination as stream:
+        writer = csv.writer(stream)
+        writer.writerow(PLAYER_SHOT_COLUMNS)
+        writer.writerows(attempts)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     games = commands.add_parser("games", help="list recent games in a season")
     games.add_argument("--season", type=season_value, default=current_season(), help="YYYY-YY (default: current season)")
-    games.add_argument("--season-type", choices=("Regular Season", "Playoffs", "PlayIn", "Pre Season", "All Star"),
+    games.add_argument("--season-type", choices=SEASON_TYPES,
                        default="Regular Season")
     games.add_argument("--page", type=positive_int, default=1)
     games.add_argument("--page-size", type=positive_int, default=20)
@@ -214,11 +294,17 @@ def main() -> int:
     shots = commands.add_parser("attempts", help="print field goal attempts as CSV")
     shots.add_argument("game_id", type=game_id_value, help="10-digit ID from the games command")
     shots.add_argument("--season", type=season_value, help="YYYY-YY (inferred from game ID by default)")
-    shots.add_argument("--season-type", choices=("Regular Season", "Playoffs", "PlayIn", "Pre Season", "All Star"),
+    shots.add_argument("--season-type", choices=SEASON_TYPES,
                        help="default: Playoffs for 004 games, otherwise Regular Season")
     shots.add_argument("--output", "-o", metavar="FILE", help="write CSV to FILE instead of standard output")
     shots.add_argument("--boxscore", metavar="FILE", help="write the final player box score as CSV")
     shots.set_defaults(func=field_goal_attempts)
+    player_shots = commands.add_parser("player-attempts", help="export a player's shot-chart attempts across a date range")
+    player_shots.add_argument("player_id", type=positive_int, help="NBA player ID")
+    player_shots.add_argument("start_date", type=iso_date, help="first game date, YYYY-MM-DD")
+    player_shots.add_argument("end_date", type=iso_date, help="last game date, YYYY-MM-DD (inclusive)")
+    player_shots.add_argument("--output", "-o", metavar="FILE", help="write CSV to FILE instead of standard output")
+    player_shots.set_defaults(func=player_attempts)
     args = parser.parse_args()
     try:
         args.func(args)
