@@ -248,6 +248,18 @@ enum ClipPlanner {
     }
 
     static func attempts(from text: String) throws -> [MissedAttempt] {
+        func shotDescription(_ raw: String, shortName: String) -> String {
+            let description = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !shortName.isEmpty,
+                  let prefix = description.range(of: "MISS \(shortName)",
+                      options: [.anchored, .caseInsensitive, .diacriticInsensitive]),
+                  let next = description[prefix.upperBound...].first, next.isWhitespace else {
+                return description
+            }
+            return description[prefix.upperBound...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
         let rows = try csvRows(text)
         guard let header = rows.first?.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }),
               let periodIndex = header.firstIndex(of: "period"),
@@ -270,7 +282,8 @@ enum ClipPlanner {
                 return nil
             }
             let result = row[resultIndex].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let player = playerIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
+            let player = (playerIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             let playerID = playerIDIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
             let fullName = fullNameIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
             let jersey = jerseyIndex.flatMap { row.indices.contains($0) ? row[$0] : nil } ?? ""
@@ -296,7 +309,8 @@ enum ClipPlanner {
             let displayName = fullName.isEmpty ? player : fullName
             let identity = jersey.isEmpty ? displayName : "#\(jersey) \(displayName)"
             let caption = total.map { identity.isEmpty ? "\($0.made)/\($0.attempted)" : "\(identity)\n\($0.made)/\($0.attempted)" }
-            return MissedAttempt(period: period, gameSecond: seconds, description: row[descriptionIndex],
+            return MissedAttempt(period: period, gameSecond: seconds,
+                                 description: shotDescription(row[descriptionIndex], shortName: player),
                                  player: displayName.isEmpty ? nil : "\(team)|\(displayName)",
                                  playerID: playerID.isEmpty ? nil : playerID,
                                  caption: caption, location: location)

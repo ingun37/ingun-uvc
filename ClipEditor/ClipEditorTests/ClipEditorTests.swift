@@ -181,6 +181,22 @@ struct ClipEditorTests {
         #expect(!attempts.isEmpty)
     }
 
+    @Test func stripsMatchingMissAndShortNameFromShotDescriptions() throws {
+        let csv = "period,clock,team,player,result,description\n" +
+            "1,PT11M44S,SAS,Vassell,missed,MISS Vassell 27' 3PT Jump Shot\n" +
+            "1,PT11M20S,NOP,Matković,missed,MISS Matkovic 3' Cutting Dunk Shot\n" +
+            "1,PT11M00S,SAS,Vassell,missed,MISS Vassellton Jump Shot\n"
+        let attempts = try ClipPlanner.attempts(from: csv)
+        #expect(attempts.map(\.description) == [
+            "27' 3PT Jump Shot", "3' Cutting Dunk Shot", "MISS Vassellton Jump Shot"
+        ])
+        let plan = try ClipPlanner.plan(attempts: attempts,
+            ranges: [ClockRange(period: "1ST", game_start_seconds: 704, game_end_seconds: 660,
+                                video_start_seconds: 0, video_end_seconds: 44)],
+            videoDuration: 50)
+        #expect(plan.clips.first?.attempts.first?.shotDescription == "27' 3PT Jump Shot")
+    }
+
     @Test func boxScoreExcludesNonPlayingPlayersAndMatchesExportName() throws {
         let csv = "game_id,team,player_id,player,position,minutes,comment,points,reboundsTotal,fieldGoalsMade,fieldGoalsAttempted\n" +
             "1,BOS,11,José Player,G,31:20,,24,7,9,18\n" +
