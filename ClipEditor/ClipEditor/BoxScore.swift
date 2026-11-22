@@ -165,7 +165,7 @@ struct CompilationBoxScoreView: View {
                     Rectangle().fill(haloPurpleLight).frame(height: 1)
                 }
             }
-            ForEach(players) { player in
+            ForEach(Array(players.enumerated()), id: \.offset) { index, player in
                 HStack(spacing: 4) {
                     Text(player.name)
                         .frame(width: BoxScoreLayout.compilationNameWidth, alignment: .leading)
@@ -177,6 +177,7 @@ struct CompilationBoxScoreView: View {
                 }
                 .font(.system(size: 26, weight: .medium).monospacedDigit())
                 .frame(minHeight: 40)
+                .background(index.isMultiple(of: 2) ? Color.white.opacity(0.06) : .clear)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
