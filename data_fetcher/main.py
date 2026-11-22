@@ -182,7 +182,7 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
     destination = open(args.output, "w", newline="", encoding="utf-8") if args.output else nullcontext(sys.stdout)
     with destination as stream:
         writer = csv.writer(stream)
-        writer.writerow(("game_id", "period", "clock", "team", "player", "result", "description",
+        writer.writerow(("game_id", "period", "clock", "team", "player", "player_id", "result", "description",
                          "loc_x", "loc_y", "shot_distance", "jersey_number", "player_full_name"))
         for row in rows.itertuples(index=False):
             if row.isFieldGoal not in (1, True, "1", "true", "True"):
@@ -195,7 +195,7 @@ def field_goal_attempts(args: argparse.Namespace) -> None:
             if shot_index is not None:
                 used.add(shot_index)
             writer.writerow((args.game_id, row.period, row.clock, row.teamTricode,
-                             row.playerName, result, row.description,
+                             row.playerName, valid_id(row.personId) or "", result, row.description,
                              shot.LOC_X if shot else "", shot.LOC_Y if shot else "",
                              shot.SHOT_DISTANCE if shot else "", jersey_numbers.get(valid_id(row.personId), ""),
                              player_names.get(valid_id(row.personId), "")))
