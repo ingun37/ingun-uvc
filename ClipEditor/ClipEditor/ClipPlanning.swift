@@ -256,7 +256,12 @@ enum ClipPlanner {
                   let next = description[prefix.upperBound...].first, next.isWhitespace else {
                 return description
             }
-            return description[prefix.upperBound...]
+            let detail = description[prefix.upperBound...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let distance = detail.range(
+                of: #"^[0-9]+(?:\.[0-9]+)?['’′](?:\s+|$)"#,
+                options: .regularExpression) else { return detail }
+            return detail[distance.upperBound...]
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
