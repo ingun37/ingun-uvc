@@ -15,7 +15,9 @@ struct ShotEffectView: View {
     let selection: ShotEffectWindow
     @State private var time: Double
     @State private var frame: CGImage?
+    @State private var displayedTime: Double?
     @State private var maskOverlay: CGImage?
+    @State private var maskBounds: CGRect?
     @State private var message: String?
     @State private var isFindingPerson = false
     @State private var maskRequestID = UUID()
@@ -43,10 +45,20 @@ struct ShotEffectView: View {
                                 .resizable()
                                 .allowsHitTesting(false)
                         }
+                        if let maskBounds {
+                            Rectangle()
+                                .strokeBorder(.yellow, lineWidth: 3)
+                                .frame(width: maskBounds.width * scale,
+                                       height: maskBounds.height * scale)
+                                .position(x: maskBounds.midX * scale,
+                                          y: maskBounds.midY * scale)
+                                .allowsHitTesting(false)
+                        }
                     }
                     .frame(width: size.width, height: size.height)
                     .contentShape(Rectangle())
                     .gesture(SpatialTapGesture().onEnded { tap in
+                        guard displayedTime == time else { return }
                         let point = CGPoint(x: tap.location.x / size.width * CGFloat(frame.width),
                                             y: tap.location.y / size.height * CGFloat(frame.height))
                         findPerson(in: frame, at: point)
@@ -85,8 +97,8 @@ struct ShotEffectView: View {
         .task(id: time) {
             maskRequestID = UUID()
             isFindingPerson = false
-            frame = nil
             maskOverlay = nil
+            maskBounds = nil
             message = nil
             do {
                 let url = selection.videoURL
@@ -101,9 +113,9 @@ struct ShotEffectView: View {
                 }.value
                 guard !Task.isCancelled else { return }
                 frame = image
+                displayedTime = requestedTime
             } catch {
                 guard !Task.isCancelled else { return }
-                frame = nil
                 message = "Could not load this frame: \(error.localizedDescription)"
             }
         }
@@ -114,14 +126,16 @@ struct ShotEffectView: View {
         maskRequestID = requestID
         isFindingPerson = true
         maskOverlay = nil
+        maskBounds = nil
         message = nil
         Task {
             do {
-                let overlay = try await Task.detached(priority: .userInitiated) {
+                let result = try await Task.detached(priority: .userInitiated) {
                     try PersonMask.overlay(in: frame, at: point)
                 }.value
                 guard maskRequestID == requestID, self.frame === frame else { return }
-                maskOverlay = overlay
+                maskOverlay = result.image
+                maskBounds = result.bounds
             } catch {
                 if maskRequestID == requestID, self.frame === frame {
                     message = error.localizedDescription
@@ -145,7 +159,7 @@ private enum PersonMask {
         }
     }
 
-    nonisolated static func overlay(in frame: CGImage, at point: CGPoint) throws -> CGImage {
+    nonisolated static func overlay(in frame: CGImage, at point: CGPoint) throws -> (image: CGImage, bounds: CGRect) {
         // Center a half-width, half-height crop on the click, shifting it inside the frame at edges.
         let cropWidth = max(1, frame.width / 2)
         let cropHeight = max(1, frame.height / 2)
@@ -202,6 +216,10 @@ private enum PersonMask {
         let maskHeight = CVPixelBufferGetHeight(selected)
         let maskStride = CVPixelBufferGetBytesPerRow(selected)
         var rgba = Data(count: frame.width * frame.height * 4)
+        var minimumX = frame.width
+        var minimumY = frame.height
+        var maximumX = -1
+        var maximumY = -1
         rgba.withUnsafeMutableBytes { destination in
             guard let bytes = destination.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             for y in 0..<cropHeight {
@@ -216,6 +234,12 @@ private enum PersonMask {
                         alpha = Float(maskBase.advanced(by: maskY * maskStride)
                             .assumingMemoryBound(to: UInt8.self)[maskX]) / 255
                     }
+                    if alpha >= 0.5 {
+                        minimumX = min(minimumX, originX + x)
+                        minimumY = min(minimumY, originY + y)
+                        maximumX = max(maximumX, originX + x)
+                        maximumY = max(maximumY, originY + y)
+                    }
                     let offset = ((originY + y) * frame.width + originX + x) * 4
                     bytes[offset] = 0
                     bytes[offset + 1] = 220
@@ -225,12 +249,16 @@ private enum PersonMask {
             }
         }
         guard let provider = CGDataProvider(data: rgba as CFData),
+              maximumX >= minimumX, maximumY >= minimumY,
               let image = CGImage(width: frame.width, height: frame.height,
                                   bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: frame.width * 4,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
                                   provider: provider, decode: nil, shouldInterpolate: false,
                                   intent: .defaultIntent) else { throw Failure.unsupportedMask }
-        return image
+        let bounds = CGRect(x: minimumX, y: minimumY,
+                            width: maximumX - minimumX + 1,
+                            height: maximumY - minimumY + 1)
+        return (image, bounds)
     }
 }
