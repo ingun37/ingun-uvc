@@ -5,6 +5,99 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func localShotStatsUseTwoFootRadiusAndExcludeMissingLocations() throws {
+        let csv = "loc_x,loc_y,result\n" +
+            "0,0,made\n12,16,missed\n20.1,0,made\n,0,made\n-10,0,made\n"
+        let stats = try LocalShotStats.near(.zero, in: csv)
+        #expect(stats == LocalShotStats(makes: 2, attempts: 3))
+        #expect(stats.percent == 67)
+    }
+
+    @Test func acceptsDisplayedGameDate() {
+        #expect(PlayerAttemptFetcher.gameDate("Nov 22, 2026") != nil)
+        #expect(PlayerAttemptFetcher.gameDate("2026-11-22") != nil)
+        #expect(PlayerAttemptFetcher.inputGameDate("Nov 16, 2026") == "Nov 16, 2026")
+        #expect(PlayerAttemptFetcher.inputGameDate("Nov 31, 2026") == nil)
+        #expect(PlayerAttemptFetcher.inputGameDate("2026-11-16") == nil)
+    }
+
+    @Test func shotEffectHoldsAllPlayerVideo() async throws {
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-effect-test-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        let attempt = ClipAttempt(sourceTime: 1.3, text: nil, location: .zero,
+                                  player: "A|Alice", playerID: "1", shotDescription: "Jump shot")
+        let clip = Clip(start: 0.5, end: 2, descriptions: ["Jump shot"], attempts: [attempt])
+        let width = 320, height = 180
+        var mask = Data(count: width * height)
+        for y in 40..<140 {
+            for x in 50..<110 { mask[y * width + x] = 255 }
+        }
+        let effect = AppliedShotEffect(timestamp: 1, bounds: CGRect(x: 50, y: 40, width: 60, height: 100),
+                                       frameSize: CGSize(width: width, height: height),
+                                       maskPNG: Data(), maskPixels: mask, playerID: "1",
+                                       playerName: "Alice", shotDescription: "Jump shot", shotLocation: .zero)
+        try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
+            shotEffects: [ShotEffectKey(clipID: clip.id, attemptIndex: 0):
+                PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3))])
+        let duration = try await AVURLAsset(url: output).load(.duration).seconds
+        #expect(abs(duration - 2.7) < 0.15)
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let early = try generator.copyCGImage(at: CMTime(seconds: 0.53, preferredTimescale: 600), actualTime: nil)
+        let darkened = try generator.copyCGImage(at: CMTime(seconds: 0.9, preferredTimescale: 600), actualTime: nil)
+        func brightness(_ image: CGImage, x: Int, y: Int) throws -> Int {
+            let pixel = try #require(image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+            let bytes = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
+            defer { bytes.deallocate() }
+            let context = try #require(CGContext(data: bytes, width: 1, height: 1,
+                bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return Int(bytes[0]) + Int(bytes[1]) + Int(bytes[2])
+        }
+        #expect(try brightness(darkened, x: 20, y: 20) < brightness(early, x: 20, y: 20))
+        #expect(try abs(brightness(darkened, x: 80, y: 90) - brightness(early, x: 80, y: 90)) < 35)
+    }
+
+    @Test func shotEffectComposesFractionalCaptureTimes() async throws {
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "test-data/short-2/first-quarter-only.mov")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-capture-effect-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        let attempts = [
+            ClipAttempt(sourceTime: 1.23, text: nil, location: .zero, player: "A|Alice"),
+            ClipAttempt(sourceTime: 2.77, text: nil, location: .zero, player: "A|Alice")
+        ]
+        let clip = Clip(start: 0.1734567, end: 3.4195678, descriptions: ["two shots"], attempts: attempts)
+        let width = 1920, height = 1080
+        var mask = Data(count: width * height)
+        for y in 300..<800 {
+            for x in 200..<500 { mask[y * width + x] = 255 }
+        }
+        let releaseTimes = [0.9179876, 2.2491234]
+        #expect(CMTime(seconds: releaseTimes[0], preferredTimescale: 60000) -
+                CMTime(seconds: clip.start, preferredTimescale: 60000) !=
+                CMTime(seconds: releaseTimes[0] - clip.start, preferredTimescale: 60000))
+        let effects = Dictionary(uniqueKeysWithValues: releaseTimes.enumerated().map { index, time in
+            let effect = AppliedShotEffect(timestamp: time,
+                bounds: CGRect(x: 200, y: 300, width: 300, height: 500),
+                frameSize: CGSize(width: width, height: height), maskPNG: Data(), maskPixels: mask,
+                playerID: "1", playerName: "Alice", shotDescription: "Jump shot", shotLocation: .zero)
+            return (ShotEffectKey(clipID: clip.id, attemptIndex: index),
+                    PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3)))
+        })
+        try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
+                                          shotEffects: effects)
+        let duration = try await AVURLAsset(url: output).load(.duration).seconds
+        #expect(abs(duration - (clip.end - clip.start + 2 * ShotEffectRendering.duration)) < 0.15)
+    }
+
     @Test func invalidMappingIdentifiesEntryAndValues() throws {
         let ranges = [ClockRange(period: "1ST", game_start_seconds: 100, game_end_seconds: 90,
                                  video_start_seconds: 12, video_end_seconds: 10)]

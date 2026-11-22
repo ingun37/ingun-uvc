@@ -17,6 +17,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct ClipEditorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var shotEffects = ShotEffectStore()
 
     private static func pathArgument(_ names: Set<String>) -> URL? {
         let arguments = CommandLine.arguments.dropFirst()
@@ -44,10 +45,12 @@ struct ClipEditorApp: App {
             ContentView(videoURL: videoURL, mappingURL: mappingURL,
                         attemptsURL: attemptsURL, boxscoreURL: boxscoreURL,
                         outputURL: outputURL, gameDate: gameDate)
+                .environment(shotEffects)
         }
         WindowGroup("Shot effect", for: ShotEffectWindow.self) { $selection in
             if let selection {
                 ShotEffectView(selection: selection)
+                    .environment(shotEffects)
             }
         }
     }

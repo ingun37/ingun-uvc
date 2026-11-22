@@ -14,7 +14,8 @@ enum BoxScoreVideo {
         return image
     }
 
-    static func writeStill(_ image: CGImage, size: CGSize, to url: URL) async throws {
+    static func writeStill(_ image: CGImage, size: CGSize, to url: URL,
+                           duration: Double = 5) async throws {
         let width = Int(size.width.rounded())
         let height = Int(size.height.rounded())
         guard width > 0, height > 0 else { throw RenderError.size }
@@ -37,7 +38,7 @@ enum BoxScoreVideo {
         writer.add(input)
         guard writer.startWriting() else { throw writer.error ?? RenderError.writer }
         writer.startSession(atSourceTime: .zero)
-        for frame in 0..<150 {
+        for frame in 0..<Int((duration * 30).rounded()) {
             while !input.isReadyForMoreMediaData { try Task.checkCancellation(); await Task.yield() }
             guard let pool = adaptor.pixelBufferPool else { throw RenderError.buffer }
             var maybeBuffer: CVPixelBuffer?

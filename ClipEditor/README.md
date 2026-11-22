@@ -29,8 +29,9 @@ per-player missed-attempt count animation appear in the exported videos.
 The export saves the full compilation to the selected MP4 path. It also saves
 one square MP4 per player with included misses in the same folder, named
 `<player name> | every brick VS <opposing team long name> | <date>.mp4`.
-The opposing team comes from the CSV team codes; the date comes from UnifiedApp's
-`--date` argument or the compilation filename when available.
+The opposing team comes from the CSV team codes. If `--date` is absent, enter
+the game date on the input screen in `MMM d, yyyy` format (for example,
+`Nov 16, 2026`); the date is also used for the shot-effect history lookup.
 Merged clips remain whole and appear in each involved player's video, even
 when they contain another player's attempt.
 
@@ -53,7 +54,7 @@ single scale setting for the whole overlay.
 
 Launch options `--video/-v`, `--json/-j`, `--csv/-c`, and `--boxscore` prefill the inputs.
 `--output/-o` exports directly to the given compilation path after clip review.
-`--date` supplies the formatted game date for player filenames.
+`--date` supplies the formatted game date for player filenames and shot-effect history.
 UnifiedApp passes all four paths.
 
 Build from the repository root:

@@ -84,10 +84,12 @@ private final class EditorModel {
     var boxScore: BoxScore?
     var gameDate: String?
     var message = ""
+    var errorDetails: String?
     var isBusy = false
     var exportedURL: URL?
     var playerExportURLs: [URL] = []
     var exportedPlayerStats: [PlayerFieldGoalStats] = []
+    var effectWarnings: [String] = []
     private var files: [InputKind: FileAccess] = [:]
 
     var videoURL: URL? { files[.video]?.url }
@@ -118,7 +120,9 @@ private final class EditorModel {
         exportedURL = nil
         playerExportURLs = []
         exportedPlayerStats = []
+        effectWarnings = []
         message = ""
+        errorDetails = nil
         return true
     }
 
@@ -163,7 +167,7 @@ private final class EditorModel {
         }
     }
 
-    func export(to outputURL: URL? = nil) async {
+    func export(to outputURL: URL? = nil, effects: [ShotEffectKey: AppliedShotEffect] = [:]) async {
         guard let video = videoURL, !selectedClips.isEmpty else { return }
         let destination: URL
         if let outputURL {
@@ -181,9 +185,54 @@ private final class EditorModel {
         exportedURL = nil
         playerExportURLs = []
         exportedPlayerStats = []
+        effectWarnings = []
+        errorDetails = nil
         message = "Exporting compilation…"
         defer { isBusy = false; _ = access }
+        var exportPhase = "prepare the compilation"
         do {
+            var warnings: [String] = []
+            var prepared: [ShotEffectKey: PreparedShotEffect] = [:]
+            let fetchDateText = gameDate ?? destination.deletingPathExtension().lastPathComponent
+                .components(separatedBy: " | ").last
+            let date = PlayerAttemptFetcher.gameDate(fetchDateText)
+            var fetched: [String: Result<String, Error>] = [:]
+            for clip in selectedClips {
+                for index in clip.attempts.indices {
+                    let key = ShotEffectKey(clipID: clip.id, attemptIndex: index)
+                    guard let effect = effects[key] else { continue }
+                    let label = "\(effect.playerName), attempt \(index + 1)"
+                    guard effect.timestamp >= clip.start, effect.timestamp < clip.end else {
+                        warnings.append("\(label): saved release frame is outside the edited clip")
+                        continue
+                    }
+                    guard let playerID = effect.playerID, !playerID.isEmpty else {
+                        warnings.append("\(label): \(ShotEffectError.missingPlayerID.localizedDescription)")
+                        continue
+                    }
+                    guard let date else {
+                        warnings.append("\(label): \(ShotEffectError.missingDate.localizedDescription)")
+                        continue
+                    }
+                    if fetched[playerID] == nil {
+                        message = "Fetching past-year attempts for \(effect.playerName)…"
+                        do { fetched[playerID] = .success(try await PlayerAttemptFetcher.fetch(playerID: playerID, gameDate: date)) }
+                        catch { fetched[playerID] = .failure(error) }
+                    }
+                    do {
+                        let csv = try fetched[playerID]!.get()
+                        guard let location = effect.shotLocation else {
+                            throw ShotEffectError.missingShotLocation
+                        }
+                        let stats = try LocalShotStats.near(location, in: csv)
+                        prepared[key] = PreparedShotEffect(effect: effect, stats: stats)
+                    } catch {
+                        warnings.append("\(label): \(error.localizedDescription)")
+                        effectWarnings = warnings
+                    }
+                }
+            }
+            effectWarnings = warnings
             let compilationCard = try boxScore.map {
                 try BoxScoreVideo.render(CompilationBoxScoreView(boxScore: $0, date: gameDate))
             }
@@ -197,8 +246,11 @@ private final class EditorModel {
                 }
                 return cards
             } ?? [:]
+            exportPhase = "export the all-player compilation"
+            message = "Exporting compilation…"
             try await VideoCompilation.export(videoURL: video, clips: selectedClips,
-                                              destination: destination, endCard: compilationCard)
+                                              destination: destination, endCard: compilationCard,
+                                              shotEffects: prepared)
             var playerURLs: [URL] = []
             var usedNames: Set<String> = [destination.lastPathComponent.lowercased()]
             let compilationName = destination.deletingPathExtension().lastPathComponent
@@ -223,6 +275,7 @@ private final class EditorModel {
                 }
                 usedNames.insert("\(name).mp4".lowercased())
                 let url = destination.deletingLastPathComponent().appendingPathComponent("\(name).mp4")
+                exportPhase = "export \(group.name)'s video"
                 message = "Exporting \(group.name)…"
                 try await VideoCompilation.export(videoURL: video, clips: group.clips, destination: url,
                                                   title: group.name,
@@ -236,13 +289,35 @@ private final class EditorModel {
             playerExportURLs = playerURLs
             exportedPlayerStats = PlayerFieldGoalStats.exportedPlayers(groups.map(\.key), countEvents: countEvents)
             message = "Saved compilation and \(playerURLs.count) player videos to \(destination.deletingLastPathComponent().path)."
+            effectWarnings = warnings
         } catch {
-            message = error.localizedDescription
+            message = "Could not \(exportPhase)."
+            errorDetails = Self.errorDetails(for: error)
         }
+    }
+
+    private static func errorDetails(for error: Error) -> String {
+        var lines: [String] = []
+        var current: NSError? = error as NSError
+        var seen: Set<ObjectIdentifier> = []
+        while let problem = current, seen.insert(ObjectIdentifier(problem)).inserted {
+            lines.append("\(problem.localizedDescription) [\(problem.domain), code \(problem.code)]")
+            if let reason = problem.localizedFailureReason, !reason.isEmpty,
+               reason != problem.localizedDescription {
+                lines.append("Reason: \(reason)")
+            }
+            if let suggestion = problem.localizedRecoverySuggestion, !suggestion.isEmpty {
+                lines.append("Suggestion: \(suggestion)")
+            }
+            current = problem.userInfo[NSUnderlyingErrorKey] as? NSError
+            if current != nil { lines.append("Caused by:") }
+        }
+        return lines.joined(separator: "\n")
     }
 }
 
 struct ContentView: View {
+    @Environment(ShotEffectStore.self) private var shotEffects
     let videoURL: URL?
     let mappingURL: URL?
     let attemptsURL: URL?
@@ -253,6 +328,7 @@ struct ContentView: View {
     private let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
+    @State private var dateInput = ""
     @State private var previewSpeed = 4.0
     @State private var selectedPreviewID: UUID?
     @State private var moveAllByClipID: [UUID: Bool] = [:]
@@ -291,6 +367,29 @@ struct ContentView: View {
                 Text(model.message)
                     .foregroundStyle(model.exportedURL == nil ? .orange : .green)
                     .accessibilityIdentifier("statusMessage")
+            }
+            if let details = model.errorDetails {
+                ScrollView {
+                    Text(details)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(maxHeight: 170)
+                .accessibilityIdentifier("exportErrorDetails")
+            }
+            if !model.effectWarnings.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Skipped special effects", systemImage: "exclamationmark.triangle.fill")
+                    ScrollView {
+                        Text(model.effectWarnings.joined(separator: "\n\n"))
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxHeight: 170)
+                }
+                .foregroundStyle(.orange)
             }
             if model.exportedURL != nil, !model.exportedPlayerStats.isEmpty {
                 exportRankings
@@ -342,13 +441,35 @@ struct ContentView: View {
                     return model.accept(url, for: kind)
                 }
             }
+            if gameDate == nil {
+                HStack {
+                    Text("Game date").frame(width: 230, alignment: .leading)
+                    TextField("Nov 16, 2026", text: $dateInput)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("gameDateInput")
+                    Text("MMM d, yyyy")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                if !dateInput.isEmpty && PlayerAttemptFetcher.inputGameDate(dateInput) == nil {
+                    Text("Enter the game date like Nov 16, 2026.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
             Spacer()
             HStack {
                 Spacer()
                 Button(model.isBusy ? "Reading files…" : "Next") {
+                    if gameDate == nil {
+                        model.gameDate = PlayerAttemptFetcher.inputGameDate(dateInput)
+                    }
                     Task { await model.prepare() }
                 }
-                .disabled(!model.canContinue)
+                .disabled(!model.canContinue ||
+                          (gameDate == nil && PlayerAttemptFetcher.inputGameDate(dateInput) == nil))
                 .keyboardShortcut(.defaultAction)
             }
         }
@@ -445,7 +566,7 @@ struct ContentView: View {
                 Spacer()
                 Button(outputURL == nil ? "Next" : (model.isBusy ? "Exporting…" : "Export")) {
                     if let outputURL {
-                        Task { await model.export(to: outputURL) }
+                        Task { await model.export(to: outputURL, effects: shotEffects.effects) }
                     } else {
                         model.scene = .compilation
                     }
@@ -477,7 +598,7 @@ struct ContentView: View {
                 Button("Back") { model.scene = .edit }
                 Spacer()
                 Button(model.isBusy ? "Exporting…" : "Choose Save Location and Export") {
-                    Task { await model.export() }
+                    Task { await model.export(effects: shotEffects.effects) }
                 }
                 .disabled(model.isBusy)
                 .keyboardShortcut(.defaultAction)
@@ -531,6 +652,7 @@ struct ContentView: View {
 
 private struct ClipRow: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(ShotEffectStore.self) private var shotEffects
     @Binding var clip: Clip
     let videoURL: URL
     let videoDuration: Double
@@ -575,10 +697,17 @@ private struct ClipRow: View {
                     .foregroundStyle(.secondary)
                 HStack {
                     ForEach(clip.attempts.indices, id: \.self) { index in
-                        Button("Shot effect \(index + 1)") {
+                        let applied = shotEffects.effects[ShotEffectKey(clipID: clip.id, attemptIndex: index)] != nil
+                        Button("Shot effect \(index + 1)\(applied ? " ✓" : "")") {
+                            let attempt = clip.attempts[index]
                             openWindow(value: ShotEffectWindow(clipID: clip.id, attemptIndex: index,
                                                                videoURL: videoURL, clipStart: clip.start,
-                                                               attemptTime: clip.attempts[index].sourceTime))
+                                                               attemptTime: attempt.sourceTime,
+                                                               playerID: attempt.playerID,
+                                                               playerName: attempt.player?.split(separator: "|", maxSplits: 1).last.map(String.init) ?? "Player",
+                                                               shotDescription: attempt.shotDescription,
+                                                               shotX: attempt.location.map { Double($0.x) },
+                                                               shotY: attempt.location.map { Double($0.y) }))
                         }
                     }
                 }

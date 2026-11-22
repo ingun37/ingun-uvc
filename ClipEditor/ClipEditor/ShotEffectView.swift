@@ -9,15 +9,23 @@ struct ShotEffectWindow: Codable, Hashable {
     let videoURL: URL
     let clipStart: Double
     let attemptTime: Double
+    let playerID: String?
+    let playerName: String
+    let shotDescription: String
+    let shotX: Double?
+    let shotY: Double?
 }
 
 struct ShotEffectView: View {
+    @Environment(ShotEffectStore.self) private var shotEffects
     let selection: ShotEffectWindow
     @State private var time: Double
     @State private var frame: CGImage?
     @State private var displayedTime: Double?
     @State private var maskOverlay: CGImage?
     @State private var maskBounds: CGRect?
+    @State private var maskPNG: Data?
+    @State private var maskPixels: Data?
     @State private var message: String?
     @State private var isFindingPerson = false
     @State private var maskRequestID = UUID()
@@ -91,6 +99,24 @@ struct ShotEffectView: View {
             if let message {
                 Text(message).foregroundStyle(.orange)
             }
+            HStack {
+                Spacer()
+                Button("Apply") {
+                    guard let maskBounds, let maskPNG, let maskPixels, let frame else { return }
+                    let key = ShotEffectKey(clipID: selection.clipID, attemptIndex: selection.attemptIndex)
+                    let location = (selection.shotX != nil && selection.shotY != nil)
+                        ? CGPoint(x: selection.shotX!, y: selection.shotY!) : nil
+                    shotEffects.effects[key] = AppliedShotEffect(
+                        timestamp: time, bounds: maskBounds,
+                        frameSize: CGSize(width: frame.width, height: frame.height),
+                        maskPNG: maskPNG, maskPixels: maskPixels, playerID: selection.playerID,
+                        playerName: selection.playerName,
+                        shotDescription: selection.shotDescription,
+                        shotLocation: location)
+                    message = "Effect saved for this attempt."
+                }
+                .disabled(maskBounds == nil || maskPNG == nil || maskPixels == nil || displayedTime != time || isFindingPerson)
+            }
         }
         .padding(20)
         .frame(minWidth: 720, minHeight: 500)
@@ -99,6 +125,8 @@ struct ShotEffectView: View {
             isFindingPerson = false
             maskOverlay = nil
             maskBounds = nil
+            maskPNG = nil
+            maskPixels = nil
             message = nil
             do {
                 let url = selection.videoURL
@@ -127,6 +155,8 @@ struct ShotEffectView: View {
         isFindingPerson = true
         maskOverlay = nil
         maskBounds = nil
+        maskPNG = nil
+        maskPixels = nil
         message = nil
         Task {
             do {
@@ -136,6 +166,8 @@ struct ShotEffectView: View {
                 guard maskRequestID == requestID, self.frame === frame else { return }
                 maskOverlay = result.image
                 maskBounds = result.bounds
+                maskPNG = result.maskPNG
+                maskPixels = result.maskPixels
             } catch {
                 if maskRequestID == requestID, self.frame === frame {
                     message = error.localizedDescription
@@ -159,7 +191,7 @@ private enum PersonMask {
         }
     }
 
-    nonisolated static func overlay(in frame: CGImage, at point: CGPoint) throws -> (image: CGImage, bounds: CGRect) {
+    nonisolated static func overlay(in frame: CGImage, at point: CGPoint) throws -> (image: CGImage, bounds: CGRect, maskPNG: Data, maskPixels: Data) {
         // Center a half-width, half-height crop on the click, shifting it inside the frame at edges.
         let cropWidth = max(1, frame.width / 2)
         let cropHeight = max(1, frame.height / 2)
@@ -216,12 +248,15 @@ private enum PersonMask {
         let maskHeight = CVPixelBufferGetHeight(selected)
         let maskStride = CVPixelBufferGetBytesPerRow(selected)
         var rgba = Data(count: frame.width * frame.height * 4)
+        var grayscale = Data(count: frame.width * frame.height)
         var minimumX = frame.width
         var minimumY = frame.height
         var maximumX = -1
         var maximumY = -1
-        rgba.withUnsafeMutableBytes { destination in
+        grayscale.withUnsafeMutableBytes { maskDestination in
+          rgba.withUnsafeMutableBytes { destination in
             guard let bytes = destination.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            guard let maskBytes = maskDestination.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             for y in 0..<cropHeight {
                 let maskY = min(maskHeight - 1, y * maskHeight / cropHeight)
                 for x in 0..<cropWidth {
@@ -241,12 +276,14 @@ private enum PersonMask {
                         maximumY = max(maximumY, originY + y)
                     }
                     let offset = ((originY + y) * frame.width + originX + x) * 4
+                    maskBytes[(originY + y) * frame.width + originX + x] = UInt8(max(0, min(1, alpha)) * 255)
                     bytes[offset] = 0
                     bytes[offset + 1] = 220
                     bytes[offset + 2] = 255
                     bytes[offset + 3] = UInt8(max(0, min(1, alpha)) * 150)
                 }
             }
+          }
         }
         guard let provider = CGDataProvider(data: rgba as CFData),
               maximumX >= minimumX, maximumY >= minimumY,
@@ -259,6 +296,15 @@ private enum PersonMask {
         let bounds = CGRect(x: minimumX, y: minimumY,
                             width: maximumX - minimumX + 1,
                             height: maximumY - minimumY + 1)
-        return (image, bounds)
+        guard let maskProvider = CGDataProvider(data: grayscale as CFData),
+              let maskImage = CGImage(width: frame.width, height: frame.height,
+                                      bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: frame.width,
+                                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(),
+                                      provider: maskProvider, decode: nil, shouldInterpolate: false,
+                                      intent: .defaultIntent),
+              let png = NSBitmapImageRep(cgImage: maskImage).representation(using: .png, properties: [:]) else {
+            throw Failure.unsupportedMask
+        }
+        return (image, bounds, png, grayscale)
     }
 }

@@ -9,7 +9,8 @@ struct VideoCompilation {
     static func export(videoURL: URL, clips: [Clip], destination: URL,
                        title: String? = nil, subtitle: String? = nil,
                        player: String? = nil, square: Bool = false,
-                       countEvents: [CountEvent] = [], endCard: CGImage? = nil) async throws {
+                       countEvents: [CountEvent] = [], endCard: CGImage? = nil,
+                       shotEffects: [ShotEffectKey: PreparedShotEffect] = [:]) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -24,6 +25,31 @@ struct VideoCompilation {
         let duration = try await asset.load(.duration).seconds
         let selected = clips.filter(\.included)
         guard !selected.isEmpty else { throw CompilationError.noClips }
+        let natural = try await videoTrack.load(.naturalSize)
+        let freezeDuration = ShotEffectRendering.duration
+        var freezeAssets: [AVURLAsset] = []
+        var freezeTracks: [ShotEffectKey: AVAssetTrack] = [:]
+        var freezeFiles: [URL] = []
+        defer { for url in freezeFiles { try? FileManager.default.removeItem(at: url) } }
+        if player == nil && !shotEffects.isEmpty {
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = false
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            for (key, prepared) in shotEffects {
+                let still = try generator.copyCGImage(
+                    at: CMTime(seconds: prepared.effect.timestamp, preferredTimescale: 60000), actualTime: nil)
+                let url = FileManager.default.temporaryDirectory.appending(path: "shot-freeze-\(UUID().uuidString).mp4")
+                freezeFiles.append(url)
+                try await BoxScoreVideo.writeStill(still, size: natural, to: url, duration: freezeDuration)
+                let freezeAsset = AVURLAsset(url: url)
+                guard let track = try await freezeAsset.loadTracks(withMediaType: .video).first else {
+                    throw CompilationError.trackSetup
+                }
+                freezeAssets.append(freezeAsset)
+                freezeTracks[key] = track
+            }
+        }
 
         let composition = AVMutableComposition()
         guard let outputVideo = composition.addMutableTrack(withMediaType: .video,
@@ -36,27 +62,65 @@ struct VideoCompilation {
         let audioParameters = outputAudio.map { AVMutableAudioMixInputParameters(track: $0) }
         var cursor = CMTime.zero
         var overlays: [(Double, ShotCaption)] = []
+        var effectEvents: [(Double, PreparedShotEffect)] = []
         for (index, clip) in selected.enumerated() {
-            let range = CMTimeRange(start: CMTime(seconds: clip.start, preferredTimescale: 600),
-                                    end: CMTime(seconds: clip.end, preferredTimescale: 600))
-            try outputVideo.insertTimeRange(range, of: videoTrack, at: cursor)
+            let clipCursor = cursor
+            let effects = clip.attempts.indices.compactMap { attemptIndex -> (ShotEffectKey, PreparedShotEffect)? in
+                let key = ShotEffectKey(clipID: clip.id, attemptIndex: attemptIndex)
+                guard let effect = shotEffects[key], freezeTracks[key] != nil,
+                      effect.effect.timestamp >= clip.start, effect.effect.timestamp < clip.end else { return nil }
+                return (key, effect)
+            }.sorted { $0.1.effect.timestamp < $1.1.effect.timestamp }
+            var sourceCursor = CMTime(seconds: clip.start, preferredTimescale: 60000)
+            for (key, prepared) in effects {
+                let pauseAt = CMTime(seconds: prepared.effect.timestamp, preferredTimescale: 60000)
+                if pauseAt > sourceCursor {
+                    let sourceRange = CMTimeRange(start: sourceCursor, end: pauseAt)
+                    try outputVideo.insertTimeRange(sourceRange, of: videoTrack, at: cursor)
+                    cursor = cursor + sourceRange.duration
+                }
+                effectEvents.append((cursor.seconds, prepared))
+                try outputVideo.insertTimeRange(
+                    CMTimeRange(start: .zero, duration: CMTime(seconds: freezeDuration, preferredTimescale: 600)),
+                    of: freezeTracks[key]!, at: cursor)
+                cursor = cursor + CMTime(seconds: freezeDuration, preferredTimescale: 600)
+                sourceCursor = pauseAt
+            }
+            let clipEnd = CMTime(seconds: clip.end, preferredTimescale: 60000)
+            if clipEnd > sourceCursor {
+                let sourceRange = CMTimeRange(start: sourceCursor, end: clipEnd)
+                try outputVideo.insertTimeRange(sourceRange, of: videoTrack, at: cursor)
+                cursor = cursor + sourceRange.duration
+            }
             overlays += clip.captions.filter {
                 $0.sourceTime >= clip.start && $0.sourceTime < clip.end &&
                 (player == nil || $0.player == player)
             }
-                .map { (cursor.seconds + $0.sourceTime - clip.start, $0) }
+                .map { caption in
+                    let pauses = effects.filter { $0.1.effect.timestamp <= caption.sourceTime }.count
+                    return (clipCursor.seconds + caption.sourceTime - clip.start + Double(pauses) * freezeDuration, caption)
+                }
             if let audioTrack {
                 // Audio extends across the video cut. Alternating tracks allow tails and heads to overlap.
                 let head = index == 0 ? 0 : min(0.25, clip.start, selected[index - 1].end - selected[index - 1].start)
                 let tail = index == selected.count - 1 ? 0 : min(0.25, duration - clip.end, selected[index + 1].end - selected[index + 1].start)
                 let audioStart = max(0, clip.start - head)
                 let audioEnd = min(duration, clip.end + tail)
-                let audioAt = cursor - CMTime(seconds: clip.start - audioStart, preferredTimescale: 600)
-                try outputAudio[index % 2].insertTimeRange(
-                    CMTimeRange(start: CMTime(seconds: audioStart, preferredTimescale: 600),
-                                end: CMTime(seconds: audioEnd, preferredTimescale: 600)),
-                    of: audioTrack, at: audioAt)
+                let boundaries = [audioStart] + effects.map { $0.1.effect.timestamp } + [audioEnd]
+                let clipSourceStart = CMTime(seconds: clip.start, preferredTimescale: 60000)
+                for pair in zip(boundaries, boundaries.dropFirst()) where pair.1 > pair.0 {
+                    let pauses = effects.filter { $0.1.effect.timestamp <= pair.0 }.count
+                    let audioAt = clipCursor +
+                        (CMTime(seconds: pair.0, preferredTimescale: 60000) - clipSourceStart) +
+                        CMTime(seconds: Double(pauses) * freezeDuration, preferredTimescale: 60000)
+                    try outputAudio[index % 2].insertTimeRange(
+                        CMTimeRange(start: CMTime(seconds: pair.0, preferredTimescale: 60000),
+                                    end: CMTime(seconds: pair.1, preferredTimescale: 60000)),
+                        of: audioTrack, at: audioAt)
+                }
                 let parameters = audioParameters[index % 2]
+                let audioAt = clipCursor +
+                    (CMTime(seconds: audioStart, preferredTimescale: 60000) - clipSourceStart)
                 if head > 0 {
                     parameters.setVolumeRamp(fromStartVolume: 0, toEndVolume: 1,
                         timeRange: CMTimeRange(start: audioAt, duration: CMTime(seconds: head, preferredTimescale: 600)))
@@ -64,12 +128,11 @@ struct VideoCompilation {
                     parameters.setVolume(1, at: audioAt)
                 }
                 if tail > 0 {
-                    let fadeAt = cursor + range.duration
+                    let fadeAt = cursor
                     parameters.setVolumeRamp(fromStartVolume: 1, toEndVolume: 0,
                         timeRange: CMTimeRange(start: fadeAt, duration: CMTime(seconds: tail, preferredTimescale: 600)))
                 }
             }
-            cursor = cursor + range.duration
         }
         let lastClipDuration = selected.last.map { max(0, $0.end - $0.start) } ?? 0
         let boxScoreFade = endCard == nil ? 0 : min(boxScoreFadeSeconds, lastClipDuration / 2)
@@ -80,7 +143,6 @@ struct VideoCompilation {
                 timeRange: CMTimeRange(start: cursor - fadeTime, duration: fadeTime))
         }
         let transform = try await videoTrack.load(.preferredTransform)
-        let natural = try await videoTrack.load(.naturalSize)
         let rect = CGRect(origin: .zero, size: natural).applying(transform)
         let sourceSize = CGSize(width: abs(rect.width), height: abs(rect.height))
         let side = min(sourceSize.width, sourceSize.height)
@@ -104,7 +166,7 @@ struct VideoCompilation {
         guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw CompilationError.exportSetup
         }
-        if !overlays.isEmpty || title != nil || endCard != nil {
+        if !overlays.isEmpty || !effectEvents.isEmpty || title != nil || endCard != nil {
             let videoComposition = AVMutableVideoComposition()
             videoComposition.renderSize = size
             videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
@@ -241,6 +303,10 @@ struct VideoCompilation {
                 box.add(visibility, forKey: "visibility")
                 parent.addSublayer(box)
             }
+            for (time, prepared) in effectEvents {
+                ShotEffectRendering.add(prepared, at: time, to: parent, size: size,
+                                        timelineDuration: cursor.seconds)
+            }
             if let endCard {
                 let card = CALayer()
                 card.frame = parent.frame
@@ -271,7 +337,12 @@ struct VideoCompilation {
             session.videoComposition = videoComposition
         }
         if !audioParameters.isEmpty { session.audioMix = mix }
-        try await session.export(to: staged, as: .mp4)
+        do {
+            try await session.export(to: staged, as: .mp4)
+        } catch {
+            throw session.error ?? error
+        }
+        withExtendedLifetime(freezeAssets) {}
         if FileManager.default.fileExists(atPath: destination.path) {
             _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
         } else {
