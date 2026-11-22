@@ -45,5 +45,10 @@ struct ClipEditorApp: App {
                         attemptsURL: attemptsURL, boxscoreURL: boxscoreURL,
                         outputURL: outputURL, gameDate: gameDate)
         }
+        WindowGroup("Shot effect", for: ShotEffectWindow.self) { $selection in
+            if let selection {
+                ShotEffectView(selection: selection)
+            }
+        }
     }
 }

@@ -530,6 +530,7 @@ struct ContentView: View {
 }
 
 private struct ClipRow: View {
+    @Environment(\.openWindow) private var openWindow
     @Binding var clip: Clip
     let videoURL: URL
     let videoDuration: Double
@@ -572,6 +573,15 @@ private struct ClipRow: View {
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                HStack {
+                    ForEach(clip.attempts.indices, id: \.self) { index in
+                        Button("Shot effect \(index + 1)") {
+                            openWindow(value: ShotEffectWindow(clipID: clip.id, attemptIndex: index,
+                                                               videoURL: videoURL, clipStart: clip.start,
+                                                               attemptTime: clip.attempts[index].sourceTime))
+                        }
+                    }
+                }
                 Button("Reset timing") {
                     clip.resetTiming()
                 }
