@@ -64,18 +64,24 @@ enum ShotEffectRendering {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: NSColor.white,
+            .font: font, .foregroundColor: ShotEffectArea.fontColor,
             .paragraphStyle: paragraph
         ]
         let caption = NSMutableAttributedString(string: text, attributes: attributes)
         caption.addAttribute(.foregroundColor, value: ShotEffectArea.highlightColor,
                              range: (text as NSString).range(of: "within 2'", options: .backwards))
-        let width = min(size.width * 0.42, max(240, size.width - 32))
+        let padding: CGFloat = 14
+        let lineWidth = text.components(separatedBy: "\n")
+            .map { ($0 as NSString).size(withAttributes: attributes).width }
+            .max() ?? 0
+        let maximumWidth = min(size.width - 16, max(240, size.width * 0.42))
+        let width = min(maximumWidth, ceil(lineWidth) + padding * 2)
         let textSize = caption.boundingRect(
-            with: CGSize(width: width - 28, height: .greatestFiniteMagnitude),
+            with: CGSize(width: width - padding * 2, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading]).size
-        let height = min(size.height - 16, ceil(textSize.height) + 28)
-        let image = textImage(caption, size: CGSize(width: width - 28, height: height - 28))
+        let height = min(size.height - 16, ceil(textSize.height) + padding * 2)
+        let image = textImage(caption, size: CGSize(width: width - padding * 2,
+                                                    height: height - padding * 2))
         guard let image else { return }
         let box = effect.bounds
         let x = box.midX < effect.frameSize.width / 2
@@ -90,7 +96,8 @@ enum ShotEffectRendering {
         label.cornerRadius = 12
         label.opacity = 0
         let contents = CALayer()
-        contents.frame = CGRect(x: 14, y: 14, width: width - 28, height: height - 28)
+        contents.frame = CGRect(x: padding, y: padding,
+                                width: width - padding * 2, height: height - padding * 2)
         contents.contents = image
         label.addSublayer(contents)
         let reveal = min(end, time + fadeDuration)
