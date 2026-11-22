@@ -117,11 +117,6 @@ enum BoxScoreLayout {
         .init(key: "plusMinusPoints", title: "Plus/minus", width: 0),
     ]
 }
-let backgroundColor: Color = Color(.sRGB, red: 67/255, green: 66/255, blue: 59/255, opacity: 1.0)
-let fontColor1 = Color(.sRGB, red: 247/255, green: 239/255, blue: 190/255, opacity: 1.0)
-let fontColor2 = Color(.sRGB, red: 255/255, green: 229/255, blue: 28/255, opacity: 1.0)
-let haloPurpleLight = Color(.sRGB, red: 202/255, green: 157/255, blue: 232/255, opacity: 1.0)
-let haloPurpleDark =  Color(.sRGB, red: 165/255, green: 59/255, blue: 227/255, opacity: 1.0)
 struct CompilationBoxScoreView: View {
     let boxScore: BoxScore
     let date: String?
@@ -141,9 +136,9 @@ struct CompilationBoxScoreView: View {
             Spacer(minLength: 0)
         }
         .padding(58)
-        .foregroundStyle(fontColor1)
+        .foregroundStyle(ColorTheme.fontColor1)
         .frame(width: 1920, height: 1080)
-        .background(backgroundColor)
+        .background(ColorTheme.backgroundColor)
     }
 
     private func teamTable(_ team: String) -> some View {
@@ -157,12 +152,12 @@ struct CompilationBoxScoreView: View {
                 }
             }
             .font(.system(size: 23, weight: .bold))
-            .foregroundStyle(fontColor2)
-            Rectangle().fill(haloPurpleDark).frame(height: 3)
+            .foregroundStyle(ColorTheme.fontColor2)
+            Rectangle().fill(ColorTheme.haloPurpleDark).frame(height: 3)
                 .blur(radius: 5)
                 .overlay {
                 ZStack {
-                    Rectangle().fill(haloPurpleLight).frame(height: 1)
+                    Rectangle().fill(ColorTheme.haloPurpleLight).frame(height: 1)
                 }
             }
             ForEach(Array(players.enumerated()), id: \.offset) { index, player in
@@ -190,15 +185,15 @@ struct PlayerBoxScoreView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("FINAL BOX SCORE")
-                .font(.system(size: 32, weight: .bold)).foregroundStyle(fontColor2)
+                .font(.system(size: 32, weight: .bold)).foregroundStyle(ColorTheme.fontColor2)
             Text(player.name)
                 .font(.system(size: 64, weight: .black)).lineLimit(1).minimumScaleFactor(0.65)
             Text(player.team).font(.system(size: 32, weight: .semibold))
-            Rectangle().fill(haloPurpleDark).frame(height: 3)
+            Rectangle().fill(ColorTheme.haloPurpleDark).frame(height: 3)
                 .blur(radius: 5)
                 .overlay {
                 ZStack {
-                    Rectangle().fill(haloPurpleLight).frame(height: 1)
+                    Rectangle().fill(ColorTheme.haloPurpleLight).frame(height: 1)
                 }
             }
             VStack(spacing: 0) {
@@ -216,9 +211,9 @@ struct PlayerBoxScoreView: View {
             Spacer(minLength: 0)
         }
         .padding(64)
-        .foregroundStyle(fontColor1)
+        .foregroundStyle(ColorTheme.fontColor1)
         .frame(width: 1080, height: 1080)
-        .background(backgroundColor)
+        .background(ColorTheme.backgroundColor)
     }
 }
 

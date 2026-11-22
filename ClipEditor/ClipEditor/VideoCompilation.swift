@@ -254,7 +254,7 @@ struct VideoCompilation {
                 let paragraph = NSMutableParagraphStyle()
                 paragraph.alignment = .center
                 let attributes: [NSAttributedString.Key: Any] = [
-                    .font: font, .foregroundColor: player == nil ? NSColor.white : NSColor.black,
+                    .font: font, .foregroundColor: player == nil ? ColorTheme.fontColor1NS : NSColor.black,
                     .paragraphStyle: paragraph
                 ]
                 let padding: CGFloat = player == nil ? 16 : playerCaptionPadding

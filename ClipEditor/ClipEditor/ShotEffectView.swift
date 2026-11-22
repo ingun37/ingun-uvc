@@ -58,8 +58,8 @@ struct ShotEffectView: View {
                                 atBottomOf: maskBounds,
                                 in: CGSize(width: frame.width, height: frame.height))
                             Ellipse()
-                                .fill(Color(ShotEffectArea.highlightColor).opacity(0.22))
-                                .overlay(Ellipse().strokeBorder(Color(ShotEffectArea.highlightColor), lineWidth: 2))
+                                .fill(ColorTheme.fontColor2.opacity(0.22))
+                                .overlay(Ellipse().strokeBorder(ColorTheme.fontColor2, lineWidth: 2))
                                 .frame(width: area.width * scale, height: area.height * scale)
                                 .position(x: area.midX * scale, y: area.midY * scale)
                                 .allowsHitTesting(false)

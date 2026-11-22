@@ -40,8 +40,8 @@ enum ShotEffectRendering {
         let areaLayer = CAShapeLayer()
         areaLayer.frame = CGRect(origin: .zero, size: size)
         areaLayer.path = CGPath(ellipseIn: areaRect, transform: nil)
-        areaLayer.fillColor = ShotEffectArea.highlightColor.withAlphaComponent(0.2).cgColor
-        areaLayer.strokeColor = ShotEffectArea.highlightColor.cgColor
+        areaLayer.fillColor = ColorTheme.fontColor2NS.withAlphaComponent(0.2).cgColor
+        areaLayer.strokeColor = ColorTheme.fontColor2NS.cgColor
         areaLayer.lineWidth = max(2, size.height * 0.003)
         areaLayer.opacity = 0
         let areaVisibility = CAKeyframeAnimation(keyPath: "opacity")
@@ -64,11 +64,11 @@ enum ShotEffectRendering {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: ShotEffectArea.fontColor,
+            .font: font, .foregroundColor: ColorTheme.fontColor1NS,
             .paragraphStyle: paragraph
         ]
         let caption = NSMutableAttributedString(string: text, attributes: attributes)
-        caption.addAttribute(.foregroundColor, value: ShotEffectArea.highlightColor,
+        caption.addAttribute(.foregroundColor, value: ColorTheme.fontColor2NS,
                              range: (text as NSString).range(of: "within 2'", options: .backwards))
         let padding: CGFloat = 14
         let lineWidth = text.components(separatedBy: "\n")

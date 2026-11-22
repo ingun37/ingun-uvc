@@ -25,9 +25,6 @@ struct PreparedShotEffect: Sendable {
 }
 
 enum ShotEffectArea {
-    static let highlightColor = NSColor(srgbRed: 1, green: 229.0 / 255.0,
-                                        blue: 28.0 / 255.0, alpha: 1)
-    static let fontColor = NSColor(srgbRed: 247/255, green: 239/255, blue: 190/255, alpha: 1)
     // Coordinates match the displayed frame: the origin is at its top-left.
     static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize) -> CGRect {
         guard frameSize.width > 0, frameSize.height > 0 else { return .zero }
