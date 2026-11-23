@@ -53,10 +53,13 @@ final class ShotEffectStore {
 }
 
 struct LocalShotStats: Equatable {
+    static let minimumSamplesForEffect = 10
+
     let makes: Int
     let attempts: Int
 
     var percent: Int { attempts == 0 ? 0 : Int((Double(makes) / Double(attempts) * 100).rounded()) }
+    var hasEnoughSamplesForEffect: Bool { attempts >= Self.minimumSamplesForEffect }
 
     static func near(_ location: CGPoint, in csv: String) throws -> Self {
         let rows = try ClipPlanner.csvRows(csv)

@@ -42,6 +42,8 @@ struct ClipEditorTests {
         let stats = try LocalShotStats.near(.zero, in: csv)
         #expect(stats == LocalShotStats(makes: 2, attempts: 3))
         #expect(stats.percent == 67)
+        #expect(!LocalShotStats(makes: 4, attempts: 9).hasEnoughSamplesForEffect)
+        #expect(LocalShotStats(makes: 4, attempts: 10).hasEnoughSamplesForEffect)
     }
 
     @Test func acceptsDisplayedGameDate() {

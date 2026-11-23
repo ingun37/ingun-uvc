@@ -225,6 +225,15 @@ private final class EditorModel {
                             throw ShotEffectError.missingShotLocation
                         }
                         let stats = try LocalShotStats.near(location, in: csv)
+                        guard stats.hasEnoughSamplesForEffect else {
+                            let detail = "\(label) at \(String(format: "%.3f", effect.timestamp))s " +
+                                "(\(effect.shotDescription)): \(stats.attempts) past-year attempts " +
+                                "within 2'; at least \(LocalShotStats.minimumSamplesForEffect) required"
+                            print("[ClipEditor] Skipped shot effect: \(detail)")
+                            warnings.append(detail)
+                            effectWarnings = warnings
+                            continue
+                        }
                         prepared[key] = PreparedShotEffect(effect: effect, stats: stats)
                     } catch {
                         warnings.append("\(label): \(error.localizedDescription)")
