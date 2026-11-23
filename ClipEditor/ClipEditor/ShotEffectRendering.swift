@@ -3,7 +3,7 @@ import AppKit
 import QuartzCore
 
 enum ShotEffectRendering {
-    static let duration = 1.2
+    static let duration = 2.0
     private static let fadeDuration = 0.2
 
     static func add(_ prepared: PreparedShotEffect, at time: Double, to parent: CALayer,

@@ -14,6 +14,29 @@
 			<key>orderHint</key>
 			<integer>1</integer>
 		</dict>
+		<key>ShotEffectPlayground.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>929ACB3030935A9C00674F83</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>929ACB3D30935A9D00674F83</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>929ACB4730935A9D00674F83</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
 	</dict>
 </dict>
 </plist>

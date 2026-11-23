@@ -217,8 +217,19 @@ private final class EditorModel {
                     }
                     if fetched[playerID] == nil {
                         message = "Fetching past-year attempts for \(effect.playerName)…"
-                        do { fetched[playerID] = .success(try await PlayerAttemptFetcher.fetch(playerID: playerID, gameDate: date)) }
-                        catch { fetched[playerID] = .failure(error) }
+                        do {
+                            let csv = try await PlayerAttemptFetcher.fetch(playerID: playerID, gameDate: date)
+                            fetched[playerID] = .success(csv)
+                            do {
+                                _ = try PlayerAttemptFetcher.saveCopy(csv, shortName: effect.playerName,
+                                                                     playerID: playerID, beside: video)
+                            } catch {
+                                warnings.append("\(label): Could not save the past-year CSV beside the input video: \(error.localizedDescription)")
+                                effectWarnings = warnings
+                            }
+                        } catch {
+                            fetched[playerID] = .failure(error)
+                        }
                     }
                     do {
                         let csv = try fetched[playerID]!.get()

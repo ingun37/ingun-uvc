@@ -8,6 +8,16 @@
 
 /* Begin PBXBuildFile section */
 		F10A00000000000000000002 /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
+		A10000000000000000000001 /* ShotEffectView.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011; };
+		A10000000000000000000002 /* ShotEffect.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012; };
+		A10000000000000000000003 /* ShotEffectRendering.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013; };
+		A10000000000000000000004 /* ColorTheme.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014; };
+		A10000000000000000000005 /* ClipPlanning.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015; };
+		A10000000000000000000006 /* CourtSpotMap.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016; };
+		A10000000000000000000007 /* VideoCompilation.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017; };
+		A10000000000000000000008 /* BoxScoreVideo.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018; };
+		A10000000000000000000009 /* BasketSide.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019; };
+		A1000000000000000000000A /* mapping.json in Playground Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,8 +41,18 @@
 		929ACB3130935A9D00674F83 /* ClipEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		92A9B6B930B432E8008E564E /* ShotEffectPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShotEffectPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */ = {isa = PBXFileReference; explicitFileType = "archive.metal-library"; includeInIndex = 0; path = PimpUpTheStats.metallib; sourceTree = BUILT_PRODUCTS_DIR; };
 		F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../court_spot_loc_mapper/mapping.json; sourceTree = "<group>"; };
+		A10000000000000000000011 /* ShotEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectView.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* ShotEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffect.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* ShotEffectRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectRendering.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ColorTheme.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* ClipPlanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ClipPlanning.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* CourtSpotMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/CourtSpotMap.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* VideoCompilation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/VideoCompilation.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* BoxScoreVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BoxScoreVideo.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* BasketSide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BasketSide.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -49,6 +69,11 @@
 		929ACB4B30935A9D00674F83 /* ClipEditorUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ClipEditorUITests;
+			sourceTree = "<group>";
+		};
+		92A9B6BA30B432E8008E564E /* ShotEffectPlayground */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ShotEffectPlayground;
 			sourceTree = "<group>";
 		};
 		92E27A6430A9BBB00088F688 /* PimpUpTheStats */ = {
@@ -74,6 +99,11 @@
 			files = (
 			);
 		};
+		92A9B6B630B432E8008E564E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -81,10 +111,20 @@
 			isa = PBXGroup;
 			children = (
 				F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */,
+				A10000000000000000000011 /* ShotEffectView.swift */,
+				A10000000000000000000012 /* ShotEffect.swift */,
+				A10000000000000000000013 /* ShotEffectRendering.swift */,
+				A10000000000000000000014 /* ColorTheme.swift */,
+				A10000000000000000000015 /* ClipPlanning.swift */,
+				A10000000000000000000016 /* CourtSpotMap.swift */,
+				A10000000000000000000017 /* VideoCompilation.swift */,
+				A10000000000000000000018 /* BoxScoreVideo.swift */,
+				A10000000000000000000019 /* BasketSide.swift */,
 				929ACB3330935A9D00674F83 /* ClipEditor */,
 				929ACB4130935A9D00674F83 /* ClipEditorTests */,
 				929ACB4B30935A9D00674F83 /* ClipEditorUITests */,
 				92E27A6430A9BBB00088F688 /* PimpUpTheStats */,
+				92A9B6BA30B432E8008E564E /* ShotEffectPlayground */,
 				929ACB3230935A9D00674F83 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -96,6 +136,7 @@
 				929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */,
 				929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */,
 				92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */,
+				92A9B6B930B432E8008E564E /* ShotEffectPlayground.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -163,6 +204,24 @@
 			productReference = 929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		92A9B6B830B432E8008E564E /* ShotEffectPlayground */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 92A9B6C330B432E8008E564E /* Build configuration list for PBXNativeTarget "ShotEffectPlayground" */;
+			buildPhases = (
+				92A9B6B530B432E8008E564E /* Sources */,
+				92A9B6B630B432E8008E564E /* Frameworks */,
+				92A9B6B730B432E8008E564E /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				92A9B6BA30B432E8008E564E /* ShotEffectPlayground */,
+			);
+			name = ShotEffectPlayground;
+			productName = ShotEffectPlayground;
+			productReference = 92A9B6B930B432E8008E564E /* ShotEffectPlayground.app */;
+			productType = "com.apple.product-type.application";
+		};
 		92E27A6230A9BBB00088F688 /* PimpUpTheStats */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 92E27A6930A9BBB00088F688 /* Build configuration list for PBXNativeTarget "PimpUpTheStats" */;
@@ -186,7 +245,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2710;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2710;
 				TargetAttributes = {
 					929ACB3030935A9C00674F83 = {
@@ -199,6 +258,9 @@
 					929ACB4730935A9D00674F83 = {
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = 929ACB3030935A9C00674F83;
+					};
+					92A9B6B830B432E8008E564E = {
+						CreatedOnToolsVersion = 27.2;
 					};
 					92E27A6230A9BBB00088F688 = {
 						CreatedOnToolsVersion = 27.2;
@@ -223,6 +285,7 @@
 				929ACB3D30935A9D00674F83 /* ClipEditorTests */,
 				929ACB4730935A9D00674F83 /* ClipEditorUITests */,
 				92E27A6230A9BBB00088F688 /* PimpUpTheStats */,
+				92A9B6B830B432E8008E564E /* ShotEffectPlayground */,
 			);
 		};
 /* End PBXProject section */
@@ -244,6 +307,12 @@
 			files = (
 			);
 		};
+		92A9B6B730B432E8008E564E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				A1000000000000000000000A /* mapping.json in Playground Resources */,
+			);
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -260,6 +329,20 @@
 		929ACB4430935A9D00674F83 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+			);
+		};
+		92A9B6B530B432E8008E564E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				A10000000000000000000001 /* ShotEffectView.swift in Playground Sources */,
+				A10000000000000000000002 /* ShotEffect.swift in Playground Sources */,
+				A10000000000000000000003 /* ShotEffectRendering.swift in Playground Sources */,
+				A10000000000000000000004 /* ColorTheme.swift in Playground Sources */,
+				A10000000000000000000005 /* ClipPlanning.swift in Playground Sources */,
+				A10000000000000000000006 /* CourtSpotMap.swift in Playground Sources */,
+				A10000000000000000000007 /* VideoCompilation.swift in Playground Sources */,
+				A10000000000000000000008 /* BoxScoreVideo.swift in Playground Sources */,
+				A10000000000000000000009 /* BasketSide.swift in Playground Sources */,
 			);
 		};
 		92E27A6130A9BBB00088F688 /* Sources */ = {
@@ -537,6 +620,66 @@
 			};
 			name = Release;
 		};
+		92A9B6C130B432E8008E564E /* Debug configuration for PBXNativeTarget "ShotEffectPlayground" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ShotEffectPlayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		92A9B6C230B432E8008E564E /* Release configuration for PBXNativeTarget "ShotEffectPlayground" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ShotEffectPlayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		92E27A6730A9BBB00088F688 /* Debug configuration for PBXNativeTarget "PimpUpTheStats" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -587,6 +730,14 @@
 			buildConfigurations = (
 				929ACB5730935A9D00674F83 /* Debug configuration for PBXNativeTarget "ClipEditorUITests" */,
 				929ACB5830935A9D00674F83 /* Release configuration for PBXNativeTarget "ClipEditorUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		92A9B6C330B432E8008E564E /* Build configuration list for PBXNativeTarget "ShotEffectPlayground" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				92A9B6C130B432E8008E564E /* Debug configuration for PBXNativeTarget "ShotEffectPlayground" */,
+				92A9B6C230B432E8008E564E /* Release configuration for PBXNativeTarget "ShotEffectPlayground" */,
 			);
 			defaultConfigurationName = Release;
 		};

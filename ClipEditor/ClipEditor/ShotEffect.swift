@@ -29,8 +29,8 @@ enum ShotEffectArea {
     // Coordinates match the displayed frame: the origin is at its top-left.
     static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize) -> CGRect {
         guard frameSize.width > 0, frameSize.height > 0 else { return .zero }
-        let width = min(frameSize.width, max(24, bounds.width * 1.25))
-        let height = min(frameSize.height, max(8, width * 0.22))
+        let width = min(frameSize.width, max(24, bounds.width * 2.4))
+        let height = min(frameSize.height, max(8, width * 0.28))
         let centerX = min(max(bounds.midX, width / 2), frameSize.width - width / 2)
         let centerY = min(max(bounds.maxY, height / 2), frameSize.height - height / 2)
         return CGRect(x: centerX - width / 2, y: centerY - height / 2,
@@ -103,6 +103,19 @@ enum ShotEffectError: LocalizedError {
 }
 
 enum PlayerAttemptFetcher {
+    static func saveCopy(_ csv: String, shortName: String, playerID: String,
+                         beside videoURL: URL) throws -> URL {
+        func fileComponent(_ value: String) -> String {
+            value.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(of: ":", with: "-")
+        }
+        let filename = "player-shots-\(fileComponent(shortName))-\(fileComponent(playerID)).csv"
+        let destination = videoURL.deletingLastPathComponent().appending(path: filename)
+        try csv.write(to: destination, atomically: true, encoding: .utf8)
+        return destination
+    }
+
     static func inputGameDate(_ text: String) -> String? {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let formatter = DateFormatter()

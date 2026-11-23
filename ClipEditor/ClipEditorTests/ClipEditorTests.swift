@@ -17,10 +17,10 @@ struct ClipEditorTests {
         let area = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 40, width: 60, height: 100),
             in: CGSize(width: 320, height: 180))
-        #expect(abs(area.minX - 42.5) < 0.001)
-        #expect(abs(area.minY - 131.75) < 0.001)
-        #expect(abs(area.width - 75) < 0.001)
-        #expect(abs(area.height - 16.5) < 0.001)
+        #expect(abs(area.minX - 8) < 0.001)
+        #expect(abs(area.minY - 119.84) < 0.001)
+        #expect(abs(area.width - 144) < 0.001)
+        #expect(abs(area.height - 40.32) < 0.001)
         let tallerBox = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 0, width: 60, height: 140),
             in: CGSize(width: 320, height: 180))
@@ -64,6 +64,22 @@ struct ClipEditorTests {
         #expect(PlayerAttemptFetcher.inputGameDate("2026-11-16") == nil)
     }
 
+    @Test func savesFetchedPlayerAttemptsBesideInputVideo() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-player-shots-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let video = directory.appending(path: "game.mov")
+        let saved = try PlayerAttemptFetcher.saveCopy("result\nmissed\n", shortName: "Vassell",
+                                                       playerID: "1629027", beside: video)
+        #expect(saved.lastPathComponent == "player-shots-Vassell-1629027.csv")
+        #expect(saved.path == directory.appending(path: "player-shots-Vassell-1629027.csv").path)
+        #expect(try String(contentsOf: saved, encoding: .utf8) == "result\nmissed\n")
+        _ = try PlayerAttemptFetcher.saveCopy("result\nmade\n", shortName: "Vassell",
+                                              playerID: "1629027", beside: video)
+        #expect(try String(contentsOf: saved, encoding: .utf8) == "result\nmade\n")
+    }
+
     @Test func shotEffectHoldsAllPlayerVideo() async throws {
         let fixture = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
@@ -87,7 +103,7 @@ struct ClipEditorTests {
                 PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3),
                                    spotLabel: "Low Post")])
         let duration = try await AVURLAsset(url: output).load(.duration).seconds
-        #expect(abs(duration - 2.7) < 0.15)
+        #expect(abs(duration - (1.5 + ShotEffectRendering.duration)) < 0.15)
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
@@ -241,7 +257,7 @@ struct ClipEditorTests {
         let caption = ShotEffectRendering.caption(
             for: PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 3, attempts: 10),
                                     spotLabel: "Left Corner"), font: font)
-        #expect(caption.string == "Vassell's\nrecent\n3PT Jump Shot\nat the\nLeft Corner\n30% 3/10")
+        #expect(caption.string == "Vassell's\nrecent\n3PT Jump Shot\nat the\nLeft Corner\n30% (3/10)")
         let percentageRange = (caption.string as NSString).range(of: "30%")
         let percentageColor = try #require(caption.attribute(.foregroundColor, at: percentageRange.location,
                                                               effectiveRange: nil) as? NSColor)
