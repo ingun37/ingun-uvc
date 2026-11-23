@@ -289,6 +289,18 @@ private final class EditorModel {
             let shortDate = dateText.components(separatedBy: ",").first?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? dateText
             for group in groups {
+                for clip in group.clips {
+                    for index in clip.attempts.indices where clip.attempts[index].player == group.key {
+                        let key = ShotEffectKey(clipID: clip.id, attemptIndex: index)
+                        guard let effect = prepared[key]?.effect,
+                              !ShotEffectArea.fitsInsideCenteredSquare(effect.bounds,
+                                                                      in: effect.frameSize) else { continue }
+                        let detail = "\(group.name), attempt \(index + 1): per-player shot effect skipped because its bounding box crosses the square crop."
+                        warnings.append(detail)
+                        print("[ClipEditor] \(detail)")
+                    }
+                }
+                effectWarnings = warnings
                 let safeName = group.name.replacingOccurrences(of: #"[^\p{L}\p{N}._ -]"#,
                     with: "_", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
                 let team = String(group.key.split(separator: "|", maxSplits: 1,
@@ -311,7 +323,9 @@ private final class EditorModel {
                                                   subtitle: "Every 🧱 VS \(opponent) | \(shortDate)",
                                                   player: group.key, square: true,
                                                   countEvents: countEvents[group.key] ?? [],
-                                                  endCard: playerCards[group.key])
+                                                  endCard: playerCards[group.key],
+                                                  shotEffects: prepared,
+                                                  shotEffectSettings: shotEffectSettings)
                 playerURLs.append(url)
             }
             exportedURL = destination

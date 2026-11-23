@@ -6,10 +6,13 @@ enum ShotEffectRendering {
     private static let fadeDuration = 0.2
 
     static func add(_ prepared: PreparedShotEffect, at time: Double, to parent: CALayer,
-                    size: CGSize, timelineDuration: Double, settings: ShotEffectSettings) {
+                    size: CGSize, timelineDuration: Double, settings: ShotEffectSettings,
+                    crop: CGRect? = nil) {
         let effect = prepared.effect
+        let frameCrop = crop ?? CGRect(origin: .zero, size: effect.frameSize)
         guard timelineDuration > 0,
-              let shade = inverseMaskImage(effect, settings: settings) else { return }
+              frameCrop.width > 0, frameCrop.height > 0,
+              let shade = inverseMaskImage(effect, settings: settings)?.cropping(to: frameCrop) else { return }
         let dark = CALayer()
         dark.frame = CGRect(origin: .zero, size: size)
         dark.contents = shade
@@ -31,10 +34,10 @@ enum ShotEffectRendering {
 
         let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize,
                                             settings: settings)
-        let scaleX = size.width / effect.frameSize.width
-        let scaleY = size.height / effect.frameSize.height
-        let areaRect = CGRect(x: area.minX * scaleX,
-                              y: size.height - area.maxY * scaleY,
+        let scaleX = size.width / frameCrop.width
+        let scaleY = size.height / frameCrop.height
+        let areaRect = CGRect(x: (area.minX - frameCrop.minX) * scaleX,
+                              y: size.height - (area.maxY - frameCrop.minY) * scaleY,
                               width: area.width * scaleX,
                               height: area.height * scaleY)
         let areaLayer = CAShapeLayer()
@@ -75,10 +78,10 @@ enum ShotEffectRendering {
                                                     height: height - padding * 2))
         guard let image else { return }
         let box = effect.bounds
-        let x = box.midX < effect.frameSize.width / 2
-            ? box.maxX * scaleX + 16
-            : box.minX * scaleX - width - 16
-        let centerY = size.height - box.midY * scaleY
+        let x = box.midX < frameCrop.midX
+            ? (box.maxX - frameCrop.minX) * scaleX + 16
+            : (box.minX - frameCrop.minX) * scaleX - width - 16
+        let centerY = size.height - (box.midY - frameCrop.minY) * scaleY
         let label = CALayer()
         label.frame = CGRect(x: min(max(8, x), size.width - width - 8),
                              y: min(max(8, centerY - height / 2), size.height - height - 8),

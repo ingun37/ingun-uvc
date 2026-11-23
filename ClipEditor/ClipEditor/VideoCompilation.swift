@@ -26,18 +26,30 @@ struct VideoCompilation {
         let duration = try await asset.load(.duration).seconds
         let selected = clips.filter(\.included)
         guard !selected.isEmpty else { throw CompilationError.noClips }
+        let clipsByID = Dictionary(uniqueKeysWithValues: selected.map { ($0.id, $0) })
+        let activeEffects = shotEffects.filter { key, prepared in
+            guard let clip = clipsByID[key.clipID], clip.attempts.indices.contains(key.attemptIndex),
+                  prepared.effect.timestamp >= clip.start,
+                  prepared.effect.timestamp < clip.end else { return false }
+            if let player, clip.attempts[key.attemptIndex].player != player { return false }
+            if square && !ShotEffectArea.fitsInsideCenteredSquare(
+                prepared.effect.bounds, in: prepared.effect.frameSize) {
+                return false
+            }
+            return true
+        }
         let natural = try await videoTrack.load(.naturalSize)
         let freezeDuration = shotEffectSettings.duration
         var freezeAssets: [AVURLAsset] = []
         var freezeTracks: [ShotEffectKey: AVAssetTrack] = [:]
         var freezeFiles: [URL] = []
         defer { for url in freezeFiles { try? FileManager.default.removeItem(at: url) } }
-        if player == nil && !shotEffects.isEmpty {
+        if !activeEffects.isEmpty {
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = false
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
-            for (key, prepared) in shotEffects {
+            for (key, prepared) in activeEffects {
                 let still = try generator.copyCGImage(
                     at: CMTime(seconds: prepared.effect.timestamp, preferredTimescale: 60000), actualTime: nil)
                 let url = FileManager.default.temporaryDirectory.appending(path: "shot-freeze-\(UUID().uuidString).mp4")
@@ -68,7 +80,7 @@ struct VideoCompilation {
             let clipCursor = cursor
             let effects = clip.attempts.indices.compactMap { attemptIndex -> (ShotEffectKey, PreparedShotEffect)? in
                 let key = ShotEffectKey(clipID: clip.id, attemptIndex: attemptIndex)
-                guard let effect = shotEffects[key], freezeTracks[key] != nil,
+                guard let effect = activeEffects[key], freezeTracks[key] != nil,
                       effect.effect.timestamp >= clip.start, effect.effect.timestamp < clip.end else { return nil }
                 return (key, effect)
             }.sorted { $0.1.effect.timestamp < $1.1.effect.timestamp }
@@ -228,7 +240,8 @@ struct VideoCompilation {
             }
             if player != nil {
                 addCountAnimation(to: parent, size: size, duration: cursor.seconds,
-                                  clips: selected, player: player!, events: countEvents)
+                                  clips: selected, player: player!, events: countEvents,
+                                  shotEffects: activeEffects, freezeDuration: freezeDuration)
             }
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
@@ -306,7 +319,9 @@ struct VideoCompilation {
             }
             for (time, prepared) in effectEvents {
                 ShotEffectRendering.add(prepared, at: time, to: parent, size: size,
-                                        timelineDuration: cursor.seconds, settings: shotEffectSettings)
+                                        timelineDuration: cursor.seconds, settings: shotEffectSettings,
+                                        crop: square ? ShotEffectArea.centeredSquareCrop(
+                                            in: prepared.effect.frameSize) : nil)
             }
             if let endCard {
                 let card = CALayer()
@@ -352,13 +367,18 @@ struct VideoCompilation {
     }
 
     private static func addCountAnimation(to parent: CALayer, size: CGSize, duration: Double,
-                                          clips: [Clip], player: String, events: [CountEvent]) {
+                                          clips: [Clip], player: String, events: [CountEvent],
+                                          shotEffects: [ShotEffectKey: PreparedShotEffect],
+                                          freezeDuration: Double) {
         guard duration > 0 else { return }
         struct Change { let time: Double; let count: CountEvent? }
         var changes = [Change(time: 0, count: nil)]
         var shownAttempts = 0
         var cursor = 0.0
         for clip in clips {
+            let pauseTimes = clip.attempts.indices.compactMap { index in
+                shotEffects[ShotEffectKey(clipID: clip.id, attemptIndex: index)]?.effect.timestamp
+            }
             let shots = clip.captions.filter { $0.player == player &&
                 $0.sourceTime >= clip.start && $0.sourceTime < clip.end
             }.sorted { $0.sourceTime < $1.sourceTime }
@@ -374,10 +394,13 @@ struct VideoCompilation {
                         changes.append(Change(time: cursor + available * fraction, count: events[index - 1]))
                     }
                 }
-                changes.append(Change(time: cursor + shot.sourceTime - clip.start, count: events[attempts - 1]))
+                let pausesBeforeShot = pauseTimes.filter { $0 <= shot.sourceTime }.count
+                changes.append(Change(time: cursor + shot.sourceTime - clip.start +
+                                      Double(pausesBeforeShot) * freezeDuration,
+                                      count: events[attempts - 1]))
                 shownAttempts = attempts
             }
-            cursor += clip.end - clip.start
+            cursor += clip.end - clip.start + Double(pauseTimes.count) * freezeDuration
         }
         changes.sort { $0.time < $1.time }
         let font = NSFont.systemFont(ofSize: max(36, size.height * 0.065), weight: .semibold)

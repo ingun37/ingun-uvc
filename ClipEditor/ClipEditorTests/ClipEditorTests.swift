@@ -14,24 +14,25 @@ struct ClipEditorTests {
     }
 
     @Test func areaEllipseSitsAtBoundingBoxBottomAndStaysInFrame() {
+        let settings = ShotEffectSettings(ellipseWidthMultiplier: 2.4, duration: 2)
         let area = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 40, width: 60, height: 100),
-            in: CGSize(width: 320, height: 180))
+            in: CGSize(width: 320, height: 180), settings: settings)
         #expect(abs(area.minX - 8) < 0.001)
         #expect(abs(area.minY - 119.84) < 0.001)
         #expect(abs(area.width - 144) < 0.001)
         #expect(abs(area.height - 40.32) < 0.001)
         let tallerBox = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 0, width: 60, height: 140),
-            in: CGSize(width: 320, height: 180))
+            in: CGSize(width: 320, height: 180), settings: settings)
         #expect(abs(tallerBox.height - area.height) < 0.001)
         let widerBox = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 40, width: 120, height: 100),
-            in: CGSize(width: 320, height: 180))
+            in: CGSize(width: 320, height: 180), settings: settings)
         #expect(widerBox.width > area.width && widerBox.height > area.height)
         let edge = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 0, y: 160, width: 60, height: 100),
-            in: CGSize(width: 320, height: 180))
+            in: CGSize(width: 320, height: 180), settings: settings)
         #expect(edge.minX >= 0 && edge.maxY <= 180)
     }
 
@@ -45,6 +46,19 @@ struct ClipEditorTests {
         #expect(abs(area.height - 25.2) < 0.001)
         #expect(ShotEffectSettings.parse(ellipseSize: "0", duration: "3") == nil)
         #expect(ShotEffectSettings.parse(ellipseSize: "2", duration: "NaN") == nil)
+    }
+
+    @Test func squareCropRequiresEntireBoundingBoxInside() {
+        let frame = CGSize(width: 320, height: 180)
+        #expect(ShotEffectArea.centeredSquareCrop(in: frame) == CGRect(x: 70, y: 0, width: 180, height: 180))
+        #expect(ShotEffectArea.fitsInsideCenteredSquare(
+            CGRect(x: 80, y: 20, width: 60, height: 100), in: frame))
+        #expect(!ShotEffectArea.fitsInsideCenteredSquare(
+            CGRect(x: 60, y: 20, width: 60, height: 100), in: frame))
+        #expect(!ShotEffectArea.fitsInsideCenteredSquare(
+            CGRect(x: 70, y: 20, width: 60, height: 100), in: frame))
+        #expect(!ShotEffectArea.fitsInsideCenteredSquare(
+            CGRect(x: 250, y: 20, width: 30, height: 100), in: frame))
     }
 
     @Test func boundingBoxResizeKeepsBoxInsideFrame() {
@@ -504,6 +518,65 @@ struct ClipEditorTests {
         let track = try #require(await AVURLAsset(url: output).loadTracks(withMediaType: .video).first)
         let size = try await track.load(.naturalSize)
         #expect(abs(size.width - size.height) < 1)
+    }
+
+    @Test func squarePlayerVideoAppliesOnlyOwnEffectsInsideCrop() async throws {
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-square-effects-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: output) }
+        let attempts = [
+            ClipAttempt(sourceTime: 1.1, text: nil, location: nil, player: "A|Player"),
+            ClipAttempt(sourceTime: 1.4, text: nil, location: nil, player: "A|Player"),
+            ClipAttempt(sourceTime: 1.7, text: nil, location: nil, player: "B|Other")
+        ]
+        let clip = Clip(start: 0.5, end: 2, descriptions: ["miss"], attempts: attempts)
+        let frame = CGSize(width: 320, height: 180)
+        var mask = Data(count: 320 * 180)
+        for y in 40..<140 { for x in 80..<140 { mask[y * 320 + x] = 255 } }
+        let bounds = [CGRect(x: 80, y: 40, width: 60, height: 100),
+                      CGRect(x: 50, y: 40, width: 60, height: 100),
+                      CGRect(x: 100, y: 40, width: 60, height: 100)]
+        let effects = Dictionary(uniqueKeysWithValues: bounds.enumerated().map { index, box in
+            let effect = AppliedShotEffect(timestamp: [1.0, 1.3, 1.6][index], bounds: box,
+                frameSize: frame, maskPNG: Data(), maskPixels: mask, playerID: nil,
+                playerName: "Player", shotDescription: "Jump Shot", shotLocation: nil)
+            return (ShotEffectKey(clipID: clip.id, attemptIndex: index),
+                    PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 5, attempts: 10),
+                                       spotLabel: "Low Post"))
+        })
+        let settings = ShotEffectSettings(ellipseWidthMultiplier: 2, duration: 1.5)
+        try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
+                                          title: "Player", player: "A|Player", square: true,
+                                          shotEffects: effects, shotEffectSettings: settings)
+        let asset = AVURLAsset(url: output)
+        let duration = try await asset.load(.duration).seconds
+        #expect(abs(duration - (clip.end - clip.start + settings.duration)) < 0.15)
+        let track = try #require(await asset.loadTracks(withMediaType: .video).first)
+        let size = try await track.load(.naturalSize)
+        #expect(abs(size.width - size.height) < 1)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let earlyFrame = try generator.copyCGImage(at: CMTime(seconds: 0.49, preferredTimescale: 600), actualTime: nil)
+        let effectFrame = try generator.copyCGImage(at: CMTime(seconds: 0.9, preferredTimescale: 600), actualTime: nil)
+        func brightness(_ image: CGImage, x: Int, y: Int) throws -> Int {
+            let pixel = try #require(image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1)))
+            let bytes = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
+            defer { bytes.deallocate() }
+            let context = try #require(CGContext(data: bytes, width: 1, height: 1,
+                bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return Int(bytes[0]) + Int(bytes[1]) + Int(bytes[2])
+        }
+        let earlyOutside = try brightness(earlyFrame, x: 5, y: 90)
+        let darkOutside = try brightness(effectFrame, x: 5, y: 90)
+        let earlyPlayer = try brightness(earlyFrame, x: 15, y: 90)
+        let highlightedPlayer = try brightness(effectFrame, x: 15, y: 90)
+        #expect(darkOutside < earlyOutside)
+        #expect(abs(highlightedPlayer - earlyPlayer) < abs(darkOutside - earlyOutside))
     }
 
     @Test func exportsAnimatedCountFromShortFixture() async throws {

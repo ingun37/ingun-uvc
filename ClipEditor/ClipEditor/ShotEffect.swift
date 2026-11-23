@@ -42,6 +42,22 @@ struct ShotEffectSettings: Codable, Hashable, Sendable {
 
 enum ShotEffectArea {
     // Coordinates match the displayed frame: the origin is at its top-left.
+    static func centeredSquareCrop(in frameSize: CGSize) -> CGRect {
+        guard frameSize.width.isFinite, frameSize.height.isFinite,
+              frameSize.width > 0, frameSize.height > 0 else { return .zero }
+        let side = min(frameSize.width, frameSize.height)
+        return CGRect(x: floor((frameSize.width - side) / 2),
+                      y: floor((frameSize.height - side) / 2),
+                      width: side, height: side)
+    }
+
+    static func fitsInsideCenteredSquare(_ bounds: CGRect, in frameSize: CGSize) -> Bool {
+        let crop = centeredSquareCrop(in: frameSize)
+        return crop.width > 0 && bounds.width > 0 && bounds.height > 0 &&
+            bounds.minX > crop.minX && bounds.maxX < crop.maxX &&
+            bounds.minY > crop.minY && bounds.maxY < crop.maxY
+    }
+
     static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize,
                         settings: ShotEffectSettings = .defaults) -> CGRect {
         guard frameSize.width > 0, frameSize.height > 0 else { return .zero }
