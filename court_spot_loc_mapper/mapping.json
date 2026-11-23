@@ -1,0 +1,102 @@
+{
+  "spotList": [
+    {
+      "label": "Free Throw Line",
+      "loc": {
+        "x": 0,
+        "y": 140
+      }
+    },
+    {
+      "label": "Left Elbow",
+      "loc": {
+        "x": -80.04,
+        "y": 140.49
+      }
+    },
+    {
+      "label": "Right Elbow",
+      "loc": {
+        "x": 77.81,
+        "y": 139.48
+      }
+    },
+    {
+      "label": "Paint",
+      "loc": {
+        "x": -1.51,
+        "y": 63.63
+      }
+    },
+    {
+      "label": "Low Post",
+      "loc": {
+        "x": -2.57,
+        "y": 0.68
+      }
+    },
+    {
+      "label": "Right Block",
+      "loc": {
+        "x": 78.56,
+        "y": 27.98
+      }
+    },
+    {
+      "label": "Left Block",
+      "loc": {
+        "x": -79.52,
+        "y": 30.62
+      }
+    },
+    {
+      "label": "Right Short Corner",
+      "loc": {
+        "x": 165.8,
+        "y": -16
+      }
+    },
+    {
+      "label": "Right Corner",
+      "loc": {
+        "x": 226.73,
+        "y": -5.15
+      }
+    },
+    {
+      "label": "Left Short Corner",
+      "loc": {
+        "x": -149.5,
+        "y": -7.6
+      }
+    },
+    {
+      "label": "Left Corner",
+      "loc": {
+        "x": -230.29,
+        "y": 0.23
+      }
+    },
+    {
+      "label": "Left Wing",
+      "loc": {
+        "x": -164.34,
+        "y": 182.01
+      }
+    },
+    {
+      "label": "Right Wing",
+      "loc": {
+        "x": 157.73,
+        "y": 179.76
+      }
+    },
+    {
+      "label": "Top",
+      "loc": {
+        "x": -1.78,
+        "y": 245.65
+      }
+    }
+  ]
+}

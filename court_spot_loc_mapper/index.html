@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Court spot mapper</title>
+  <style>
+    :root { font: 15px system-ui, sans-serif; color: #f1f3f5; background: #171b22; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #39404b; }
+    h1 { font-size: 20px; margin: 0; }
+    button { font: inherit; padding: 9px 14px; border: 1px solid #697483; border-radius: 8px; color: #fff; background: #303b4a; cursor: pointer; }
+    button:hover { background: #40536a; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.primary, button.active { background: #1866bb; border-color: #439bf8; }
+    button.danger { background: #663138; }
+    main { padding: 20px 24px; display: grid; grid-template-columns: minmax(300px, 728px) minmax(260px, 320px); gap: 24px; align-items: start; }
+    .court { position: relative; width: 100%; max-width: 728px; line-height: 0; background: white; touch-action: none; }
+    .court img { width: 100%; height: auto; display: block; user-select: none; pointer-events: none; }
+    .spot { position: absolute; width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; background: #d63c31; box-shadow: 0 1px 5px #111; transform: translate(-50%, -50%); cursor: grab; touch-action: none; z-index: 1; }
+    .spot.selected { background: #167be6; width: 24px; height: 24px; z-index: 2; }
+    .spot span { position: absolute; left: 22px; top: -5px; display: block; padding: 3px 6px; border-radius: 4px; background: #171b22e8; color: #fff; white-space: nowrap; font: 12px system-ui, sans-serif; pointer-events: none; }
+    .panel { padding: 16px; border: 1px solid #39404b; border-radius: 10px; background: #222831; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hint, #status { color: #bac3cf; line-height: 1.5; }
+    #status.error { color: #ffaaa5; }
+    .list { display: grid; gap: 4px; margin: 14px 0; max-height: 260px; overflow: auto; }
+    .list button { text-align: left; padding: 7px 9px; }
+    .list button.selected { border-color: #439bf8; background: #2e4f72; }
+    label { display: grid; gap: 5px; margin: 12px 0; }
+    input { min-width: 0; width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #697483; color: #fff; background: #171b22; font: inherit; }
+    .coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } .panel { max-width: 728px; } }
+  </style>
+</head>
+<body>
+  <header><h1>Court spot mapper</h1><button id="save" class="primary">Save JSON</button></header>
+  <main>
+    <div class="court" id="court"><img src="/court.jpg" alt="Basketball court diagram"><div id="spots"></div></div>
+    <section class="panel">
+      <div class="actions"><button id="add">Add spot</button><button id="remove" class="danger" disabled>Remove selected</button></div>
+      <p class="hint" id="hint">Select a spot, or click Add spot and then click the court. Drag a spot to move it.</p>
+      <div class="list" id="list"></div>
+      <div id="details" hidden>
+        <label>Label<input id="label" type="text" autocomplete="off"></label>
+        <div class="coordinates">
+          <label>X (−250 to 250)<input id="x" type="number" min="-250" max="250" step="any"></label>
+          <label>Y (−52 to 418)<input id="y" type="number" min="-52" max="418" step="any"></label>
+        </div>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
