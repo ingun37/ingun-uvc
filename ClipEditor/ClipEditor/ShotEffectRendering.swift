@@ -3,21 +3,20 @@ import AppKit
 import QuartzCore
 
 enum ShotEffectRendering {
-    static let duration = 2.0
     private static let fadeDuration = 0.2
 
     static func add(_ prepared: PreparedShotEffect, at time: Double, to parent: CALayer,
-                    size: CGSize, timelineDuration: Double) {
+                    size: CGSize, timelineDuration: Double, settings: ShotEffectSettings) {
         let effect = prepared.effect
         guard timelineDuration > 0,
-              let shade = inverseMaskImage(effect) else { return }
+              let shade = inverseMaskImage(effect, settings: settings) else { return }
         let dark = CALayer()
         dark.frame = CGRect(origin: .zero, size: size)
         dark.contents = shade
         dark.contentsGravity = .resize
         dark.opacity = 0
         let darkAnimation = CAKeyframeAnimation(keyPath: "opacity")
-        let end = min(timelineDuration, time + duration)
+        let end = min(timelineDuration, time + settings.duration)
         darkAnimation.values = [0, 0, 0.5, 0.5, 0, 0]
         darkAnimation.keyTimes = [0, NSNumber(value: time / timelineDuration),
                                   NSNumber(value: min(end, time + fadeDuration) / timelineDuration),
@@ -30,7 +29,8 @@ enum ShotEffectRendering {
         dark.add(darkAnimation, forKey: "playerHighlight")
         parent.addSublayer(dark)
 
-        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize)
+        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize,
+                                            settings: settings)
         let scaleX = size.width / effect.frameSize.width
         let scaleY = size.height / effect.frameSize.height
         let areaRect = CGRect(x: area.minX * scaleX,
@@ -135,11 +135,13 @@ enum ShotEffectRendering {
         return caption
     }
 
-    private static func inverseMaskImage(_ effect: AppliedShotEffect) -> CGImage? {
+    private static func inverseMaskImage(_ effect: AppliedShotEffect,
+                                         settings: ShotEffectSettings) -> CGImage? {
         let width = Int(effect.frameSize.width)
         let height = Int(effect.frameSize.height)
         guard width > 0, height > 0, effect.maskPixels.count == width * height else { return nil }
-        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize)
+        let area = ShotEffectArea.ellipse(atBottomOf: effect.bounds, in: effect.frameSize,
+                                            settings: settings)
         let radiusX = max(area.width / 2, 1)
         let radiusY = max(area.height / 2, 1)
         var pixels = Data(count: width * height * 4)

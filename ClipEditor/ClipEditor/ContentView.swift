@@ -90,6 +90,7 @@ private final class EditorModel {
     var playerExportURLs: [URL] = []
     var exportedPlayerStats: [PlayerFieldGoalStats] = []
     var effectWarnings: [String] = []
+    var shotEffectSettings: ShotEffectSettings = .defaults
     private var files: [InputKind: FileAccess] = [:]
 
     var videoURL: URL? { files[.video]?.url }
@@ -277,7 +278,8 @@ private final class EditorModel {
             message = "Exporting compilation…"
             try await VideoCompilation.export(videoURL: video, clips: selectedClips,
                                               destination: destination, endCard: compilationCard,
-                                              shotEffects: prepared)
+                                              shotEffects: prepared,
+                                              shotEffectSettings: shotEffectSettings)
             var playerURLs: [URL] = []
             var usedNames: Set<String> = [destination.lastPathComponent.lowercased()]
             let compilationName = destination.deletingPathExtension().lastPathComponent
@@ -356,6 +358,8 @@ struct ContentView: View {
     @State private var model = EditorModel()
     @State private var didLoadLaunchInputs = false
     @State private var dateInput = ""
+    @State private var ellipseSizeInput = String(ShotEffectSettings.defaults.ellipseWidthMultiplier)
+    @State private var effectDurationInput = String(ShotEffectSettings.defaults.duration)
     @State private var previewSpeed = 4.0
     @State private var selectedPreviewID: UUID?
     @State private var moveAllByClipID: [UUID: Bool] = [:]
@@ -486,20 +490,47 @@ struct ContentView: View {
                         .foregroundStyle(.orange)
                 }
             }
+            HStack {
+                Text("Ellipse size").frame(width: 230, alignment: .leading)
+                TextField("Width multiplier", text: $ellipseSizeInput)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 110)
+                Text("× bounding box width")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Shot effect duration").frame(width: 230, alignment: .leading)
+                TextField("Seconds", text: $effectDurationInput)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 110)
+                Text("seconds")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if shotEffectSettingsInput == nil {
+                Text("Use an ellipse size from 0.1 to 10 and a duration from 0.3 to 30 seconds.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
             Spacer()
             HStack {
                 Spacer()
                 Button(model.isBusy ? "Reading files…" : "Next") {
+                    guard let settings = shotEffectSettingsInput else { return }
+                    model.shotEffectSettings = settings
                     if gameDate == nil {
                         model.gameDate = PlayerAttemptFetcher.inputGameDate(dateInput)
                     }
                     Task { await model.prepare() }
                 }
                 .disabled(!model.canContinue ||
+                          shotEffectSettingsInput == nil ||
                           (gameDate == nil && PlayerAttemptFetcher.inputGameDate(dateInput) == nil))
                 .keyboardShortcut(.defaultAction)
             }
         }
+    }
+
+    private var shotEffectSettingsInput: ShotEffectSettings? {
+        ShotEffectSettings.parse(ellipseSize: ellipseSizeInput, duration: effectDurationInput)
     }
 
     private var editScene: some View {
@@ -537,6 +568,7 @@ struct ContentView: View {
                         ForEach($model.clips) { $clip in
                             if let videoURL = model.videoURL {
                                 ClipRow(clip: $clip, videoURL: videoURL, videoDuration: model.videoDuration,
+                                        shotEffectSettings: model.shotEffectSettings,
                                         previewSpeed: previewSpeed, isSelected: selectedPreviewID == clip.id,
                                         playToggle: previewPlayToggle, moveAll: moveAllBinding(for: clip.id))
                                     .id(clip.id)
@@ -683,6 +715,7 @@ private struct ClipRow: View {
     @Binding var clip: Clip
     let videoURL: URL
     let videoDuration: Double
+    let shotEffectSettings: ShotEffectSettings
     let previewSpeed: Double
     let isSelected: Bool
     let playToggle: Int
@@ -734,7 +767,8 @@ private struct ClipRow: View {
                                                                playerName: attempt.shortName ?? attempt.player?.split(separator: "|", maxSplits: 1).last.map(String.init) ?? "Player",
                                                                shotDescription: attempt.shotDescription,
                                                                shotX: attempt.location.map { Double($0.x) },
-                                                               shotY: attempt.location.map { Double($0.y) }))
+                                                               shotY: attempt.location.map { Double($0.y) },
+                                                               settings: shotEffectSettings))
                         }
                     }
                 }

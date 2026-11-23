@@ -7,17 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000000000000000000001 /* ClipEditor/ShotEffectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* ClipEditor/ShotEffectView.swift */; };
+		A10000000000000000000002 /* ClipEditor/ShotEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ClipEditor/ShotEffect.swift */; };
+		A10000000000000000000003 /* ClipEditor/ShotEffectRendering.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* ClipEditor/ShotEffectRendering.swift */; };
+		A10000000000000000000004 /* ClipEditor/ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ClipEditor/ColorTheme.swift */; };
+		A10000000000000000000005 /* ClipEditor/ClipPlanning.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* ClipEditor/ClipPlanning.swift */; };
+		A10000000000000000000006 /* ClipEditor/CourtSpotMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* ClipEditor/CourtSpotMap.swift */; };
+		A10000000000000000000007 /* ClipEditor/VideoCompilation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* ClipEditor/VideoCompilation.swift */; };
+		A10000000000000000000008 /* ClipEditor/BoxScoreVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */; };
+		A10000000000000000000009 /* ClipEditor/BasketSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* ClipEditor/BasketSide.swift */; };
+		A1000000000000000000000A /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
 		F10A00000000000000000002 /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
-		A10000000000000000000001 /* ShotEffectView.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011; };
-		A10000000000000000000002 /* ShotEffect.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012; };
-		A10000000000000000000003 /* ShotEffectRendering.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013; };
-		A10000000000000000000004 /* ColorTheme.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014; };
-		A10000000000000000000005 /* ClipPlanning.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015; };
-		A10000000000000000000006 /* CourtSpotMap.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016; };
-		A10000000000000000000007 /* VideoCompilation.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017; };
-		A10000000000000000000008 /* BoxScoreVideo.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018; };
-		A10000000000000000000009 /* BasketSide.swift in Playground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019; };
-		A1000000000000000000000A /* mapping.json in Playground Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,16 +43,16 @@
 		929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		92A9B6B930B432E8008E564E /* ShotEffectPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShotEffectPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */ = {isa = PBXFileReference; explicitFileType = "archive.metal-library"; includeInIndex = 0; path = PimpUpTheStats.metallib; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000011 /* ClipEditor/ShotEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectView.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* ClipEditor/ShotEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffect.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* ClipEditor/ShotEffectRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectRendering.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* ClipEditor/ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ColorTheme.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* ClipEditor/ClipPlanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ClipPlanning.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* ClipEditor/CourtSpotMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/CourtSpotMap.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* ClipEditor/VideoCompilation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/VideoCompilation.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BoxScoreVideo.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* ClipEditor/BasketSide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BasketSide.swift; sourceTree = "<group>"; };
 		F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../court_spot_loc_mapper/mapping.json; sourceTree = "<group>"; };
-		A10000000000000000000011 /* ShotEffectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectView.swift; sourceTree = "<group>"; };
-		A10000000000000000000012 /* ShotEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffect.swift; sourceTree = "<group>"; };
-		A10000000000000000000013 /* ShotEffectRendering.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ShotEffectRendering.swift; sourceTree = "<group>"; };
-		A10000000000000000000014 /* ColorTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ColorTheme.swift; sourceTree = "<group>"; };
-		A10000000000000000000015 /* ClipPlanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/ClipPlanning.swift; sourceTree = "<group>"; };
-		A10000000000000000000016 /* CourtSpotMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/CourtSpotMap.swift; sourceTree = "<group>"; };
-		A10000000000000000000017 /* VideoCompilation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/VideoCompilation.swift; sourceTree = "<group>"; };
-		A10000000000000000000018 /* BoxScoreVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BoxScoreVideo.swift; sourceTree = "<group>"; };
-		A10000000000000000000019 /* BasketSide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipEditor/BasketSide.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -111,15 +111,15 @@
 			isa = PBXGroup;
 			children = (
 				F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */,
-				A10000000000000000000011 /* ShotEffectView.swift */,
-				A10000000000000000000012 /* ShotEffect.swift */,
-				A10000000000000000000013 /* ShotEffectRendering.swift */,
-				A10000000000000000000014 /* ColorTheme.swift */,
-				A10000000000000000000015 /* ClipPlanning.swift */,
-				A10000000000000000000016 /* CourtSpotMap.swift */,
-				A10000000000000000000017 /* VideoCompilation.swift */,
-				A10000000000000000000018 /* BoxScoreVideo.swift */,
-				A10000000000000000000019 /* BasketSide.swift */,
+				A10000000000000000000011 /* ClipEditor/ShotEffectView.swift */,
+				A10000000000000000000012 /* ClipEditor/ShotEffect.swift */,
+				A10000000000000000000013 /* ClipEditor/ShotEffectRendering.swift */,
+				A10000000000000000000014 /* ClipEditor/ColorTheme.swift */,
+				A10000000000000000000015 /* ClipEditor/ClipPlanning.swift */,
+				A10000000000000000000016 /* ClipEditor/CourtSpotMap.swift */,
+				A10000000000000000000017 /* ClipEditor/VideoCompilation.swift */,
+				A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */,
+				A10000000000000000000019 /* ClipEditor/BasketSide.swift */,
 				929ACB3330935A9D00674F83 /* ClipEditor */,
 				929ACB4130935A9D00674F83 /* ClipEditorTests */,
 				929ACB4B30935A9D00674F83 /* ClipEditorUITests */,
@@ -310,7 +310,7 @@
 		92A9B6B730B432E8008E564E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
-				A1000000000000000000000A /* mapping.json in Playground Resources */,
+				A1000000000000000000000A /* ../court_spot_loc_mapper/mapping.json in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
@@ -334,15 +334,15 @@
 		92A9B6B530B432E8008E564E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
-				A10000000000000000000001 /* ShotEffectView.swift in Playground Sources */,
-				A10000000000000000000002 /* ShotEffect.swift in Playground Sources */,
-				A10000000000000000000003 /* ShotEffectRendering.swift in Playground Sources */,
-				A10000000000000000000004 /* ColorTheme.swift in Playground Sources */,
-				A10000000000000000000005 /* ClipPlanning.swift in Playground Sources */,
-				A10000000000000000000006 /* CourtSpotMap.swift in Playground Sources */,
-				A10000000000000000000007 /* VideoCompilation.swift in Playground Sources */,
-				A10000000000000000000008 /* BoxScoreVideo.swift in Playground Sources */,
-				A10000000000000000000009 /* BasketSide.swift in Playground Sources */,
+				A10000000000000000000001 /* ClipEditor/ShotEffectView.swift in Sources */,
+				A10000000000000000000002 /* ClipEditor/ShotEffect.swift in Sources */,
+				A10000000000000000000003 /* ClipEditor/ShotEffectRendering.swift in Sources */,
+				A10000000000000000000004 /* ClipEditor/ColorTheme.swift in Sources */,
+				A10000000000000000000005 /* ClipEditor/ClipPlanning.swift in Sources */,
+				A10000000000000000000006 /* ClipEditor/CourtSpotMap.swift in Sources */,
+				A10000000000000000000007 /* ClipEditor/VideoCompilation.swift in Sources */,
+				A10000000000000000000008 /* ClipEditor/BoxScoreVideo.swift in Sources */,
+				A10000000000000000000009 /* ClipEditor/BasketSide.swift in Sources */,
 			);
 		};
 		92E27A6130A9BBB00088F688 /* Sources */ = {
@@ -501,7 +501,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.27;
+				MARKETING_VERSION = 1.28;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -531,7 +531,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.27;
+				MARKETING_VERSION = 1.28;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

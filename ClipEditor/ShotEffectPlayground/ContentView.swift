@@ -27,6 +27,9 @@ struct ContentView: View {
     @State private var selectedVideo: SelectedVideo?
     @State private var videoDuration = 0.0
     @State private var clipID = UUID()
+    @State private var ellipseSizeInput = String(ShotEffectSettings.defaults.ellipseWidthMultiplier)
+    @State private var effectDurationInput = String(ShotEffectSettings.defaults.duration)
+    @State private var shotEffectSettings: ShotEffectSettings = .defaults
     @State private var locX = ""
     @State private var locY = ""
     @State private var playerName = ""
@@ -46,6 +49,9 @@ struct ContentView: View {
     }
     private var makes: Int? { Int(fgm) }
     private var attempts: Int? { Int(fga) }
+    private var settingsInput: ShotEffectSettings? {
+        ShotEffectSettings.parse(ellipseSize: ellipseSizeInput, duration: effectDurationInput)
+    }
     private var detailsAreValid: Bool {
         guard location != nil, !playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !shotDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -76,11 +82,29 @@ struct ContentView: View {
             Text("1. Choose a video").font(.title2)
             Button("Choose Video") { chooseVideo() }
             if let selectedVideo { Text(selectedVideo.url.path).textSelection(.enabled) }
+            HStack {
+                Text("Ellipse size")
+                TextField("Width multiplier", text: $ellipseSizeInput)
+                    .textFieldStyle(.roundedBorder).frame(width: 100)
+                Text("× bounding box width").foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Shot effect duration")
+                TextField("Seconds", text: $effectDurationInput)
+                    .textFieldStyle(.roundedBorder).frame(width: 100)
+                Text("seconds").foregroundStyle(.secondary)
+            }
+            if settingsInput == nil {
+                Text("Use an ellipse size from 0.1 to 10 and a duration from 0.3 to 30 seconds.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
             Button("Next") {
+                guard let settings = settingsInput else { return }
+                shotEffectSettings = settings
                 step = .effect
                 Task { await loadVideoAndOpenEditor() }
             }
-            .disabled(selectedVideo == nil)
+            .disabled(selectedVideo == nil || settingsInput == nil)
         }
     }
 
@@ -209,7 +233,8 @@ struct ContentView: View {
                                            videoURL: url, clipStart: 0,
                                            attemptTime: videoDuration - 0.01,
                                            playerID: nil, playerName: "Player",
-                                           shotDescription: "Jump Shot", shotX: nil, shotY: nil))
+                                           shotDescription: "Jump Shot", shotX: nil, shotY: nil,
+                                           settings: shotEffectSettings))
     }
 
     private func generateVideo() async {
@@ -242,7 +267,8 @@ struct ContentView: View {
                                               shotEffects: [ShotEffectKey(clipID: clip.id, attemptIndex: 0):
                                                   PreparedShotEffect(effect: effect,
                                                                      stats: LocalShotStats(makes: makes, attempts: attempts),
-                                                                     spotLabel: spotLabel)])
+                                                                     spotLabel: spotLabel)],
+                                              shotEffectSettings: shotEffectSettings)
             outputURL = output
             player = AVPlayer(url: output)
             player?.play()

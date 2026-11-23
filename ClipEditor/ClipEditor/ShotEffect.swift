@@ -25,11 +25,27 @@ struct PreparedShotEffect: Sendable {
     let spotLabel: String
 }
 
+struct ShotEffectSettings: Codable, Hashable, Sendable {
+    let ellipseWidthMultiplier: Double
+    let duration: Double
+
+    static let defaults = Self(ellipseWidthMultiplier: 4.0, duration: 2.0)
+
+    static func parse(ellipseSize: String, duration: String) -> Self? {
+        guard let size = Double(ellipseSize.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let seconds = Double(duration.trimmingCharacters(in: .whitespacesAndNewlines)),
+              size.isFinite, seconds.isFinite,
+              (0.1...10).contains(size), (0.3...30).contains(seconds) else { return nil }
+        return Self(ellipseWidthMultiplier: size, duration: seconds)
+    }
+}
+
 enum ShotEffectArea {
     // Coordinates match the displayed frame: the origin is at its top-left.
-    static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize) -> CGRect {
+    static func ellipse(atBottomOf bounds: CGRect, in frameSize: CGSize,
+                        settings: ShotEffectSettings = .defaults) -> CGRect {
         guard frameSize.width > 0, frameSize.height > 0 else { return .zero }
-        let width = min(frameSize.width, max(24, bounds.width * 2.4))
+        let width = min(frameSize.width, max(24, bounds.width * settings.ellipseWidthMultiplier))
         let height = min(frameSize.height, max(8, width * 0.28))
         let centerX = min(max(bounds.midX, width / 2), frameSize.width - width / 2)
         let centerY = min(max(bounds.maxY, height / 2), frameSize.height - height / 2)

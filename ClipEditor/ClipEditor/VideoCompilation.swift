@@ -10,7 +10,8 @@ struct VideoCompilation {
                        title: String? = nil, subtitle: String? = nil,
                        player: String? = nil, square: Bool = false,
                        countEvents: [CountEvent] = [], endCard: CGImage? = nil,
-                       shotEffects: [ShotEffectKey: PreparedShotEffect] = [:]) async throws {
+                       shotEffects: [ShotEffectKey: PreparedShotEffect] = [:],
+                       shotEffectSettings: ShotEffectSettings = .defaults) async throws {
         let staged = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -26,7 +27,7 @@ struct VideoCompilation {
         let selected = clips.filter(\.included)
         guard !selected.isEmpty else { throw CompilationError.noClips }
         let natural = try await videoTrack.load(.naturalSize)
-        let freezeDuration = ShotEffectRendering.duration
+        let freezeDuration = shotEffectSettings.duration
         var freezeAssets: [AVURLAsset] = []
         var freezeTracks: [ShotEffectKey: AVAssetTrack] = [:]
         var freezeFiles: [URL] = []
@@ -305,7 +306,7 @@ struct VideoCompilation {
             }
             for (time, prepared) in effectEvents {
                 ShotEffectRendering.add(prepared, at: time, to: parent, size: size,
-                                        timelineDuration: cursor.seconds)
+                                        timelineDuration: cursor.seconds, settings: shotEffectSettings)
             }
             if let endCard {
                 let card = CALayer()

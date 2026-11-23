@@ -14,6 +14,7 @@ struct ShotEffectWindow: Codable, Hashable {
     let shotDescription: String
     let shotX: Double?
     let shotY: Double?
+    let settings: ShotEffectSettings
 }
 
 struct ShotEffectView: View {
@@ -56,7 +57,8 @@ struct ShotEffectView: View {
                         if let maskBounds {
                             let area = ShotEffectArea.ellipse(
                                 atBottomOf: maskBounds,
-                                in: CGSize(width: frame.width, height: frame.height))
+                                in: CGSize(width: frame.width, height: frame.height),
+                                settings: selection.settings)
                             Ellipse()
                                 .fill(ColorTheme.fontColor2.opacity(0.22))
                                 .overlay(Ellipse().strokeBorder(ColorTheme.fontColor2, lineWidth: 2))

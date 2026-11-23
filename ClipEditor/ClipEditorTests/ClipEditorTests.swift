@@ -35,6 +35,18 @@ struct ClipEditorTests {
         #expect(edge.minX >= 0 && edge.maxY <= 180)
     }
 
+    @Test func shotEffectSettingsControlEllipseSize() throws {
+        let settings = try #require(ShotEffectSettings.parse(ellipseSize: "1.5", duration: "3.5"))
+        #expect(settings.duration == 3.5)
+        let area = ShotEffectArea.ellipse(
+            atBottomOf: CGRect(x: 50, y: 40, width: 60, height: 100),
+            in: CGSize(width: 320, height: 180), settings: settings)
+        #expect(abs(area.width - 90) < 0.001)
+        #expect(abs(area.height - 25.2) < 0.001)
+        #expect(ShotEffectSettings.parse(ellipseSize: "0", duration: "3") == nil)
+        #expect(ShotEffectSettings.parse(ellipseSize: "2", duration: "NaN") == nil)
+    }
+
     @Test func boundingBoxResizeKeepsBoxInsideFrame() {
         let original = CGRect(x: 50, y: 40, width: 60, height: 100)
         let frame = CGSize(width: 320, height: 180)
@@ -98,12 +110,13 @@ struct ClipEditorTests {
                                        frameSize: CGSize(width: width, height: height),
                                        maskPNG: Data(), maskPixels: mask, playerID: "1",
                                        playerName: "Alice", shotDescription: "Jump shot", shotLocation: .zero)
+        let settings = ShotEffectSettings(ellipseWidthMultiplier: 1.5, duration: 3.5)
         try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
             shotEffects: [ShotEffectKey(clipID: clip.id, attemptIndex: 0):
                 PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3),
-                                   spotLabel: "Low Post")])
+                                   spotLabel: "Low Post")], shotEffectSettings: settings)
         let duration = try await AVURLAsset(url: output).load(.duration).seconds
-        #expect(abs(duration - (1.5 + ShotEffectRendering.duration)) < 0.15)
+        #expect(abs(duration - (1.5 + settings.duration)) < 0.15)
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
@@ -157,7 +170,7 @@ struct ClipEditorTests {
         try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
                                           shotEffects: effects)
         let duration = try await AVURLAsset(url: output).load(.duration).seconds
-        #expect(abs(duration - (clip.end - clip.start + 2 * ShotEffectRendering.duration)) < 0.15)
+        #expect(abs(duration - (clip.end - clip.start + 2 * ShotEffectSettings.defaults.duration)) < 0.15)
     }
 
     @Test func invalidMappingIdentifiesEntryAndValues() throws {
