@@ -22,6 +22,7 @@ struct AppliedShotEffect: Sendable {
 struct PreparedShotEffect: Sendable {
     let effect: AppliedShotEffect
     let stats: LocalShotStats
+    let spotLabel: String
 }
 
 enum ShotEffectArea {
@@ -61,7 +62,7 @@ struct LocalShotStats: Equatable {
     var percent: Int { attempts == 0 ? 0 : Int((Double(makes) / Double(attempts) * 100).rounded()) }
     var hasEnoughSamplesForEffect: Bool { attempts >= Self.minimumSamplesForEffect }
 
-    static func near(_ location: CGPoint, in csv: String) throws -> Self {
+    static func atSpot(_ spotIndex: Int, in csv: String, mapping: CourtSpotMap) throws -> Self {
         let rows = try ClipPlanner.csvRows(csv)
         guard let header = rows.first?.map({ $0.lowercased() }),
               let xIndex = header.firstIndex(of: "loc_x"),
@@ -75,7 +76,7 @@ struct LocalShotStats: Equatable {
             guard row.indices.contains(max(xIndex, yIndex, resultIndex)),
                   let x = Double(row[xIndex]), let y = Double(row[yIndex]),
                   x.isFinite, y.isFinite,
-                  hypot(x - location.x, y - location.y) <= 20 else { continue }
+                  mapping.nearestSpotIndex(to: CGPoint(x: x, y: y)) == spotIndex else { continue }
             attempts += 1
             if row[resultIndex].lowercased() == "made" { makes += 1 }
         }
@@ -84,7 +85,8 @@ struct LocalShotStats: Equatable {
 }
 
 enum ShotEffectError: LocalizedError {
-    case invalidCSV, missingDate, missingPlayerID, missingShotLocation, missingFetcher, fetchFailed(String)
+    case invalidCSV, missingDate, missingPlayerID, missingShotLocation
+    case missingCourtSpotMap, missingCourtSpot, missingFetcher, fetchFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -92,6 +94,8 @@ enum ShotEffectError: LocalizedError {
         case .missingDate: "The game date could not be determined."
         case .missingPlayerID: "The attempt has no NBA player ID."
         case .missingShotLocation: "The attempt has no court location."
+        case .missingCourtSpotMap: "The bundled court spot mapping.json could not be found."
+        case .missingCourtSpot: "The court spot mapping has no usable labels."
         case .missingFetcher: "The data_fetcher executable could not be found."
         case .fetchFailed(let detail): "The player-attempts fetch failed: \(detail)"
         }

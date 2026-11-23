@@ -57,7 +57,7 @@ enum ShotEffectRendering {
         areaLayer.add(areaVisibility, forKey: "areaVisibility")
         parent.addSublayer(areaLayer)
 
-        let text = "\(effect.playerName)'s\n\(effect.shotDescription)\npast year\nwithin 2'\n" +
+        let text = "\(effect.playerName)'s\n\(effect.shotDescription)\npast year\n\(prepared.spotLabel)\n" +
             String(format: "%02d%% (%d/%d)", prepared.stats.percent,
                    prepared.stats.makes, prepared.stats.attempts)
         let font = NSFont.systemFont(ofSize: max(22, size.height * 0.037), weight: .bold)
@@ -69,7 +69,7 @@ enum ShotEffectRendering {
         ]
         let caption = NSMutableAttributedString(string: text, attributes: attributes)
         caption.addAttribute(.foregroundColor, value: ColorTheme.fontColor2NS,
-                             range: (text as NSString).range(of: "within 2'", options: .backwards))
+                             range: (text as NSString).range(of: prepared.spotLabel, options: .backwards))
         let padding: CGFloat = 14
         let lineWidth = text.components(separatedBy: "\n")
             .map { ($0 as NSString).size(withAttributes: attributes).width }

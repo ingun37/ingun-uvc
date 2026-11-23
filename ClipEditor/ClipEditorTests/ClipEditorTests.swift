@@ -5,6 +5,13 @@ import Testing
 @testable import ClipEditor
 
 struct ClipEditorTests {
+    @Test func bundledCourtSpotMapFindsNearestLabel() throws {
+        let map = try CourtSpotMap.bundled()
+        #expect(map.nearestLabel(to: CGPoint(x: 0, y: 140)) == "Free Throw Line")
+        #expect(map.nearestLabel(to: CGPoint(x: -230, y: 0)) == "Left Corner")
+        #expect(map.nearestLabel(to: CGPoint(x: 78, y: 140)) == "Right Elbow")
+    }
+
     @Test func areaEllipseSitsAtBoundingBoxBottomAndStaysInFrame() {
         let area = ShotEffectArea.ellipse(
             atBottomOf: CGRect(x: 50, y: 40, width: 60, height: 100),
@@ -36,10 +43,12 @@ struct ClipEditorTests {
         #expect(clamped == CGRect(x: 0, y: 0, width: 320, height: 180))
     }
 
-    @Test func localShotStatsUseTwoFootRadiusAndExcludeMissingLocations() throws {
+    @Test func localShotStatsUseNearestCourtSpotAndExcludeMissingLocations() throws {
+        let mapping = try CourtSpotMap.bundled()
+        let freeThrowLine = try #require(mapping.nearestSpotIndex(to: CGPoint(x: 0, y: 140)))
         let csv = "loc_x,loc_y,result\n" +
-            "0,0,made\n12,16,missed\n20.1,0,made\n,0,made\n-10,0,made\n"
-        let stats = try LocalShotStats.near(.zero, in: csv)
+            "0,140,made\n0,175,missed\n78,140,made\n,140,made\n-10,150,made\n0,200,missed\n"
+        let stats = try LocalShotStats.atSpot(freeThrowLine, in: csv, mapping: mapping)
         #expect(stats == LocalShotStats(makes: 2, attempts: 3))
         #expect(stats.percent == 67)
         #expect(!LocalShotStats(makes: 4, attempts: 9).hasEnoughSamplesForEffect)
@@ -74,7 +83,8 @@ struct ClipEditorTests {
                                        playerName: "Alice", shotDescription: "Jump shot", shotLocation: .zero)
         try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
             shotEffects: [ShotEffectKey(clipID: clip.id, attemptIndex: 0):
-                PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3))])
+                PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3),
+                                   spotLabel: "Low Post")])
         let duration = try await AVURLAsset(url: output).load(.duration).seconds
         #expect(abs(duration - 2.7) < 0.15)
         let generator = AVAssetImageGenerator(asset: AVURLAsset(url: output))
@@ -124,7 +134,8 @@ struct ClipEditorTests {
                 frameSize: CGSize(width: width, height: height), maskPNG: Data(), maskPixels: mask,
                 playerID: "1", playerName: "Alice", shotDescription: "Jump shot", shotLocation: .zero)
             return (ShotEffectKey(clipID: clip.id, attemptIndex: index),
-                    PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3)))
+                    PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 2, attempts: 3),
+                                       spotLabel: "Low Post"))
         })
         try await VideoCompilation.export(videoURL: fixture, clips: [clip], destination: output,
                                           shotEffects: effects)

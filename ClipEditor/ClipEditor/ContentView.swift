@@ -196,6 +196,7 @@ private final class EditorModel {
             let fetchDateText = gameDate ?? destination.deletingPathExtension().lastPathComponent
                 .components(separatedBy: " | ").last
             let date = PlayerAttemptFetcher.gameDate(fetchDateText)
+            let courtSpots = Result { try CourtSpotMap.bundled() }
             var fetched: [String: Result<String, Error>] = [:]
             for clip in selectedClips {
                 for index in clip.attempts.indices {
@@ -224,17 +225,23 @@ private final class EditorModel {
                         guard let location = effect.shotLocation else {
                             throw ShotEffectError.missingShotLocation
                         }
-                        let stats = try LocalShotStats.near(location, in: csv)
+                        let mapping = try courtSpots.get()
+                        guard let spotIndex = mapping.nearestSpotIndex(to: location),
+                              let spotLabel = mapping.label(at: spotIndex) else {
+                            throw ShotEffectError.missingCourtSpot
+                        }
+                        let stats = try LocalShotStats.atSpot(spotIndex, in: csv, mapping: mapping)
                         guard stats.hasEnoughSamplesForEffect else {
                             let detail = "\(label) at \(String(format: "%.3f", effect.timestamp))s " +
                                 "(\(effect.shotDescription)): \(stats.attempts) past-year attempts " +
-                                "within 2'; at least \(LocalShotStats.minimumSamplesForEffect) required"
+                                "at \(spotLabel); at least \(LocalShotStats.minimumSamplesForEffect) required"
                             print("[ClipEditor] Skipped shot effect: \(detail)")
                             warnings.append(detail)
                             effectWarnings = warnings
                             continue
                         }
-                        prepared[key] = PreparedShotEffect(effect: effect, stats: stats)
+                        prepared[key] = PreparedShotEffect(effect: effect, stats: stats,
+                                                           spotLabel: spotLabel)
                     } catch {
                         warnings.append("\(label): \(error.localizedDescription)")
                         effectWarnings = warnings
