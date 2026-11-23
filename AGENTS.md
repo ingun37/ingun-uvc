@@ -24,8 +24,10 @@ This repository contains multiple projects:
   Before working on this project, read and follow [data_fetcher/AGENTS.md](data_fetcher/AGENTS.md).
 - `ClipEditor/`: native macOS SwiftUI app for missed-shot compilations and
   per-player videos with animated FGM/FGA counts, basket-side detection
-  for all-player captions, shared preview speed, and keyboard navigation
-  between clip previews.
+  for all-player captions, shared preview speed, keyboard navigation between
+  clip previews, and player-mask shot effects in compilation and square player
+  videos. Its Xcode project also contains `ShotEffectPlayground`, which uses
+  the same editor and renderer to test an effect from manual inputs.
   Before working on this project, read and follow [ClipEditor/AGENTS.md](ClipEditor/AGENTS.md).
 - `TestDataGenerator/`: native macOS Swift CLI for per-attempt clips and metadata.
   Before working on this project, read and follow

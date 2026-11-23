@@ -10,7 +10,7 @@ This repository contains several tools for basketball video workflows:
 - `MockGameClock/`: app and CLI that render scripted game-clock videos for mapper tests.
 - `GametimeMapper/`: legacy mapper app and CLI, retained for reference.
 - `data_fetcher/`: Python CLI that fetches field-goal attempts for an NBA game.
-- `ClipEditor/`: macOS app for missed-shot compilations, including one video per player. See [its README](ClipEditor/README.md).
+- `ClipEditor/`: macOS app for missed-shot compilations and square per-player videos with optional player-mask shot effects. Its `ShotEffectPlayground` target tests the same effect editor and renderer with manual inputs. See [its README](ClipEditor/README.md).
 - `TestDataGenerator/`: macOS CLI that generates per-attempt clips and metadata.
 - `thumbnail-web/`: React template and screenshot renderer for video thumbnails.
 - `UnifiedApp/`: macOS app that runs the complete games → attempts → mapper → editor → thumbnail workflow. See [its README](UnifiedApp/README.md).
@@ -19,6 +19,8 @@ When UnifiedApp runs the workflow, it writes `<video name>-<game id>.csv` and
 `<video name>-map.json` beside the source video. ClipEditor saves the full
 compilation plus a square `<player name> | every brick VS <opposing team long name> | <date>.mp4` for each player
 with included missed attempts. Player videos keep an animated FGM/FGA count visible throughout.
+An applied shot effect pauses and highlights the player in the compilation.
+The player's square video includes it when the bounding box fits inside its crop.
 
 ## GuraStreaming
 

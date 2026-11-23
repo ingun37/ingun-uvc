@@ -38,6 +38,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		9218BB9730B444F2009E204B /* PlayerBoxscorePlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlayerBoxscorePlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB3130935A9D00674F83 /* ClipEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -56,6 +57,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		9218BB9830B444F2009E204B /* PlayerBoxscorePlayground */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PlayerBoxscorePlayground;
+			sourceTree = "<group>";
+		};
 		929ACB3330935A9D00674F83 /* ClipEditor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ClipEditor;
@@ -84,6 +90,11 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		9218BB9430B444F2009E204B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 		929ACB2E30935A9C00674F83 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -125,6 +136,7 @@
 				929ACB4B30935A9D00674F83 /* ClipEditorUITests */,
 				92E27A6430A9BBB00088F688 /* PimpUpTheStats */,
 				92A9B6BA30B432E8008E564E /* ShotEffectPlayground */,
+				9218BB9830B444F2009E204B /* PlayerBoxscorePlayground */,
 				929ACB3230935A9D00674F83 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -137,6 +149,7 @@
 				929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */,
 				92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */,
 				92A9B6B930B432E8008E564E /* ShotEffectPlayground.app */,
+				9218BB9730B444F2009E204B /* PlayerBoxscorePlayground.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -144,6 +157,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		9218BB9630B444F2009E204B /* PlayerBoxscorePlayground */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9218BBA130B444F3009E204B /* Build configuration list for PBXNativeTarget "PlayerBoxscorePlayground" */;
+			buildPhases = (
+				9218BB9330B444F2009E204B /* Sources */,
+				9218BB9430B444F2009E204B /* Frameworks */,
+				9218BB9530B444F2009E204B /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				9218BB9830B444F2009E204B /* PlayerBoxscorePlayground */,
+			);
+			name = PlayerBoxscorePlayground;
+			productName = PlayerBoxscorePlayground;
+			productReference = 9218BB9730B444F2009E204B /* PlayerBoxscorePlayground.app */;
+			productType = "com.apple.product-type.application";
+		};
 		929ACB3030935A9C00674F83 /* ClipEditor */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 929ACB5030935A9D00674F83 /* Build configuration list for PBXNativeTarget "ClipEditor" */;
@@ -248,6 +279,9 @@
 				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2710;
 				TargetAttributes = {
+					9218BB9630B444F2009E204B = {
+						CreatedOnToolsVersion = 27.2;
+					};
 					929ACB3030935A9C00674F83 = {
 						CreatedOnToolsVersion = 27.1;
 					};
@@ -286,11 +320,17 @@
 				929ACB4730935A9D00674F83 /* ClipEditorUITests */,
 				92E27A6230A9BBB00088F688 /* PimpUpTheStats */,
 				92A9B6B830B432E8008E564E /* ShotEffectPlayground */,
+				9218BB9630B444F2009E204B /* PlayerBoxscorePlayground */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		9218BB9530B444F2009E204B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 		929ACB2F30935A9C00674F83 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
@@ -316,6 +356,11 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		9218BB9330B444F2009E204B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		929ACB2D30935A9C00674F83 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -366,6 +411,66 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		9218BB9F30B444F3009E204B /* Debug configuration for PBXNativeTarget "PlayerBoxscorePlayground" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.PlayerBoxscorePlayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		9218BBA030B444F3009E204B /* Release configuration for PBXNativeTarget "PlayerBoxscorePlayground" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.PlayerBoxscorePlayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		929ACB4E30935A9D00674F83 /* Debug configuration for PBXProject "ClipEditor" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -701,6 +806,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		9218BBA130B444F3009E204B /* Build configuration list for PBXNativeTarget "PlayerBoxscorePlayground" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9218BB9F30B444F3009E204B /* Debug configuration for PBXNativeTarget "PlayerBoxscorePlayground" */,
+				9218BBA030B444F3009E204B /* Release configuration for PBXNativeTarget "PlayerBoxscorePlayground" */,
+			);
+			defaultConfigurationName = Release;
+		};
 		929ACB2C30935A9C00674F83 /* Build configuration list for PBXProject "ClipEditor" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
