@@ -15,4 +15,12 @@ enum ColorTheme {
 
     static let fontColor1NS = NSColor(fontColor1)
     static let fontColor2NS = NSColor(fontColor2)
+
+    static func shotPercentageColor(_ percentage: Int) -> NSColor {
+        let amount = min(max(CGFloat(percentage - 20) / 30, 0), 1)
+        let red = (255.0 + (70.0 - 255.0) * amount) / 255.0
+        let green = (70.0 + (210.0 - 70.0) * amount) / 255.0
+        let blue = (70.0 + (100.0 - 70.0) * amount) / 255.0
+        return NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
+    }
 }

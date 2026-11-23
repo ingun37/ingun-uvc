@@ -1,4 +1,5 @@
 import AVFoundation
+import AppKit
 import CoreGraphics
 import Foundation
 import Testing
@@ -220,10 +221,42 @@ struct ClipEditorTests {
     }
 
     @Test func readsDataFetcherCRLFFile() throws {
-        let csv = "game_id,period,clock,team,player,result,description\r\n" +
-            "0012600061,1,PT11M33.00S,SAS,Vassell,missed,MISS Vassell 27' 3PT Jump Shot\r\n"
+        let csv = "game_id,period,clock,team,player,player_full_name,result,description\r\n" +
+            "0012600061,1,PT11M33.00S,SAS,Vassell,Devin Vassell,missed,MISS Vassell 27' 3PT Jump Shot\r\n"
         let attempts = try ClipPlanner.attempts(from: csv)
         #expect(!attempts.isEmpty)
+        #expect(attempts[0].shortName == "Vassell")
+        #expect(attempts[0].player == "SAS|Devin Vassell")
+        let plan = try ClipPlanner.plan(attempts: attempts,
+            ranges: [ClockRange(period: "1ST", game_start_seconds: 700, game_end_seconds: 680,
+                                video_start_seconds: 0, video_end_seconds: 20)], videoDuration: 25)
+        #expect(plan.clips.first?.attempts.first?.shortName == "Vassell")
+    }
+
+    @Test func shotEffectCaptionUsesRequestedLinesAndPercentageColor() throws {
+        let effect = AppliedShotEffect(timestamp: 1, bounds: .zero, frameSize: CGSize(width: 1, height: 1),
+                                       maskPNG: Data(), maskPixels: Data(), playerID: "1",
+                                       playerName: "Vassell", shotDescription: "3PT Jump Shot", shotLocation: nil)
+        let font = NSFont.systemFont(ofSize: 24)
+        let caption = ShotEffectRendering.caption(
+            for: PreparedShotEffect(effect: effect, stats: LocalShotStats(makes: 3, attempts: 10),
+                                    spotLabel: "Left Corner"), font: font)
+        #expect(caption.string == "Vassell's\nrecent\n3PT Jump Shot\nat the\nLeft Corner\n30% 3/10")
+        let percentageRange = (caption.string as NSString).range(of: "30%")
+        let percentageColor = try #require(caption.attribute(.foregroundColor, at: percentageRange.location,
+                                                              effectiveRange: nil) as? NSColor)
+        let middle = ColorTheme.shotPercentageColor(35)
+        #expect(percentageColor.isEqual(ColorTheme.shotPercentageColor(30)))
+        #expect(middle.redComponent < ColorTheme.shotPercentageColor(20).redComponent)
+        #expect(middle.greenComponent > ColorTheme.shotPercentageColor(20).greenComponent)
+        #expect(middle.redComponent > ColorTheme.shotPercentageColor(50).redComponent)
+        #expect(middle.greenComponent < ColorTheme.shotPercentageColor(50).greenComponent)
+        #expect(ColorTheme.shotPercentageColor(0).isEqual(ColorTheme.shotPercentageColor(20)))
+        #expect(ColorTheme.shotPercentageColor(100).isEqual(ColorTheme.shotPercentageColor(50)))
+        let countIndex = (caption.string as NSString).range(of: "3/10").location
+        let countColor = try #require(caption.attribute(.foregroundColor, at: countIndex,
+                                                         effectiveRange: nil) as? NSColor)
+        #expect(countColor.isEqual(ColorTheme.fontColor1NS))
     }
 
     @Test func stripsMatchingMissAndShortNameFromShotDescriptions() throws {

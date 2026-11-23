@@ -13,16 +13,19 @@ struct MissedAttempt: Sendable {
     let gameSecond: Double
     let description: String
     let player: String?
+    let shortName: String?
     let playerID: String?
     let caption: String?
     let location: CGPoint?
 
     init(period: String, gameSecond: Double, description: String, player: String? = nil,
+         shortName: String? = nil,
          playerID: String? = nil, caption: String? = nil, location: CGPoint? = nil) {
         self.period = period
         self.gameSecond = gameSecond
         self.description = description
         self.player = player
+        self.shortName = shortName
         self.playerID = playerID
         self.caption = caption
         self.location = location
@@ -42,16 +45,19 @@ struct ClipAttempt: Sendable {
     let text: String?
     let location: CGPoint?
     let player: String?
+    let shortName: String?
     let playerID: String?
     let shotDescription: String
 
     init(sourceTime: Double, text: String?, location: CGPoint?, player: String?,
+         shortName: String? = nil,
          playerID: String? = nil, shotDescription: String = "") {
         originalSourceTime = sourceTime
         self.sourceTime = sourceTime
         self.text = text
         self.location = location
         self.player = player
+        self.shortName = shortName
         self.playerID = playerID
         self.shotDescription = shotDescription
     }
@@ -317,6 +323,7 @@ enum ClipPlanner {
             return MissedAttempt(period: period, gameSecond: seconds,
                                  description: shotDescription(row[descriptionIndex], shortName: player),
                                  player: displayName.isEmpty ? nil : "\(team)|\(displayName)",
+                                 shortName: player.isEmpty ? nil : player,
                                  playerID: playerID.isEmpty ? nil : playerID,
                                  caption: caption, location: location)
         }
@@ -371,6 +378,7 @@ enum ClipPlanner {
             if end > start {
                 let marker = ClipAttempt(sourceTime: moment, text: attempt.caption,
                                          location: attempt.location, player: attempt.player,
+                                         shortName: attempt.shortName,
                                          playerID: attempt.playerID, shotDescription: attempt.description)
                 candidates.append(Clip(start: start, end: end, descriptions: [attempt.description],
                                        gameTimes: ["\(attempt.period) \(clockLabel(attempt.gameSecond))"], attempts: [marker],

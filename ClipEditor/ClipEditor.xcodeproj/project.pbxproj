@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F10A00000000000000000002 /* mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* mapping.json */; };
+		F10A00000000000000000002 /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,7 +32,7 @@
 		929ACB3E30935A9D00674F83 /* ClipEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		929ACB4830935A9D00674F83 /* ClipEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		92E27A6330A9BBB00088F688 /* PimpUpTheStats.metallib */ = {isa = PBXFileReference; explicitFileType = "archive.metal-library"; includeInIndex = 0; path = PimpUpTheStats.metallib; sourceTree = BUILT_PRODUCTS_DIR; };
-		F10A00000000000000000001 /* mapping.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../court_spot_loc_mapper/mapping.json; sourceTree = "<group>"; };
+		F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ../court_spot_loc_mapper/mapping.json; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,7 +80,7 @@
 		929ACB2830935A9C00674F83 = {
 			isa = PBXGroup;
 			children = (
-				F10A00000000000000000001 /* mapping.json */,
+				F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */,
 				929ACB3330935A9D00674F83 /* ClipEditor */,
 				929ACB4130935A9D00674F83 /* ClipEditorTests */,
 				929ACB4B30935A9D00674F83 /* ClipEditorUITests */,
@@ -231,7 +231,7 @@
 		929ACB2F30935A9C00674F83 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
-				F10A00000000000000000002 /* mapping.json in Resources */,
+				F10A00000000000000000002 /* ../court_spot_loc_mapper/mapping.json in Resources */,
 			);
 		};
 		929ACB3C30935A9D00674F83 /* Resources */ = {
@@ -418,7 +418,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.26;
+				MARKETING_VERSION = 1.27;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -448,7 +448,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.26;
+				MARKETING_VERSION = 1.27;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

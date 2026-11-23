@@ -57,19 +57,10 @@ enum ShotEffectRendering {
         areaLayer.add(areaVisibility, forKey: "areaVisibility")
         parent.addSublayer(areaLayer)
 
-        let text = "\(effect.playerName)'s\n\(effect.shotDescription)\npast year\n\(prepared.spotLabel)\n" +
-            String(format: "%02d%% (%d/%d)", prepared.stats.percent,
-                   prepared.stats.makes, prepared.stats.attempts)
         let font = NSFont.systemFont(ofSize: max(22, size.height * 0.037), weight: .bold)
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: ColorTheme.fontColor1NS,
-            .paragraphStyle: paragraph
-        ]
-        let caption = NSMutableAttributedString(string: text, attributes: attributes)
-        caption.addAttribute(.foregroundColor, value: ColorTheme.fontColor2NS,
-                             range: (text as NSString).range(of: prepared.spotLabel, options: .backwards))
+        let caption = caption(for: prepared, font: font)
+        let text = caption.string
+        let attributes = caption.attributes(at: 0, effectiveRange: nil)
         let padding: CGFloat = 14
         let lineWidth = text.components(separatedBy: "\n")
             .map { ($0 as NSString).size(withAttributes: attributes).width }
@@ -123,6 +114,25 @@ enum ShotEffectRendering {
         pop.fillMode = .both
         label.add(pop, forKey: "effectTextPop")
         parent.addSublayer(label)
+    }
+
+    static func caption(for prepared: PreparedShotEffect, font: NSFont) -> NSAttributedString {
+        let effect = prepared.effect
+        let percentage = String(format: "%02d%%", prepared.stats.percent)
+        let text = "\(effect.playerName)'s\nrecent\n\(effect.shotDescription)\nat the\n\(prepared.spotLabel)\n" +
+            "\(percentage) (\(prepared.stats.makes)/\(prepared.stats.attempts))"
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: ColorTheme.fontColor1NS,
+            .paragraphStyle: paragraph
+        ]
+        let caption = NSMutableAttributedString(string: text, attributes: attributes)
+        caption.addAttribute(.foregroundColor, value: ColorTheme.fontColor2NS,
+                             range: (text as NSString).range(of: prepared.spotLabel, options: .backwards))
+        caption.addAttribute(.foregroundColor, value: ColorTheme.shotPercentageColor(prepared.stats.percent),
+                             range: (text as NSString).range(of: percentage, options: .backwards))
+        return caption
     }
 
     private static func inverseMaskImage(_ effect: AppliedShotEffect) -> CGImage? {

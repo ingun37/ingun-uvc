@@ -720,7 +720,7 @@ private struct ClipRow: View {
                                                                videoURL: videoURL, clipStart: clip.start,
                                                                attemptTime: attempt.sourceTime,
                                                                playerID: attempt.playerID,
-                                                               playerName: attempt.player?.split(separator: "|", maxSplits: 1).last.map(String.init) ?? "Player",
+                                                               playerName: attempt.shortName ?? attempt.player?.split(separator: "|", maxSplits: 1).last.map(String.init) ?? "Player",
                                                                shotDescription: attempt.shotDescription,
                                                                shotX: attempt.location.map { Double($0.x) },
                                                                shotY: attempt.location.map { Double($0.y) }))
