@@ -18,6 +18,9 @@ struct VideoCompilation {
         let stillURL = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-boxscore-\(UUID().uuidString).mp4")
         defer { try? FileManager.default.removeItem(at: stillURL) }
+        let stagedThumbnail = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-thumbnail-\(UUID().uuidString).jpg")
+        defer { try? FileManager.default.removeItem(at: stagedThumbnail) }
         let asset = AVURLAsset(url: videoURL)
         guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else {
             throw CompilationError.noVideo
@@ -174,6 +177,7 @@ struct VideoCompilation {
             cardTrack = track
         }
         let totalDuration = cursor + (endCard == nil ? .zero : BoxScoreVideo.duration)
+        var thumbnailTime: Double?
         let mix = AVMutableAudioMix()
         mix.inputParameters = audioParameters
         guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
@@ -239,7 +243,7 @@ struct VideoCompilation {
                 parent.addSublayer(box)
             }
             if player != nil {
-                addCountAnimation(to: parent, size: size, duration: cursor.seconds,
+                thumbnailTime = addCountAnimation(to: parent, size: size, duration: cursor.seconds,
                                   clips: selected, player: player!, events: countEvents,
                                   shotEffects: activeEffects, freezeDuration: freezeDuration)
             }
@@ -358,19 +362,40 @@ struct VideoCompilation {
         } catch {
             throw session.error ?? error
         }
+        if let thumbnailTime {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: staged))
+            generator.appliesPreferredTrackTransform = true
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            let frame = try generator.copyCGImage(
+                at: CMTime(seconds: thumbnailTime, preferredTimescale: 60000), actualTime: nil)
+            guard let jpeg = NSBitmapImageRep(cgImage: frame).representation(
+                using: .jpeg, properties: [.compressionFactor: 0.9]) else {
+                throw CompilationError.thumbnailEncoding
+            }
+            try jpeg.write(to: stagedThumbnail, options: .atomic)
+        }
         withExtendedLifetime(freezeAssets) {}
         if FileManager.default.fileExists(atPath: destination.path) {
             _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
         } else {
             try FileManager.default.moveItem(at: staged, to: destination)
         }
+        if thumbnailTime != nil {
+            let thumbnail = URL(fileURLWithPath: destination.path + ".jpg")
+            if FileManager.default.fileExists(atPath: thumbnail.path) {
+                _ = try FileManager.default.replaceItemAt(thumbnail, withItemAt: stagedThumbnail)
+            } else {
+                try FileManager.default.moveItem(at: stagedThumbnail, to: thumbnail)
+            }
+        }
     }
 
     private static func addCountAnimation(to parent: CALayer, size: CGSize, duration: Double,
                                           clips: [Clip], player: String, events: [CountEvent],
                                           shotEffects: [ShotEffectKey: PreparedShotEffect],
-                                          freezeDuration: Double) {
-        guard duration > 0 else { return }
+                                          freezeDuration: Double) -> Double? {
+        guard duration > 0 else { return nil }
         struct Change { let time: Double; let count: CountEvent? }
         var changes = [Change(time: 0, count: nil)]
         var shownAttempts = 0
@@ -412,6 +437,7 @@ struct VideoCompilation {
         let horizontalPadding: CGFloat = 20
         let verticalPadding: CGFloat = 12
         let centerY = max(56, size.height * 0.1)
+        var lastBrickTime: Double?
         for (index, change) in changes.enumerated() {
             let count = change.count.map { "\($0.made)/\($0.attempted)" } ?? "0/0"
             let textSize = (count as NSString).size(withAttributes: attributes)
@@ -490,6 +516,7 @@ struct VideoCompilation {
             icon.opacity = 0
             guard change.time < duration - 0.05 else { continue }
             let span = min(0.7, duration - change.time)
+            if !event.isMade { lastBrickTime = change.time + span * 0.5 }
             let bounce = CAKeyframeAnimation(keyPath: "position.y")
             let y = icon.position.y
             bounce.values = [y + 90, y + 90, y - 24, y + 12, y, y]
@@ -515,6 +542,7 @@ struct VideoCompilation {
             icon.add(fade, forKey: "fade")
             parent.addSublayer(icon)
         }
+        return lastBrickTime
     }
 
     private static func captionImage(_ text: String, size: CGSize,
@@ -538,13 +566,14 @@ struct VideoCompilation {
     }
 
     enum CompilationError: LocalizedError {
-        case noVideo, noClips, trackSetup, exportSetup
+        case noVideo, noClips, trackSetup, exportSetup, thumbnailEncoding
         var errorDescription: String? {
             switch self {
             case .noVideo: "The selected file has no video track."
             case .noClips: "Include at least one clip before exporting."
             case .trackSetup: "Could not create the compilation tracks."
             case .exportSetup: "Could not create a video export session."
+            case .thumbnailEncoding: "Could not encode the player thumbnail."
             }
         }
     }

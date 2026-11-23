@@ -520,6 +520,35 @@ struct ClipEditorTests {
         #expect(abs(size.width - size.height) < 1)
     }
 
+    @Test func exportsLastBrickThumbnailBesidePlayerVideo() async throws {
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
+        let output = FileManager.default.temporaryDirectory
+            .appending(path: "clip-editor-bricks-\(UUID().uuidString).mp4")
+        let thumbnail = URL(fileURLWithPath: output.path + ".jpg")
+        defer {
+            try? FileManager.default.removeItem(at: output)
+            try? FileManager.default.removeItem(at: thumbnail)
+        }
+        let attempts = [
+            ClipAttempt(sourceTime: 1.1, text: "Player\n0/1", location: nil, player: "A|Player"),
+            ClipAttempt(sourceTime: 2.3, text: "Player\n0/2", location: nil, player: "A|Player")
+        ]
+        let events = [
+            CountEvent(made: 0, attempted: 1, isMade: false, gameTime: nil),
+            CountEvent(made: 0, attempted: 2, isMade: false, gameTime: nil)
+        ]
+        try await VideoCompilation.export(videoURL: fixture,
+            clips: [Clip(start: 0.5, end: 3, descriptions: ["misses"], attempts: attempts)],
+            destination: output, title: "Player", player: "A|Player", square: true,
+            countEvents: events)
+        let data = try Data(contentsOf: thumbnail)
+        #expect(data.starts(with: [0xff, 0xd8]))
+        let image = try #require(NSBitmapImageRep(data: data))
+        #expect(image.pixelsWide == image.pixelsHigh)
+        #expect(image.pixelsWide > 0)
+    }
+
     @Test func squarePlayerVideoAppliesOnlyOwnEffectsInsideCrop() async throws {
         let fixture = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appending(path: "Fixtures/sample.mp4")
@@ -596,10 +625,15 @@ struct ClipEditorTests {
         #expect(!clips.isEmpty)
         let output = FileManager.default.temporaryDirectory
             .appending(path: "clip-editor-animated-\(UUID().uuidString).mp4")
-        defer { try? FileManager.default.removeItem(at: output) }
+        let thumbnail = URL(fileURLWithPath: output.path + ".jpg")
+        defer {
+            try? FileManager.default.removeItem(at: output)
+            try? FileManager.default.removeItem(at: thumbnail)
+        }
         try await VideoCompilation.export(videoURL: video, clips: clips, destination: output,
                                           title: "Cade Cunningham", player: player, square: true,
                                           countEvents: events)
         #expect(FileManager.default.fileExists(atPath: output.path))
+        #expect(FileManager.default.fileExists(atPath: thumbnail.path))
     }
 }
