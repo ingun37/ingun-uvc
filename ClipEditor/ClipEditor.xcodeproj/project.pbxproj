@@ -16,11 +16,11 @@
 		A10000000000000000000007 /* ClipEditor/VideoCompilation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* ClipEditor/VideoCompilation.swift */; };
 		A10000000000000000000008 /* ClipEditor/BoxScoreVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */; };
 		A10000000000000000000009 /* ClipEditor/BasketSide.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* ClipEditor/BasketSide.swift */; };
-		A1000000000000000000000B /* ClipEditor/BoxScore.swift in PlayerBoxscorePlayground Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* ClipEditor/BoxScore.swift */; };
-		A1000000000000000000000C /* ClipEditor/BoxScoreVideo.swift in PlayerBoxscorePlayground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */; };
-		A1000000000000000000000D /* ClipEditor/ColorTheme.swift in PlayerBoxscorePlayground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ClipEditor/ColorTheme.swift */; };
-		A1000000000000000000000E /* ClipEditor/ClipPlanning.swift in PlayerBoxscorePlayground Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* ClipEditor/ClipPlanning.swift */; };
 		A1000000000000000000000A /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
+		A1000000000000000000000B /* ClipEditor/BoxScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* ClipEditor/BoxScore.swift */; };
+		A1000000000000000000000C /* ClipEditor/BoxScoreVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ClipEditor/BoxScoreVideo.swift */; };
+		A1000000000000000000000D /* ClipEditor/ColorTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ClipEditor/ColorTheme.swift */; };
+		A1000000000000000000000E /* ClipEditor/ClipPlanning.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* ClipEditor/ClipPlanning.swift */; };
 		F10A00000000000000000002 /* ../court_spot_loc_mapper/mapping.json in Resources */ = {isa = PBXBuildFile; fileRef = F10A00000000000000000001 /* ../court_spot_loc_mapper/mapping.json */; };
 /* End PBXBuildFile section */
 
@@ -365,10 +365,10 @@
 		9218BB9330B444F2009E204B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
-				A1000000000000000000000B /* ClipEditor/BoxScore.swift in PlayerBoxscorePlayground Sources */,
-				A1000000000000000000000C /* ClipEditor/BoxScoreVideo.swift in PlayerBoxscorePlayground Sources */,
-				A1000000000000000000000D /* ClipEditor/ColorTheme.swift in PlayerBoxscorePlayground Sources */,
-				A1000000000000000000000E /* ClipEditor/ClipPlanning.swift in PlayerBoxscorePlayground Sources */,
+				A1000000000000000000000B /* ClipEditor/BoxScore.swift in Sources */,
+				A1000000000000000000000C /* ClipEditor/BoxScoreVideo.swift in Sources */,
+				A1000000000000000000000D /* ClipEditor/ColorTheme.swift in Sources */,
+				A1000000000000000000000E /* ClipEditor/ClipPlanning.swift in Sources */,
 			);
 		};
 		929ACB2D30935A9C00674F83 /* Sources */ = {
@@ -616,7 +616,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.29;
+				MARKETING_VERSION = 1.30;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -646,7 +646,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.29;
+				MARKETING_VERSION = 1.30;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ingun37.ClipEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

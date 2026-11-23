@@ -745,7 +745,7 @@ private struct ClipRow: View {
         HStack(alignment: .top, spacing: 16) {
             ClipPreview(url: videoURL, start: clip.start, end: clip.end, speed: previewSpeed,
                         isSelected: isSelected, playToggle: playToggle)
-                .frame(width: 320, height: 180)
+                .frame(width: 320, height: 320)
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Include in compilation", isOn: $clip.included)
                 Text(clip.descriptions.joined(separator: " · "))
@@ -912,6 +912,7 @@ private struct NativePlayerView: NSViewRepresentable {
         let view = AVPlayerView()
         view.controlsStyle = .floating
         view.player = player
+        view.videoGravity = .resizeAspectFill
         return view
     }
 
