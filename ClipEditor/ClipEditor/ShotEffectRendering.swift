@@ -122,7 +122,7 @@ enum ShotEffectRendering {
     static func caption(for prepared: PreparedShotEffect, font: NSFont) -> NSAttributedString {
         let effect = prepared.effect
         let percentage = String(format: "%02d%%", prepared.stats.percent)
-        let text = "\(effect.playerName)'s\nrecent\n\(effect.shotDescription)\nat the\n\(prepared.spotLabel)\n" +
+        let text = "\(effect.playerName)'s\nrecent\n\(effect.shotDescription)\nat \(prepared.spotLabel)\n" +
             "\(percentage) (\(prepared.stats.makes)/\(prepared.stats.attempts))"
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
