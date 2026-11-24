@@ -743,7 +743,8 @@ private struct ClipRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            ClipPreview(url: videoURL, start: clip.start, end: clip.end, speed: previewSpeed,
+            ClipPreview(url: videoURL, start: clip.start, end: clip.end,
+                        attemptTimes: clip.attempts.map(\.sourceTime), speed: previewSpeed,
                         isSelected: isSelected, playToggle: playToggle)
                 .frame(width: 320, height: 320)
             VStack(alignment: .leading, spacing: 10) {
@@ -855,17 +856,43 @@ private struct ClipPreview: View {
     let url: URL
     let start: Double
     let end: Double
+    let attemptTimes: [Double]
     let speed: Double
     let isSelected: Bool
     let playToggle: Int
     @State private var player = AVPlayer()
+    @State private var timeObserver: Any?
+    @State private var previousPlaybackTime: Double?
+    @State private var observedAttemptTimes: [Double] = []
+    @State private var flashTask: Task<Void, Never>?
+    @State private var isFlashing = false
 
     var body: some View {
         NativePlayerView(player: player)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(.yellow, lineWidth: 10)
+                    .shadow(color: .yellow.opacity(0.8), radius: 8)
+                    .opacity(isFlashing ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
             .onAppear {
+                observedAttemptTimes = attemptTimes
                 player.defaultRate = Float(speed)
                 player.replaceCurrentItem(with: AVPlayerItem(url: url))
                 resetRange()
+                timeObserver = player.addPeriodicTimeObserver(
+                    forInterval: CMTime(seconds: 1.0 / 60.0, preferredTimescale: 600),
+                    queue: .main
+                ) { time in
+                    let currentTime = time.seconds
+                    guard currentTime.isFinite else { return }
+                    if player.rate > 0, let previousPlaybackTime,
+                       observedAttemptTimes.contains(where: { previousPlaybackTime < $0 && $0 <= currentTime }) {
+                        flashAtAttempt()
+                    }
+                    previousPlaybackTime = currentTime
+                }
             }
             .onChange(of: speed) { _, newSpeed in
                 player.defaultRate = Float(newSpeed)
@@ -886,18 +913,43 @@ private struct ClipPreview: View {
             }
             .onChange(of: start) { _, _ in resetRange() }
             .onChange(of: end) { _, _ in resetRange() }
+            .onChange(of: attemptTimes) { _, _ in
+                observedAttemptTimes = attemptTimes
+                previousPlaybackTime = player.currentTime().seconds
+            }
             .onReceive(NotificationCenter.default.publisher(for: AVPlayerItem.didPlayToEndTimeNotification)) { notification in
                 guard let item = notification.object as? AVPlayerItem, item === player.currentItem else { return }
                 player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
             }
             .onDisappear {
+                flashTask?.cancel()
+                flashTask = nil
+                isFlashing = false
+                if let timeObserver {
+                    player.removeTimeObserver(timeObserver)
+                    self.timeObserver = nil
+                }
                 player.pause()
                 player.replaceCurrentItem(with: nil)
             }
     }
 
+    private func flashAtAttempt() {
+        flashTask?.cancel()
+        isFlashing = true
+        flashTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            isFlashing = false
+        }
+    }
+
     private func resetRange() {
         player.pause()
+        flashTask?.cancel()
+        flashTask = nil
+        isFlashing = false
+        previousPlaybackTime = nil
         player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: end, preferredTimescale: 600)
         player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
     }
